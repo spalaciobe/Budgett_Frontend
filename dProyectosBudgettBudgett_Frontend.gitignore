@@ -1,0 +1,13 @@
+
+# Local configuration file (sdk path, etc)
+android/local.properties
+
+# IOS/MacOS
+ios/Flutter/ephemeral/
+ios/Pods/
+macos/Flutter/ephemeral/
+macos/Pods/
+
+# Windows/Linux
+windows/flutter/ephemeral/
+linux/flutter/ephemeral/
