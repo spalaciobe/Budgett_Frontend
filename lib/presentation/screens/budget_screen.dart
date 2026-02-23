@@ -7,19 +7,76 @@ import 'package:budgett_frontend/presentation/widgets/create_category_dialog.dar
 import 'package:budgett_frontend/presentation/widgets/edit_budget_dialog.dart';
 import 'package:budgett_frontend/presentation/widgets/budget_comparison_widget.dart';
 import 'package:budgett_frontend/presentation/widgets/edit_category_dialog.dart';
+import 'package:budgett_frontend/presentation/widgets/app_drawer.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:budgett_frontend/data/models/category_spending.dart';
+
+final budgetDateProvider = StateProvider.autoDispose<DateTime>((ref) => DateTime.now());
 
 class BudgetScreen extends ConsumerWidget {
   const BudgetScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final now = DateTime.now();
-    final budgetsAsync = ref.watch(budgetsProvider((month: now.month, year: now.year)));
+    final selectedDate = ref.watch(budgetDateProvider);
+    final budgetsAsync = ref.watch(budgetsProvider((month: selectedDate.month, year: selectedDate.year)));
     final categoriesAsync = ref.watch(categoriesProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text('Budget - ${_getMonthName(now.month)} ${now.year}')),
+      // Drawer is handled by MainScaffold
+      appBar: AppBar(
+        title: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.chevron_left, size: 20),
+                onPressed: () {
+                  ref.read(budgetDateProvider.notifier).state = DateTime(
+                    selectedDate.year,
+                    selectedDate.month - 1,
+                  );
+                },
+              ),
+              GestureDetector(
+                onTap: () async {
+                  final picked = await showDialog<DateTime>(
+                    context: context,
+                    builder: (context) => _MonthPickerDialog(initialDate: selectedDate),
+                  );
+                  if (picked != null) {
+                    ref.read(budgetDateProvider.notifier).state = picked;
+                  }
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                  child: Text(
+                    '${_getMonthName(selectedDate.month)} ${selectedDate.year}',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ),
+              ),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.chevron_right, size: 20),
+                onPressed: () {
+                  ref.read(budgetDateProvider.notifier).state = DateTime(
+                    selectedDate.year,
+                    selectedDate.month + 1,
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+        centerTitle: true,
+      ),
       body: budgetsAsync.when(
         data: (budgets) {
           return categoriesAsync.when(
@@ -53,7 +110,7 @@ class BudgetScreen extends ConsumerWidget {
               );
 
               return FutureBuilder<double>(
-                future: ref.read(financeRepositoryProvider).getMonthlyIncome(now.month, now.year),
+                future: ref.read(financeRepositoryProvider).getMonthlyIncome(selectedDate.month, selectedDate.year),
                 builder: (context, incomeSnapshot) {
                   final monthlyIncome = incomeSnapshot.data ?? 0.0;
                   // Use Expected Income as the base for allocation if set, otherwise fallback to actual income
@@ -61,44 +118,65 @@ class BudgetScreen extends ConsumerWidget {
                   
                   final availableToAllocate = baseIncome - totalBudget;
                   final allocationPercentage = baseIncome > 0 ? (totalBudget / baseIncome * 100) : 0.0;
-
-                  return FutureBuilder<List<Map<String, double>>>(
+                  
+                  // Using dynamic temporarily to fix build error
+                  return FutureBuilder<List<Map<String, dynamic>>>(
                     future: Future.wait([
-                      ref.read(financeRepositoryProvider).getSpendingByCategory(now.month, now.year),
-                      ref.read(financeRepositoryProvider).getIncomeByCategory(now.month, now.year),
+                      ref.read(financeRepositoryProvider).getSpendingByCategory(selectedDate.month, selectedDate.year),
+                      ref.read(financeRepositoryProvider).getIncomeByCategory(selectedDate.month, selectedDate.year),
                     ]),
                     builder: (context, snapshots) {
                       final spending = snapshots.data?[0] ?? {};
                       final incomeFlows = snapshots.data?[1] ?? {};
-                      final totalSpent = spending.values.fold<double>(0.0, (sum, val) => sum + val);
+                      
+                      // Calculate total spent
+                      final totalSpent = spending.values.fold<double>(0.0, (sum, val) => sum + (val as CategorySpending).total);
 
                       return Column(
                         children: [
-                          // Combined Financial Overview Card
                           Card(
-                            margin: const EdgeInsets.all(16),
-                            elevation: 2,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                            child: Padding(
-                              padding: const EdgeInsets.all(20),
-                              child: Column(
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text('Financial Health', 
-                                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 18,
-                                        )),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                        decoration: BoxDecoration(
-                                          color: allocationPercentage > 100 
-                                              ? Colors.red.withOpacity(0.1)
-                                              : Theme.of(context).colorScheme.primaryContainer.withOpacity(0.5),
-                                          borderRadius: BorderRadius.circular(20),
-                                        ),
+                            margin: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                            elevation: 4,
+                            shadowColor: Colors.black12,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(20),
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Theme.of(context).cardTheme.color ?? Colors.white,
+                                    Theme.of(context).cardTheme.color?.withOpacity(0.95) ?? Colors.white.withOpacity(0.95),
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(20),
+                                child: Column(
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text('Financial Health', 
+                                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 18,
+                                            letterSpacing: 0.5,
+                                          )),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                          decoration: BoxDecoration(
+                                            color: allocationPercentage > 100 
+                                                ? Colors.red.withOpacity(0.1)
+                                                : Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                                            borderRadius: BorderRadius.circular(20),
+                                            border: Border.all(
+                                              color: allocationPercentage > 100 
+                                                  ? Colors.red.withOpacity(0.2)
+                                                  : Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                                            )
+                                          ),
                                         child: Text(
                                           '${allocationPercentage.toStringAsFixed(1)}% Allocated - ${availableToAllocate > 0 ? 'Remaining: ${CurrencyFormatter.format(availableToAllocate, decimalDigits: 2)}' : 'Over: ${CurrencyFormatter.format(availableToAllocate.abs(), decimalDigits: 2)}'}',
                                           style: TextStyle(
@@ -112,7 +190,7 @@ class BudgetScreen extends ConsumerWidget {
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: 32),
+                                  const SizedBox(height: 20),
                                   
                                   // Custom Horizontal Bar
                                   _FinancialHealthBar(
@@ -120,106 +198,100 @@ class BudgetScreen extends ConsumerWidget {
                                     expectedIncome: expectedIncome,
                                     budget: totalBudget,
                                     spent: totalSpent,
-                                    incomeColor: const Color(0xFF1ABC9C).withOpacity(0.85),
-                                    budgetColor: const Color(0xFF9b59b6).withOpacity(0.85),
-                                    spentColor: const Color(0xFFFF6F61).withOpacity(0.85),
+                                    incomeColor: const Color(0xFF1ABC9C),
+                                    budgetColor: const Color(0xFF9b59b6),
+                                    spentColor: const Color(0xFFFF6F61),
                                   ),
                                   
-                                  const SizedBox(height: 24),
+                                  const SizedBox(height: 16),
 
-                                  // Stats Details
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
-                                          Row(
-                                            children: [
-                                              Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF1ABC9C), shape: BoxShape.circle)),
-                                              const SizedBox(width: 4),
-                                              Text('Income', style: TextStyle(color: Colors.grey[200], fontSize: 12)),
-                                            ],
+                                          if (expectedIncome > 0)
+                                            _buildSummaryColumn(
+                                              context,
+                                              label: 'Expected',
+                                              amount: expectedIncome,
+                                              color: const Color(0xFF1ABC9C),
+                                              isHatched: true,
+                                            ),
+                                          if (monthlyIncome > 0)
+                                            _buildSummaryColumn(
+                                              context,
+                                              label: 'Actual',
+                                              amount: monthlyIncome,
+                                              color: const Color(0xFF1ABC9C),
+                                            ),
+                                          _buildSummaryColumn(
+                                            context,
+                                            label: 'Budget',
+                                            amount: totalBudget,
+                                            color: const Color(0xFF9b59b6),
                                           ),
-                                          Text(
-                                            expectedIncome > 0 
-                                              ? '${CurrencyFormatter.format(monthlyIncome)} / ${CurrencyFormatter.format(expectedIncome)}'
-                                              : CurrencyFormatter.format(monthlyIncome),
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                          ),
-                                        ],
-                                      ),
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.center,
-                                        children: [
-                                          Row(
-                                            children: [
-                                              Container(width: 8, height: 8, decoration: BoxDecoration(color: const Color(0xFF9b59b6).withOpacity(0.85), shape: BoxShape.circle)),
-                                              const SizedBox(width: 4),
-                                              Text('Budgeted', style: TextStyle(color: Colors.grey[200], fontSize: 12)),
-                                            ],
-                                          ),
-                                          Text(CurrencyFormatter.format(totalBudget), style: TextStyle(fontWeight: FontWeight.bold, color: const Color(0xFF9b59b6).withOpacity(0.85), fontSize: 16)),
-                                        ],
-                                      ),
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.end,
-                                        children: [
-                                          Row(
-                                            children: [
-                                              Container(
-                                                width: 8, 
-                                                height: 8, 
-                                                decoration: BoxDecoration(
-                                                  color: totalSpent > totalBudget 
-                                                    ? const Color(0xFFD32F2F) 
-                                                    : const Color(0xFFFF6F61).withOpacity(0.85), 
-                                                  shape: BoxShape.circle
-                                                )
-                                              ),
-                                              const SizedBox(width: 4),
-                                              Text('Spent', style: TextStyle(color: Colors.grey[200], fontSize: 12)),
-                                            ],
-                                          ),
-                                          Text(
-                                            CurrencyFormatter.format(totalSpent), 
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold, 
-                                              color: totalSpent > totalBudget 
+                                          _buildSummaryColumn(
+                                            context,
+                                            label: 'Spent',
+                                            amount: totalSpent,
+                                            color: totalSpent > totalBudget 
                                                 ? const Color(0xFFD32F2F) 
-                                                : const Color(0xFFFF6F61).withOpacity(0.85), 
-                                              fontSize: 16
-                                            )
+                                                : const Color(0xFFFF6F61),
                                           ),
                                         ],
                                       ),
-                                    ],
-                                  ),
+                                    ),
                                   
-                                  const SizedBox(height: 20),
+                                  const SizedBox(height: 12),
                                   
                                   // Messages / Alerts
-                                  if (totalSpent > totalBudget) ...[
+                                  Column(
+                                    children: [
                                       if (totalSpent > totalBudget)
                                         Container(
+                                          margin: const EdgeInsets.only(bottom: 8),
                                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                           decoration: BoxDecoration(
-                                            color: Colors.red.withOpacity(0.1),
+                                            color: Colors.red.withOpacity(0.05),
                                             borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: Colors.red.withOpacity(0.1)),
                                           ),
                                           child: Row(
                                             children: [
-                                              Icon(Icons.trending_down, color: Colors.red[800], size: 16),
+                                              Icon(Icons.trending_down, color: Colors.red[400], size: 16),
                                               const SizedBox(width: 8),
                                               Expanded(child: Text(
-                                                'Overspending by ${CurrencyFormatter.format(totalSpent - totalBudget, decimalDigits: 2)}',
-                                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.red[800]),
+                                                'Over budget by ${CurrencyFormatter.format(totalSpent - totalBudget, decimalDigits: 2)}',
+                                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.red[200]),
                                               )),
                                             ],
                                           ),
                                         ),
-                                  ],
+                                      if (monthlyIncome > 0 && totalSpent > monthlyIncome)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFD32F2F).withOpacity(0.25),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: const Color(0xFFD32F2F).withOpacity(0.7)),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              const Icon(Icons.warning_amber_rounded, color: Color(0xFFD32F2F), size: 16),
+                                              const SizedBox(width: 8),
+                                              Expanded(child: Text(
+                                                'Spending exceeds actual income by ${CurrencyFormatter.format(totalSpent - monthlyIncome, decimalDigits: 2)}',
+                                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.red[200]),
+                                              )),
+                                            ],
+                                          ),
+                                        ),
+                                    ],
+                                  ),
                                 ],
+                              ),
                               ),
                             ),
                           ),
@@ -236,9 +308,14 @@ class BudgetScreen extends ConsumerWidget {
                                   orElse: () => null,
                                 );
                                 final actualSpent = cat.type == 'income' 
-                                    ? (incomeFlows[cat.id] ?? 0.0)
-                                    : (spending[cat.id] ?? 0.0);
+                                    ? (incomeFlows[cat.id]?.total ?? 0.0)
+                                    : (spending[cat.id]?.total ?? 0.0);
                                 final budgetAmount = budget?.amount ?? 0.0;
+                                
+                                final subSpending = cat.type == 'income'
+                                    ? incomeFlows[cat.id]?.subCategories
+                                    : spending[cat.id]?.subCategories;
+
                                 return BudgetComparisonWidget(
                                   categoryName: cat.name,
                                   budgetAmount: budgetAmount,
@@ -246,15 +323,20 @@ class BudgetScreen extends ConsumerWidget {
                                   color: cat.color != null ? _parseColor(cat.color!) : null,
                                   iconName: cat.icon,
                                   isIncome: cat.type == 'income',
+                                  subCategories: cat.subCategories,
+                                  subCategorySpending: subSpending,
                                   onEditBudget: () {
                                     showDialog(
                                       context: context,
                                       builder: (context) => EditBudgetDialog(
                                         categoryId: cat.id,
                                         categoryName: cat.name,
-                                        month: now.month,
-                                        year: now.year,
+                                        month: selectedDate.month,
+                                        year: selectedDate.year,
                                         currentAmount: budget?.amount,
+                                        categoryType: cat.type,
+                                        categoryIcon: cat.icon,
+                                        categoryColor: cat.color,
                                       ),
                                     );
                                   },
@@ -308,6 +390,59 @@ class BudgetScreen extends ConsumerWidget {
     } catch (_) {
       return Colors.grey;
     }
+  }
+
+  Widget _buildSummaryColumn(BuildContext context, {
+    required String label,
+    required double amount,
+    required Color color,
+    bool isHatched = false,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isHatched)
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(3),
+                  border: Border.all(color: color.withOpacity(0.5)),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(2),
+                  child: CustomPaint(
+                    painter: _HatchedPainter(color: color.withOpacity(0.5)),
+                  ),
+                ),
+              )
+            else
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+            const SizedBox(width: 6),
+            Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500)),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          CurrencyFormatter.format(amount),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: color, // Use the color for the amount to link it visually
+            fontSize: 13,
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -365,41 +500,43 @@ class _FinancialHealthBar extends StatelessWidget {
               height: 20,
               child: Stack(
                 children: [
-                  // Budget marker label
-                  if (spent > budget)
+                  // Budget marker label - only when overspending
+                  if (spent > budget && budget > 0)
                     Positioned(
-                      left: budgetWidth,
+                      left: budgetWidth > maxWidth - 40 ? null : budgetWidth,
+                      right: budgetWidth > maxWidth - 40 ? 0 : null,
                       bottom: 5,
                       child: FractionalTranslation(
-                        translation: const Offset(-0.5, 0),
+                        translation: Offset(budgetWidth > maxWidth - 40 ? 0 : -0.5, 0),
                         child: const Text(
                           'Budget',
                           style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
                         ),
                       ),
                     ),
-                  // Income marker label
-                  if (spent > income && income > 0)
+                  // Income marker label - only if income is shown and spent exceeds it
+                  if (income > 0 && spent > income)
                     Positioned(
-                      left: incomeWidth,
+                      left: incomeWidth > maxWidth - 40 ? null : incomeWidth,
+                      right: incomeWidth > maxWidth - 40 ? 0 : null,
                       bottom: 5,
                       child: FractionalTranslation(
-                        translation: const Offset(-0.5, 0),
+                        translation: Offset(incomeWidth > maxWidth - 40 ? 0 : -0.5, 0),
                         child: const Text(
                           'Income',
                           style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
                         ),
                       ),
                     ),
-                  // Expected Income marker label
-                  if (income > expectedIncome && expectedIncome > 0)
+                  // Expected Income marker label - only if both are shown and actual exceeds expected
+                  if (expectedIncome > 0 && income > 0 && income > expectedIncome)
                     Positioned(
                       left: expectedIncomeWidth,
                       bottom: 5,
                       child: FractionalTranslation(
                         translation: const Offset(-0.5, 0),
                         child: const Text(
-                          'Expected',
+                          'Expected income',
                           style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
                         ),
                       ),
@@ -415,15 +552,16 @@ class _FinancialHealthBar extends StatelessWidget {
                 alignment: Alignment.centerLeft,
                 children: [
                   // 1. Actual Income (The Real Limit)
-                  Container(
-                    width: incomeWidth,
-                    height: 30,
-                    decoration: BoxDecoration(
-                      color: incomeColor,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: incomeColor),
+                  if (income > 0)
+                    Container(
+                      width: incomeWidth,
+                      height: 30,
+                      decoration: BoxDecoration(
+                        color: incomeColor,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: incomeColor),
+                      ),
                     ),
-                  ),
 
                   // 0. Expected Income (Planner/Target) - Rendered on top of Actual
                   if (expectedIncome > 0)
@@ -449,60 +587,62 @@ class _FinancialHealthBar extends StatelessWidget {
                     ),
 
                   // Budget Bar
-                  SizedBox(
-                    width: budgetWidth,
-                    height: 30,
-                    child: Stack(
-                      children: [
-                        Container(
-                          width: budgetWidth > incomeWidth && incomeWidth > 0 ? incomeWidth : budgetWidth,
-                          decoration: BoxDecoration(
-                            color: budgetColor,
-                            borderRadius: BorderRadius.horizontal(
-                              left: const Radius.circular(8),
-                              right: budgetWidth <= incomeWidth ? const Radius.circular(8) : Radius.zero,
+                  if (budget > 0)
+                    SizedBox(
+                      width: budgetWidth,
+                      height: 30,
+                      child: Stack(
+                        children: [
+                          Container(
+                            width: budgetWidth > incomeWidth && incomeWidth > 0 ? incomeWidth : budgetWidth,
+                            decoration: BoxDecoration(
+                              color: budgetColor,
+                              borderRadius: (incomeWidth == 0 || budgetWidth <= incomeWidth)
+                                  ? BorderRadius.circular(8)
+                                  : const BorderRadius.horizontal(left: Radius.circular(8)),
                             ),
                           ),
-                        ),
-                        if (budgetWidth > incomeWidth && incomeWidth > 0)
-                          Positioned(
-                            left: incomeWidth,
-                            width: budgetWidth - incomeWidth,
-                            top: 0,
-                            bottom: 0,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                 color: budgetColor.withOpacity(0.1),
-                                 borderRadius: const BorderRadius.horizontal(right: Radius.circular(8)),
-                              ),
-                              child: ClipRRect(
-                                borderRadius: const BorderRadius.horizontal(right: Radius.circular(8)),
-                                child: CustomPaint(
-                                  painter: _HatchedPainter(color: budgetColor),
-                                  size: Size.infinite,
+                          if (budgetWidth > incomeWidth && incomeWidth > 0)
+                            Positioned(
+                              left: incomeWidth,
+                              width: budgetWidth - incomeWidth,
+                              top: 0,
+                              bottom: 0,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                   color: budgetColor.withOpacity(0.1),
+                                   borderRadius: const BorderRadius.horizontal(right: Radius.circular(8)),
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: const BorderRadius.horizontal(right: Radius.circular(8)),
+                                  child: CustomPaint(
+                                    painter: _HatchedPainter(color: budgetColor),
+                                    size: Size.infinite,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
 
-                  // Spent Bar - Always full width, no clipping
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Container(
-                       width: spentWidth,
-                       height: 30,
-                       decoration: BoxDecoration(
-                         color: effectiveSpentColor,
-                         borderRadius: BorderRadius.circular(8),
-                       ),
+                  // Spent Bar - Always in front, always rounded
+                  if (spent > 0)
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      child: Container(
+                         width: spentWidth,
+                         decoration: BoxDecoration(
+                           color: effectiveSpentColor,
+                           borderRadius: BorderRadius.circular(8),
+                         ),
+                      ),
                     ),
-                  ),
                   
-                  // Dashed line when spent > budget
-                  if (spent > budget)
+                  // Dashed line for Budget limit - only when overspending
+                  if (spent > budget && budget > 0)
                      Positioned(
                        left: budgetWidth,
                        top: 0,
@@ -513,8 +653,8 @@ class _FinancialHealthBar extends StatelessWidget {
                        ),
                      ),
 
-                  // Dashed line when spent > income
-                  if (spent > income && income > 0)
+                  // Dashed line when spent > income - only if income is shown
+                  if (income > 0 && spent > income)
                      Positioned(
                        left: incomeWidth,
                        top: 0,
@@ -525,8 +665,8 @@ class _FinancialHealthBar extends StatelessWidget {
                        ),
                      ),
 
-                  // Dashed line for Expected Income if Actual exceeds it
-                  if (income > expectedIncome && expectedIncome > 0)
+                  // Dashed line for Expected Income if Actual exceeds it - only if both are shown
+                  if (expectedIncome > 0 && income > 0 && income > expectedIncome)
                      Positioned(
                        left: expectedIncomeWidth,
                        top: 0,
@@ -595,5 +735,87 @@ class _DashedLinePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _MonthPickerDialog extends StatefulWidget {
+  final DateTime initialDate;
+  const _MonthPickerDialog({super.key, required this.initialDate});
+
+  @override
+  State<_MonthPickerDialog> createState() => _MonthPickerDialogState();
+}
+
+class _MonthPickerDialogState extends State<_MonthPickerDialog> {
+  late int _selectedYear;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedYear = widget.initialDate.year;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back_ios, size: 16),
+            onPressed: () => setState(() => _selectedYear--),
+          ),
+          Text(_selectedYear.toString(), style: const TextStyle(fontWeight: FontWeight.bold)),
+          IconButton(
+            icon: const Icon(Icons.arrow_forward_ios, size: 16),
+            onPressed: () => setState(() => _selectedYear++),
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: 300,
+        height: 300,
+        child: GridView.builder(
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            childAspectRatio: 1.5,
+          ),
+          itemCount: 12,
+          itemBuilder: (context, index) {
+            final month = index + 1;
+            final isSelected = _selectedYear == widget.initialDate.year && month == widget.initialDate.month;
+            return InkWell(
+              onTap: () => Navigator.pop(context, DateTime(_selectedYear, month)),
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: isSelected ? Theme.of(context).primaryColor : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: isSelected ? Theme.of(context).primaryColor : Colors.grey.withOpacity(0.3),
+                  ),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  _getMonthName(month),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: isSelected ? Colors.white : Theme.of(context).textTheme.bodyMedium?.color,
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  String _getMonthName(int month) {
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return months[month - 1];
+  }
 }
 

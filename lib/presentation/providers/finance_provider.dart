@@ -6,9 +6,16 @@ import 'package:budgett_frontend/data/models/transaction_model.dart';
 import 'package:budgett_frontend/data/models/category_model.dart';
 import 'package:budgett_frontend/data/models/budget_model.dart';
 import 'package:budgett_frontend/data/models/goal_model.dart';
+import 'package:budgett_frontend/data/models/recurring_transaction_model.dart';
+import 'package:budgett_frontend/data/models/expense_group_model.dart';
 
 final financeRepositoryProvider = Provider<FinanceRepository>((ref) {
   return FinanceRepository(Supabase.instance.client);
+});
+
+final recurringTransactionsProvider = FutureProvider<List<RecurringTransaction>>((ref) async {
+  final repository = ref.watch(financeRepositoryProvider);
+  return repository.getRecurringTransactions();
 });
 
 final accountsProvider = FutureProvider<List<Account>>((ref) async {
@@ -35,4 +42,14 @@ final goalsProvider = FutureProvider<List<Goal>>((ref) async {
 final budgetsProvider = FutureProvider.family<List<Budget>, ({int month, int year})>((ref, date) async {
   final repository = ref.watch(financeRepositoryProvider);
   return repository.getBudgets(date.month, date.year);
+});
+
+final expenseGroupsProvider = FutureProvider.family<List<ExpenseGroup>, ({int month, int year})>((ref, date) async {
+  final repository = ref.watch(financeRepositoryProvider);
+  return repository.getExpenseGroups(date.month, date.year);
+});
+
+final yearlySummaryProvider = FutureProvider.family<List<Map<String, dynamic>>, int>((ref, year) async {
+  final repository = ref.watch(financeRepositoryProvider);
+  return repository.getYearlySummary(year);
 });

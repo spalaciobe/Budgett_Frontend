@@ -1,9 +1,12 @@
+import 'package:budgett_frontend/data/models/sub_category_model.dart';
+
 class Category {
   final String id;
   final String name;
   final String type; // 'income' or 'expense'
   final String? icon;
   final String? color;
+  final List<SubCategory>? subCategories;
 
   Category({
     required this.id,
@@ -11,6 +14,7 @@ class Category {
     required this.type,
     this.icon,
     this.color,
+    this.subCategories,
   });
 
   factory Category.fromJson(Map<String, dynamic> json) {
@@ -20,6 +24,11 @@ class Category {
       type: json['type'],
       icon: json['icon'],
       color: json['color'],
+      subCategories: json['sub_categories'] != null
+          ? (json['sub_categories'] as List)
+              .map((i) => SubCategory.fromJson(i))
+              .toList()
+          : [],
     );
   }
 
@@ -30,6 +39,8 @@ class Category {
       'type': type,
       'icon': icon,
       'color': color,
+      // We generally don't send subCategories back when creating/updating a category this way directly,
+      // but keeping it consistent if needed.
     };
   }
 }

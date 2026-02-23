@@ -1,3 +1,5 @@
+import 'credit_card_rules_model.dart';
+
 class Account {
   final String id;
   final String name;
@@ -6,6 +8,7 @@ class Account {
   final double creditLimit;
   final int? closingDay;
   final int? paymentDueDay;
+  final CreditCardRules? creditCardRules;
   final String? icon;
 
   Account({
@@ -16,6 +19,7 @@ class Account {
     this.creditLimit = 0.0,
     this.closingDay,
     this.paymentDueDay,
+    this.creditCardRules,
     this.icon,
   });
 
@@ -29,6 +33,9 @@ class Account {
       closingDay: json['closing_day'],
       paymentDueDay: json['payment_due_day'],
       icon: json['icon'],
+      creditCardRules: json['credit_card_details'] != null
+          ? CreditCardRules.fromJson(json['credit_card_details'])
+          : null,
     );
   }
 }

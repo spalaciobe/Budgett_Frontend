@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
+import '../../data/repositories/bank_repository.dart';
+import '../../data/models/bank_model.dart';
 
 class AddAccountDialog extends ConsumerStatefulWidget {
   const AddAccountDialog({super.key});
@@ -15,19 +17,26 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
   final _nameController = TextEditingController();
   final _balanceController = TextEditingController();
   final _creditLimitController = TextEditingController();
-  final _closingDayController = TextEditingController();
-  final _paymentDueDayController = TextEditingController();
+  
+  // Credit Card Controllers
+  final _cutoffDayController = TextEditingController(); // For Fixed
+  final _paymentDayController = TextEditingController(); // For Fixed
+  // For Relative (e.g. RappiCard uses fixed logic for internal display maybe, but actually relative)
   
   String _selectedType = 'checking';
   String? _selectedIcon;
+  Bank? _selectedBank;
+  
+  // Custom Config logic
+  bool _useBankDefaults = true;
 
   @override
   void dispose() {
     _nameController.dispose();
     _balanceController.dispose();
     _creditLimitController.dispose();
-    _closingDayController.dispose();
-    _paymentDueDayController.dispose();
+    _cutoffDayController.dispose();
+    _paymentDayController.dispose();
     super.dispose();
   }
 
@@ -46,18 +55,32 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
       accountData['credit_limit'] = _creditLimitController.text.isEmpty 
           ? 0.0 
           : CurrencyFormatter.parse(_creditLimitController.text);
-      accountData['closing_day'] = _closingDayController.text.isEmpty 
-          ? null 
-          : int.parse(_closingDayController.text);
-      accountData['payment_due_day'] = _paymentDueDayController.text.isEmpty 
-          ? null 
-          : int.parse(_paymentDueDayController.text);
+      
+      if (_selectedBank != null) {
+        final rules = <String, dynamic>{
+          'banco_id': _selectedBank!.id,
+          'tipo_corte': _selectedBank!.name == 'RappiCard' ? 'relativo' : 'fijo', // Logic simplification for demo
+          'tipo_pago': _selectedBank!.name == 'RappiCard' ? 'relativo_dias' : 'fijo',
+        };
+
+        if (_selectedBank!.name == 'RappiCard') {
+            rules['corte_relativo_tipo'] = 'penultimo_dia_habil';
+            rules['dias_despues_corte'] = 10;
+            rules['tipo_offset_pago'] = 'calendario';
+        } else {
+             // Fixed (Bancolombia, etc.)
+             rules['dia_corte_nominal'] = int.parse(_cutoffDayController.text.isEmpty ? '15' : _cutoffDayController.text);
+             rules['dia_pago_nominal'] = int.parse(_paymentDayController.text.isEmpty ? '30' : _paymentDayController.text);
+             rules['mes_pago'] = 'mismo'; // Default simplification
+        }
+        
+        accountData['credit_card_details'] = rules;
+      }
     }
 
     try {
       await ref.read(financeRepositoryProvider).createAccount(accountData);
       
-      // Invalidate to refresh
       ref.invalidate(accountsProvider);
       
       if (mounted) {
@@ -78,10 +101,11 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
   @override
   Widget build(BuildContext context) {
     final isCreditCard = _selectedType == 'credit_card';
+    final banksAsync = ref.watch(banksFutureProvider);
 
     return Dialog(
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 500, maxHeight: 700),
+        constraints: const BoxConstraints(maxWidth: 500, maxHeight: 800),
         padding: const EdgeInsets.all(24),
         child: Form(
           key: _formKey,
@@ -128,7 +152,12 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                     DropdownMenuItem(value: 'cash', child: Text('Cash')),
                     DropdownMenuItem(value: 'investment', child: Text('Investment')),
                   ],
-                  onChanged: (value) => setState(() => _selectedType = value!),
+                  onChanged: (value) => setState(() {
+                    _selectedType = value!;
+                    if (value == 'credit_card') {
+                       _selectedIcon = 'credit_card';
+                    }
+                  }),
                 ),
                 const SizedBox(height: 16),
 
@@ -136,15 +165,15 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                 TextFormField(
                   controller: _balanceController,
                   decoration: const InputDecoration(
-                    labelText: 'Initial Balance',
+                    labelText: 'Initial Balance / Current Debt (Negative)',
                     prefixText: '\$',
                     border: OutlineInputBorder(),
+                    helperText: 'For credit cards, enter negative value if you have debt.'
                   ),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
                   inputFormatters: [CurrencyInputFormatter()],
                   validator: (value) {
                     if (value == null || value.isEmpty) return 'Required';
-                    if (CurrencyFormatter.parse(value) == 0.0 && value != '0' && value != '0.0') return 'Invalid number';
                     return null;
                   },
                 ),
@@ -159,11 +188,11 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                   ),
                   items: const [
                     DropdownMenuItem(value: null, child: Text('Default')),
-                    DropdownMenuItem(value: 'account_balance', child: Text('🏦 Bank')),
-                    DropdownMenuItem(value: 'credit_card', child: Text('💳 Card')),
-                    DropdownMenuItem(value: 'money', child: Text('💵 Cash')),
-                    DropdownMenuItem(value: 'savings', child: Text('🐷 Savings')),
-                    DropdownMenuItem(value: 'trending_up', child: Text('📈 Investment')),
+                    DropdownMenuItem(value: 'account_balance', child: Row(children: [Icon(Icons.account_balance, size: 18), SizedBox(width: 8), Text('Bank')])),
+                    DropdownMenuItem(value: 'credit_card', child: Row(children: [Icon(Icons.credit_card, size: 18), SizedBox(width: 8), Text('Card')])),
+                    DropdownMenuItem(value: 'money', child: Row(children: [Icon(Icons.money, size: 18), SizedBox(width: 8), Text('Cash')])),
+                    DropdownMenuItem(value: 'savings', child: Row(children: [Icon(Icons.savings, size: 18), SizedBox(width: 8), Text('Savings')])),
+                    DropdownMenuItem(value: 'trending_up', child: Row(children: [Icon(Icons.trending_up, size: 18), SizedBox(width: 8), Text('Investment')])),
                   ],
                   onChanged: (value) => setState(() => _selectedIcon = value),
                 ),
@@ -175,6 +204,32 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                   Text('Credit Card Details', 
                     style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 16),
+                  
+                  // Bank Selector
+                  banksAsync.when(
+                    data: (banks) => DropdownButtonFormField<Bank>(
+                      value: _selectedBank,
+                      decoration: const InputDecoration(
+                        labelText: 'Bank',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: banks.map((bank) => DropdownMenuItem(
+                        value: bank,
+                        child: Text(bank.name),
+                      )).toList(),
+                      onChanged: (value) => setState(() {
+                        _selectedBank = value;
+                        // Defaults
+                        if (value?.code == 'RAPPICARD') {
+                           // Set defaults for Rappi (hidden logic)
+                        }
+                      }),
+                      validator: (value) => value == null ? 'Required' : null,
+                    ),
+                    loading: () => const CircularProgressIndicator(),
+                    error: (e, s) => Text('Error loading banks: $e'),
+                  ),
+                   const SizedBox(height: 16),
 
                   TextFormField(
                     controller: _creditLimitController,
@@ -188,36 +243,58 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                   ),
                   const SizedBox(height: 16),
 
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _closingDayController,
-                          decoration: const InputDecoration(
-                            labelText: 'Closing Day',
-                            border: OutlineInputBorder(),
-                            hintText: '1-31',
+                  if (_selectedBank != null && _selectedBank!.code != 'RAPPICARD') ...[
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: _cutoffDayController,
+                              decoration: const InputDecoration(
+                                labelText: 'Cutoff Day',
+                                border: OutlineInputBorder(),
+                                hintText: '1-31',
+                              ),
+                              keyboardType: TextInputType.number,
+                              validator: (v) => v!.isEmpty ? 'Required' : null,
+                            ),
                           ),
-                          keyboardType: TextInputType.number,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: TextFormField(
-                          controller: _paymentDueDayController,
-                          decoration: const InputDecoration(
-                            labelText: 'Payment Due Day',
-                            border: OutlineInputBorder(),
-                            hintText: '1-31',
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: TextFormField(
+                              controller: _paymentDayController,
+                              decoration: const InputDecoration(
+                                labelText: 'Payment Day',
+                                border: OutlineInputBorder(),
+                                hintText: '1-31',
+                              ),
+                              keyboardType: TextInputType.number,
+                              validator: (v) => v!.isEmpty ? 'Required' : null,
+                            ),
                           ),
-                          keyboardType: TextInputType.number,
-                        ),
+                        ],
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
+                       const SizedBox(height: 8),
+                       Text('For ${_selectedBank!.name}, weekends/holidays will be adjusted automatically.', 
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600])),
+                   ],
+                   if (_selectedBank != null && _selectedBank!.code == 'RAPPICARD') ...[
+                     const Card(
+                       child: Padding(
+                         padding: EdgeInsets.all(12.0),
+                         child: Column(
+                           children: [
+                             Text('RappiCard Strategy', style: TextStyle(fontWeight: FontWeight.bold)),
+                             Text('Cutoff: Penultimate business day'),
+                             Text('Payment: 10 days after cutoff'),
+                             Text('Dates are calculated automatically.'),
+                           ],
+                         ),
+                       ),
+                     )
+                   ]
                 ],
 
+                const SizedBox(height: 24),
                 // Save Button
                 SizedBox(
                   width: double.infinity,

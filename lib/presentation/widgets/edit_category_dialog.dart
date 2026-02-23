@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/data/models/category_model.dart';
+import 'package:budgett_frontend/data/models/sub_category_model.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/presentation/utils/icon_helper.dart';
 
@@ -17,12 +18,17 @@ class EditCategoryDialog extends ConsumerStatefulWidget {
 class _EditCategoryDialogState extends ConsumerState<EditCategoryDialog> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
+  final _subCategoryController = TextEditingController();
   
   late String _selectedType;
   late String _selectedIcon;
   late String _selectedColor;
   
   bool _isLoading = false;
+  
+  List<SubCategory> _existingSubCategories = [];
+  final List<String> _newSubCategories = [];
+  final List<String> _deletedSubCategoryIds = [];
 
   final List<String> _colors = [
     '0xFF4CAF50', // Green
@@ -30,14 +36,9 @@ class _EditCategoryDialogState extends ConsumerState<EditCategoryDialog> {
     '0xFFF44336', // Red
     '0xFFFF9800', // Orange
     '0xFF9C27B0', // Purple
-    '0xFF673AB7', // Deep Purple
-    '0xFF795548', // Brown
     '0xFF009688', // Teal
     '0xFFE91E63', // Pink
-    '0xFF607D8B', // Blue Grey
     '0xFF3F51B5', // Indigo
-    '0xFF9E9E9E', // Grey
-    '0xFF00BCD4', // Cyan
     '0xFFFFC107', // Amber
   ];
 
@@ -47,7 +48,8 @@ class _EditCategoryDialogState extends ConsumerState<EditCategoryDialog> {
     'pets', 'fitness_center', 'checkroom', 'credit_card', 'savings', 
     'attach_money', 'card_giftcard', 'smartphone', 'computer', 'build', 
     'palette', 'child_care', 'local_bar', 'music_note', 'subscriptions', 
-    'menu_book', 'videogame_asset', 'local_gas_station', 'receipt_long', 'more_horiz'
+    'menu_book', 'videogame_asset', 'local_gas_station', 'receipt_long', 'more_horiz',
+    'local_cafe', 'medical_services'
   ];
   
   @override
@@ -57,13 +59,17 @@ class _EditCategoryDialogState extends ConsumerState<EditCategoryDialog> {
     _selectedType = widget.category.type;
     _selectedIcon = widget.category.icon ?? IconHelper.iconMap.keys.first;
     _selectedColor = widget.category.color ?? '0xFF9E9E9E';
+    
+    if (widget.category.subCategories != null) {
+      _existingSubCategories = List.from(widget.category.subCategories!);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Dialog(
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 600, maxHeight: 700),
+        constraints: const BoxConstraints(maxWidth: 500, maxHeight: 620),
         padding: const EdgeInsets.all(24),
         child: Form(
           key: _formKey,
@@ -119,13 +125,12 @@ class _EditCategoryDialogState extends ConsumerState<EditCategoryDialog> {
                       // Color Picker
                       const Text('Color', style: TextStyle(fontWeight: FontWeight.bold)),
                       const SizedBox(height: 8),
-                      SizedBox(
-                        height: 50,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: _colors.length,
-                          itemBuilder: (context, index) {
-                            final colorStr = _colors[index];
+                      Center(
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          alignment: WrapAlignment.center,
+                          children: _colors.map((colorStr) {
                             final color = Color(int.parse(colorStr));
                             final isSelected = _selectedColor == colorStr;
                             
@@ -134,7 +139,6 @@ class _EditCategoryDialogState extends ConsumerState<EditCategoryDialog> {
                               child: Container(
                                 width: 40,
                                 height: 40,
-                                margin: const EdgeInsets.only(right: 8),
                                 decoration: BoxDecoration(
                                   color: color,
                                   shape: BoxShape.circle,
@@ -143,49 +147,111 @@ class _EditCategoryDialogState extends ConsumerState<EditCategoryDialog> {
                                 child: isSelected ? const Icon(Icons.check, color: Colors.white, size: 20) : null,
                               ),
                             );
-                          },
+                          }).toList(),
                         ),
                       ),
                       const SizedBox(height: 16),
 
                       // Icon Picker
-                      const Text('Icon', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text('Icon', style: Theme.of(context).textTheme.titleSmall),
                       const SizedBox(height: 8),
                       Container(
-                        height: 200,
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey.shade300),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: GridView.builder(
-                          padding: const EdgeInsets.all(8),
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 5,
-                            crossAxisSpacing: 8,
-                            mainAxisSpacing: 8,
-                          ),
-                          itemCount: _categoryIcons.length,
-                          itemBuilder: (context, index) {
-                            final key = _categoryIcons[index];
+                        width: double.infinity,
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          alignment: WrapAlignment.start,
+                          children: _categoryIcons.map((key) {
                             final iconData = IconHelper.getIcon(key);
                             final isSelected = _selectedIcon == key;
-
+                            
                             return InkWell(
                               onTap: () => setState(() => _selectedIcon = key),
                               child: Container(
+                                width: 48,
+                                height: 48,
                                 decoration: BoxDecoration(
-                                  color: isSelected ? Theme.of(context).colorScheme.primary.withOpacity(0.2) : null,
+                                  border: Border.all(
+                                    color: isSelected 
+                                      ? Theme.of(context).colorScheme.primary 
+                                      : Colors.grey.shade300,
+                                    width: isSelected ? 2 : 1,
+                                  ),
                                   borderRadius: BorderRadius.circular(8),
-                                  border: isSelected ? Border.all(color: Theme.of(context).colorScheme.primary) : null,
                                 ),
                                 child: Icon(
                                   iconData,
-                                  color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey.shade700,
+                                  color: isSelected ? Theme.of(context).colorScheme.primary : Colors.white,
+                                  size: 24,
                                 ),
                               ),
                             );
-                          },
+                          }).toList(),
                         ),
+                      ),
+                      
+                      const SizedBox(height: 16),
+                      
+                      // Sub Categories Management
+                      Text('Sub Categories', style: Theme.of(context).textTheme.titleSmall),
+                      Column(
+                        children: [
+                          ..._existingSubCategories.map((sub) => ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(sub.name),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.delete, size: 18, color: Colors.grey),
+                              onPressed: () {
+                                setState(() {
+                                  _existingSubCategories.remove(sub);
+                                  _deletedSubCategoryIds.add(sub.id);
+                                });
+                              },
+                            ),
+                          )),
+                          ..._newSubCategories.asMap().entries.map((entry) => ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(entry.value, style: const TextStyle(fontStyle: FontStyle.italic)),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.delete, size: 18, color: Colors.grey),
+                              onPressed: () {
+                                setState(() {
+                                  _newSubCategories.removeAt(entry.key);
+                                });
+                              },
+                            ),
+                          )),
+                        ],
+                      ),
+                      
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: _subCategoryController,
+                              decoration: const InputDecoration(
+                                labelText: 'Add Sub Category',
+                                border: OutlineInputBorder(),
+                                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton.filled(
+                            onPressed: () {
+                              if (_subCategoryController.text.isNotEmpty) {
+                                setState(() {
+                                  _newSubCategories.add(_subCategoryController.text.trim());
+                                  _subCategoryController.clear();
+                                });
+                              }
+                            },
+                            icon: const Icon(Icons.add),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -245,6 +311,22 @@ class _EditCategoryDialogState extends ConsumerState<EditCategoryDialog> {
 
       final repo = ref.read(financeRepositoryProvider);
       await repo.updateCategory(widget.category.id, categoryData);
+      
+      // Handle SubCategories
+      
+      // 1. Delete removed ones
+      for (final id in _deletedSubCategoryIds) {
+        await repo.deleteSubCategory(id);
+      }
+      
+      // 2. Add new ones
+      for (final name in _newSubCategories) {
+        await repo.addSubCategory(SubCategory(
+          id: '',
+          categoryId: widget.category.id,
+          name: name,
+        ));
+      }
       
       // Invalidate Categories provider to refresh list
       ref.invalidate(categoriesProvider);
@@ -319,6 +401,7 @@ class _EditCategoryDialogState extends ConsumerState<EditCategoryDialog> {
   @override
   void dispose() {
     _nameController.dispose();
+    _subCategoryController.dispose();
     super.dispose();
   }
 }

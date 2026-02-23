@@ -3,6 +3,7 @@ import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/data/models/budget_model.dart';
+import 'package:budgett_frontend/presentation/utils/icon_helper.dart';
 
 class EditBudgetDialog extends ConsumerStatefulWidget {
   final String categoryId;
@@ -10,6 +11,9 @@ class EditBudgetDialog extends ConsumerStatefulWidget {
   final int month;
   final int year;
   final double? currentAmount;
+  final String? categoryType;
+  final String? categoryIcon;
+  final String? categoryColor;
 
   const EditBudgetDialog({
     super.key,
@@ -18,6 +22,9 @@ class EditBudgetDialog extends ConsumerStatefulWidget {
     required this.month,
     required this.year,
     this.currentAmount,
+    this.categoryType,
+    this.categoryIcon,
+    this.categoryColor,
   });
 
   @override
@@ -78,8 +85,58 @@ class _EditBudgetDialogState extends ConsumerState<EditBudgetDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isIncome = widget.categoryType == 'income';
+    final color = widget.categoryColor != null 
+        ? Color(int.parse(widget.categoryColor!))
+        : Colors.grey;
+    
     return AlertDialog(
-      title: Text('Set Budget for ${widget.categoryName}'),
+      title: Row(
+        children: [
+          if (widget.categoryIcon != null)
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                IconHelper.getIcon(widget.categoryIcon!),
+                color: color,
+                size: 24,
+              ),
+            ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  widget.categoryName,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: isIncome ? Colors.green.withOpacity(0.2) : Colors.orange.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    isIncome ? 'Income' : 'Expense',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isIncome ? Colors.green : Colors.orange,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
       content: Form(
         key: _formKey,
         child: Column(
@@ -87,10 +144,10 @@ class _EditBudgetDialogState extends ConsumerState<EditBudgetDialog> {
           children: [
             TextFormField(
               controller: _amountController,
-              decoration: const InputDecoration(
-                labelText: 'Budget Amount',
+              decoration: InputDecoration(
+                labelText: isIncome ? 'Expected Income' : 'Budget Amount',
                 prefixText: '\$',
-                border: OutlineInputBorder(),
+                border: const OutlineInputBorder(),
               ),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               inputFormatters: [CurrencyInputFormatter()],

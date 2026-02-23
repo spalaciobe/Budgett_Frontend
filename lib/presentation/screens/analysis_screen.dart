@@ -1,214 +1,174 @@
-import 'package:fl_chart/fl_chart.dart';
-import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
-import 'package:budgett_frontend/data/models/transaction_model.dart';
-import 'package:budgett_frontend/data/models/category_model.dart';
-import 'package:budgett_frontend/data/models/budget_model.dart';
+import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 
-class AnalysisScreen extends ConsumerWidget {
+import 'package:budgett_frontend/presentation/widgets/app_drawer.dart';
+
+class AnalysisScreen extends ConsumerStatefulWidget {
   const AnalysisScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final transactionsAsync = ref.watch(recentTransactionsProvider);
-    final categoriesAsync = ref.watch(categoriesProvider);
-    
-    // Get current month and year for budget
-    final now = DateTime.now();
-    final budgetsAsync = ref.watch(budgetsProvider((month: now.month, year: now.year)));
+  ConsumerState<AnalysisScreen> createState() => _AnalysisScreenState();
+}
+
+class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
+  int _selectedYear = DateTime.now().year;
+
+  @override
+  Widget build(BuildContext context) {
+    final historyAsync = ref.watch(yearlySummaryProvider(_selectedYear));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Financial Analysis')),
+      drawer: const AppDrawer(),
+      appBar: AppBar(title: const Text('Analysis')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // Two donut charts side by side
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final isWide = constraints.maxWidth > 800;
-                
-                if (isWide) {
-                  // Side by side layout for wide screens
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: _buildSpendingSection(context, transactionsAsync, categoriesAsync),
+            // Year Selector
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back_ios, size: 16),
+                  onPressed: () => setState(() => _selectedYear--),
+                ),
+                Text('$_selectedYear', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                IconButton(
+                  icon: const Icon(Icons.arrow_forward_ios, size: 16),
+                  onPressed: () => setState(() => _selectedYear++),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            // Chart
+            SizedBox(
+              height: 300,
+              child: historyAsync.when(
+                data: (data) {
+                  if (data.isEmpty) return const Center(child: Text('No data'));
+                  
+                  // Calculate max for Y axis
+                  double maxY = 0;
+                  for (var m in data) {
+                    if (m['income'] > maxY) maxY = m['income'];
+                    if (m['expense'] > maxY) maxY = m['expense'];
+                  }
+                  if (maxY == 0) maxY = 100;
+
+                  return BarChart(
+                    BarChartData(
+                      alignment: BarChartAlignment.spaceAround,
+                      maxY: maxY * 1.2,
+                      titlesData: FlTitlesData(
+                        show: true,
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            getTitlesWidget: (value, meta) {
+                              const months = ['J','F','M','A','M','J','J','A','S','O','N','D'];
+                              if (value >= 1 && value <= 12) {
+                                return Text(months[value.toInt() - 1], style: const TextStyle(fontSize: 10));
+                              }
+                              return const Text('');
+                            },
+                          ),
+                        ),
+                        leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                       ),
-                      const SizedBox(width: 32),
-                      Expanded(
-                        child: _buildBudgetSection(context, budgetsAsync, categoriesAsync),
-                      ),
-                    ],
+                      gridData: const FlGridData(show: false),
+                      borderData: FlBorderData(show: false),
+                      barGroups: data.map((d) {
+                        return BarChartGroupData(
+                          x: d['month'],
+                          barRods: [
+                            BarChartRodData(
+                              toY: (d['income'] as num).toDouble(),
+                              color: Colors.green,
+                              width: 8,
+                            ),
+                            BarChartRodData(
+                              toY: (d['expense'] as num).toDouble(),
+                              color: Colors.red,
+                              width: 8,
+                            ),
+                          ],
+                        );
+                      }).toList(),
+                    ),
                   );
-                } else {
-                  // Stacked layout for narrow screens
-                  return Column(
-                    children: [
-                      _buildSpendingSection(context, transactionsAsync, categoriesAsync),
-                      const SizedBox(height: 32),
-                      _buildBudgetSection(context, budgetsAsync, categoriesAsync),
-                    ],
-                  );
+                },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e,s) => Center(child: Text('Error: $e')),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.circle, size: 12, color: Colors.green), SizedBox(width: 4), Text('Income'),
+                SizedBox(width: 16),
+                Icon(Icons.circle, size: 12, color: Colors.red), SizedBox(width: 4), Text('Expense'),
+              ],
+            ),
+            const SizedBox(height: 32),
+            
+            // Savings Rate Table
+            historyAsync.when(
+              data: (data) {
+                double totalInc = 0;
+                double totalExp = 0;
+                for (var d in data) {
+                  totalInc += d['income'];
+                  totalExp += d['expense'];
                 }
+                final rate = totalInc > 0 ? ((totalInc - totalExp) / totalInc * 100) : 0.0;
+                
+                return Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      children: [
+                        const Text('Yearly Overview', style: TextStyle(fontWeight: FontWeight.bold)),
+                        const Divider(),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Total Income'),
+                            Text(CurrencyFormatter.format(totalInc), style: const TextStyle(color: Colors.green)),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                         Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Total Expenses'),
+                            Text(CurrencyFormatter.format(totalExp), style: const TextStyle(color: Colors.red)),
+                          ],
+                        ),
+                        const Divider(),
+                         Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Savings Rate'),
+                            Text('${rate.toStringAsFixed(1)}%', style: const TextStyle(fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                );
               },
+              loading: () => const SizedBox(),
+              error: (_,__) => const SizedBox(),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildSpendingSection(
-    BuildContext context,
-    AsyncValue<List<Transaction>> transactionsAsync,
-    AsyncValue<List<Category>> categoriesAsync,
-  ) {
-    return Column(
-      children: [
-        Text('Spending by Category', style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 16),
-        SizedBox(
-          height: 300,
-          child: transactionsAsync.when(
-            data: (transactions) {
-              return categoriesAsync.when(
-                data: (categories) => _buildSpendingPieChart(transactions, categories),
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, s) => Text('Error: $e'),
-              );
-            },
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, s) => Text('Error: $e'),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildBudgetSection(
-    BuildContext context,
-    AsyncValue<List<Budget>> budgetsAsync,
-    AsyncValue<List<Category>> categoriesAsync,
-  ) {
-    return Column(
-      children: [
-        Text('Budget by Category', style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 16),
-        SizedBox(
-          height: 300,
-          child: budgetsAsync.when(
-            data: (budgets) {
-              return categoriesAsync.when(
-                data: (categories) => _buildBudgetPieChart(budgets, categories),
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, s) => Text('Error: $e'),
-              );
-            },
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, s) => Text('Error: $e'),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSpendingPieChart(List<Transaction> transactions, List<Category> categories) {
-    if (transactions.isEmpty) return const Center(child: Text('No data available'));
-
-    // Filter expenses only
-    final expenses = transactions.where((t) => t.type == 'expense').toList();
-    if (expenses.isEmpty) return const Center(child: Text('No expenses to analyze'));
-
-    // Group by category
-    final Map<String, double> categoryTotals = {};
-    for (var t in expenses) {
-      if (t.categoryId != null) {
-        categoryTotals.update(t.categoryId!, (val) => val + t.amount, ifAbsent: () => t.amount);
-      } else {
-        categoryTotals.update('Uncategorized', (val) => val + t.amount, ifAbsent: () => t.amount);
-      }
-    }
-
-    // Create sections
-    final List<PieChartSectionData> sections = categoryTotals.entries.map((entry) {
-      final category = categories.firstWhere(
-        (c) => c.id == entry.key, 
-        orElse: () => Category(id: 'unknown', name: 'Other', type: 'expense', color: '0xFF808080')
-      );
-      
-      final color = category.color != null ? Color(int.tryParse(category.color!) ?? 0xFF808080) : Colors.grey;
-
-      return PieChartSectionData(
-        color: color,
-        value: entry.value,
-        title: '${category.name}\n${CurrencyFormatter.format(entry.value)}',
-        radius: 60,
-        titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
-      );
-    }).toList();
-
-    return PieChart(
-      PieChartData(
-        sections: sections,
-        centerSpaceRadius: 40,
-        sectionsSpace: 2,
-      ),
-    );
-  }
-
-  Widget _buildBudgetPieChart(List<Budget> budgets, List<Category> categories) {
-    if (budgets.isEmpty) return const Center(child: Text('No budget data available'));
-
-    // Group by category (only expense categories)
-    final Map<String, double> categoryBudgets = {};
-    for (var budget in budgets) {
-      if (budget.categoryId != null) {
-        // Find the category to check its type
-        final category = categories.firstWhere(
-          (c) => c.id == budget.categoryId,
-          orElse: () => Category(id: 'unknown', name: 'Other', type: 'expense', color: '0xFF808080')
-        );
-        
-        // Only include expense categories
-        if (category.type == 'expense') {
-          categoryBudgets.update(
-            budget.categoryId!, 
-            (val) => val + budget.amount, 
-            ifAbsent: () => budget.amount
-          );
-        }
-      }
-    }
-
-    if (categoryBudgets.isEmpty) return const Center(child: Text('No budget allocations'));
-
-    // Create sections
-    final List<PieChartSectionData> sections = categoryBudgets.entries.map((entry) {
-      final category = categories.firstWhere(
-        (c) => c.id == entry.key, 
-        orElse: () => Category(id: 'unknown', name: 'Other', type: 'expense', color: '0xFF808080')
-      );
-      
-      final color = category.color != null ? Color(int.tryParse(category.color!) ?? 0xFF808080) : Colors.grey;
-
-      return PieChartSectionData(
-        color: color,
-        value: entry.value,
-        title: '${category.name}\n${CurrencyFormatter.format(entry.value)}',
-        radius: 60,
-        titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
-      );
-    }).toList();
-
-    return PieChart(
-      PieChartData(
-        sections: sections,
-        centerSpaceRadius: 40,
-        sectionsSpace: 2,
       ),
     );
   }

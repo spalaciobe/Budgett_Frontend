@@ -6,12 +6,18 @@ class Transaction {
   final DateTime date;
   final String type; // income, expense, transfer
   final String? categoryId;
+  final String? subCategoryId;
   final String? targetAccountId;
   final String status; // pending, cleared
   final String? movementType; // fixed, variable, savings, income, transfer
   final String? expenseGroupId;
   final String? notes;
   final String? place;
+  
+  // Credit Card Specific
+  final String? billingPeriod;
+  final DateTime? calculatedCutoffDate;
+  final DateTime? calculatedPaymentDate;
 
   Transaction({
     required this.id,
@@ -21,12 +27,16 @@ class Transaction {
     required this.date,
     required this.type,
     this.categoryId,
+    this.subCategoryId,
     this.targetAccountId,
     this.status = 'cleared',
     this.movementType,
     this.expenseGroupId,
     this.notes,
     this.place,
+    this.billingPeriod,
+    this.calculatedCutoffDate,
+    this.calculatedPaymentDate,
   });
 
   factory Transaction.fromJson(Map<String, dynamic> json) {
@@ -38,12 +48,16 @@ class Transaction {
       date: DateTime.parse(json['date']),
       type: json['type'],
       categoryId: json['category_id'],
+      subCategoryId: json['sub_category_id'],
       targetAccountId: json['target_account_id'],
       status: json['status'] ?? 'cleared',
       movementType: json['movement_type'],
       expenseGroupId: json['expense_group_id'],
       notes: json['notes'],
       place: json['place'],
+      billingPeriod: json['periodo_facturacion'],
+      calculatedCutoffDate: json['fecha_corte_calculada'] != null ? DateTime.parse(json['fecha_corte_calculada']) : null,
+      calculatedPaymentDate: json['fecha_pago_calculada'] != null ? DateTime.parse(json['fecha_pago_calculada']) : null,
     );
   }
 }

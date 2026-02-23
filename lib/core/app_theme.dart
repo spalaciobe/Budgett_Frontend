@@ -14,7 +14,7 @@ class AppTheme {
   static const Color _darkSurface = Color(0xFF1E2229);
   static const Color _darkSurfaceVariant = Color(0xFF2A2F3A);
 
-  static final TextTheme _textTheme = GoogleFonts.outfitTextTheme();
+  static final TextTheme _textTheme = GoogleFonts.openSansTextTheme();
 
   static ThemeData get lightTheme {
     return ThemeData(
@@ -37,7 +37,7 @@ class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         color: Colors.white,
@@ -108,7 +108,7 @@ class AppTheme {
           fontFamily: _textTheme.bodyLarge?.fontFamily,
         ),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: _darkSurface,
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),

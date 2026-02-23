@@ -281,7 +281,7 @@ class _EditGoalDialogState extends ConsumerState<EditGoalDialog> {
                 InkWell(
                   onTap: () => _selectDeadline(context),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     decoration: BoxDecoration(
                       border: Border.all(color: Theme.of(context).dividerColor),
                       borderRadius: BorderRadius.circular(4),

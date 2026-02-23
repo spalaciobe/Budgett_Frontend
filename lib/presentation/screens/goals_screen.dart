@@ -6,6 +6,8 @@ import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:budgett_frontend/presentation/widgets/edit_goal_dialog.dart';
 import 'package:budgett_frontend/presentation/utils/icon_helper.dart';
 
+import 'package:budgett_frontend/presentation/widgets/app_drawer.dart';
+
 class GoalsScreen extends ConsumerWidget {
   const GoalsScreen({super.key});
 
@@ -14,6 +16,7 @@ class GoalsScreen extends ConsumerWidget {
     final goalsAsync = ref.watch(goalsProvider);
 
     return Scaffold(
+      drawer: const AppDrawer(),
       appBar: AppBar(title: const Text('Financial Goals')),
       body: goalsAsync.when(
         data: (goals) {
@@ -191,6 +194,7 @@ class GoalsScreen extends ConsumerWidget {
                         
                         if (deadline != null)
                         Container(
+                          width: 150,
                           margin: const EdgeInsets.only(left: 16),
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
@@ -220,14 +224,60 @@ class GoalsScreen extends ConsumerWidget {
                                 const SizedBox(height: 4),
                               ],
                               if (expectedAmount > 0 && goal.currentAmount < expectedAmount)
-                                Text(
-                                  'Behind by ${CurrencyFormatter.format(expectedAmount - goal.currentAmount, decimalDigits: 0)}',
-                                  style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.error),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.red.withOpacity(0.2)),
+                                  ),
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerRight,
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.trending_down, color: Colors.red[400], size: 14),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          'Behind by ${CurrencyFormatter.format(expectedAmount - goal.currentAmount, decimalDigits: 0)}',
+                                          style: TextStyle(
+                                            fontSize: 10, 
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.red[100],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 )
                               else if (expectedAmount > 0)
-                                Text(
-                                  'On track!',
-                                  style: TextStyle(fontSize: 10, color: Colors.green),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.green.withOpacity(0.2)),
+                                  ),
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerRight,
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.check_circle_outline, color: Colors.green[400], size: 14),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          'On track!',
+                                          style: TextStyle(
+                                            fontSize: 10, 
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.green[100],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ),
                             ],
                           ),

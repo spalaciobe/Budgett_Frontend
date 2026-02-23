@@ -25,6 +25,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
   String? _selectedTargetAccountId;
   String? _selectedCategoryId;
   String? _selectedMovementType;
+  late String _status;
   
   bool _isLoading = false;
 
@@ -40,8 +41,11 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
     _selectedType = t.type;
     _selectedAccountId = t.accountId;
     _selectedTargetAccountId = t.targetAccountId;
-    _selectedCategoryId = t.categoryId;
+    // Unified selection initialization
+    _selectedCategoryId = t.subCategoryId ?? t.categoryId;
     _selectedMovementType = t.movementType;
+    _selectedMovementType = t.movementType;
+    _status = t.status;
   }
 
   @override
@@ -90,12 +94,46 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
       'description': _descriptionController.text,
       'date': _selectedDate.toIso8601String().split('T')[0],
       'type': _selectedType,
-      // 'status': 'paid', // Keep existing status or handle separately
-      'category_id': _selectedType != 'transfer' ? _selectedCategoryId : null,
+      'status': _status,
+      'status': _status,
+      // 'category_id' will be set below
       'target_account_id': _selectedType == 'transfer' ? _selectedTargetAccountId : null,
       'movement_type': _selectedType == 'expense' ? _selectedMovementType : null,
       'notes': _notesController.text.isNotEmpty ? _notesController.text : null,
     };
+    
+    // Logic to distinguish Category vs SubCategory ID (Unified Dropdown)
+    if (_selectedType != 'transfer' && _selectedCategoryId != null) {
+        final categories = ref.read(categoriesProvider).value ?? [];
+        String? finalCategoryId;
+        String? finalSubCategoryId;
+
+        // Check if it's a main category
+        try {
+          final cat = categories.firstWhere((c) => c.id == _selectedCategoryId);
+          finalCategoryId = cat.id;
+        } catch (_) {
+          // Not a main category, check subcategories
+          for (final cat in categories) {
+             if (cat.subCategories != null) {
+               try {
+                 final sub = cat.subCategories!.firstWhere((s) => s.id == _selectedCategoryId);
+                 finalCategoryId = cat.id;
+                 finalSubCategoryId = sub.id;
+                 break;
+               } catch (_) {}
+             }
+          }
+        }
+        
+        if (finalCategoryId != null) {
+          transactionData['category_id'] = finalCategoryId;
+          transactionData['sub_category_id'] = finalSubCategoryId; // Can be null
+        }
+    } else {
+       transactionData['category_id'] = null;
+       transactionData['sub_category_id'] = null;
+    }
 
     try {
       await ref.read(financeRepositoryProvider).updateTransaction(widget.transaction.id, transactionData);
@@ -231,16 +269,52 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                       const SizedBox(height: 16),
 
                       // Date
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('Date'),
-                        subtitle: Text(_selectedDate.toLocal().toString().split(' ')[0]),
-                        trailing: const Icon(Icons.calendar_today),
+                      InkWell(
                         onTap: () => _selectDate(context),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(4),
-                          side: BorderSide(color: Theme.of(context).dividerColor),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Theme.of(context).dividerColor),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Date',
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.6),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    _selectedDate.toLocal().toString().split(' ')[0],
+                                    style: Theme.of(context).textTheme.bodyLarge,
+                                  ),
+                                ],
+                              ),
+                              const Icon(Icons.calendar_today),
+                            ],
+                          ),
                         ),
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      // Status
+                      DropdownButtonFormField<String>(
+                        value: ['paid', 'pending'].contains(_status) ? _status : 'paid',
+                        decoration: const InputDecoration(
+                          labelText: 'Status',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: 'paid', child: Text('Paid')),
+                          DropdownMenuItem(value: 'pending', child: Text('Pending')),
+                        ],
+                        onChanged: (value) => setState(() => _status = value!),
                       ),
                       const SizedBox(height: 16),
 
@@ -286,9 +360,28 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                         categoriesAsync.when(
                           data: (categories) {
                             final filteredCategories = categories.where((cat) => cat.type == _selectedType).toList();
-                            // Ensure selected category is valid for type
-                            final isValidCategory = filteredCategories.any((c) => c.id == _selectedCategoryId);
-                            final currentValue = isValidCategory ? _selectedCategoryId : null;
+                            
+                            final List<DropdownMenuItem<String>> dropdownItems = [];
+                            for (final cat in filteredCategories) {
+                              if (cat.subCategories != null && cat.subCategories!.isNotEmpty) {
+                                for (final sub in cat.subCategories!) {
+                                  dropdownItems.add(DropdownMenuItem(
+                                    value: sub.id,
+                                    child: Text('${cat.name} > ${sub.name}'),
+                                  ));
+                                }
+                              } else {
+                                dropdownItems.add(DropdownMenuItem(
+                                  value: cat.id,
+                                  child: Text(cat.name),
+                                ));
+                              }
+                            }
+                            
+                            // Validate selection exists in new list (type change handling)
+                            // If simpler check needed:
+                            bool selectionExists = dropdownItems.any((item) => item.value == _selectedCategoryId);
+                            String? currentValue = selectionExists ? _selectedCategoryId : null;
                             
                             return DropdownButtonFormField<String>(
                               value: currentValue,
@@ -296,10 +389,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                                 labelText: 'Category',
                                 border: OutlineInputBorder(),
                               ),
-                              items: filteredCategories.map((cat) => DropdownMenuItem(
-                                value: cat.id,
-                                child: Text(cat.name),
-                              )).toList(),
+                              items: dropdownItems,
                               onChanged: (value) => setState(() => _selectedCategoryId = value),
                             );
                           },

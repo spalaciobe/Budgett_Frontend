@@ -2,9 +2,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:budgett_frontend/data/models/account_model.dart';
 import 'package:budgett_frontend/data/models/transaction_model.dart';
 import 'package:budgett_frontend/data/models/category_model.dart';
+import 'package:budgett_frontend/data/models/sub_category_model.dart';
 import 'package:budgett_frontend/data/models/budget_model.dart';
 import 'package:budgett_frontend/data/models/goal_model.dart';
 import 'package:budgett_frontend/data/models/expense_group_model.dart';
+import 'package:budgett_frontend/data/models/recurring_transaction_model.dart';
+import 'package:budgett_frontend/data/models/category_spending.dart';
 
 class FinanceRepository {
   final SupabaseClient _client;
@@ -63,19 +66,21 @@ class FinanceRepository {
 
   // Categories
   Future<List<Category>> getCategories() async {
-    final List<dynamic> data = await _client.from('categories').select().order('name');
+    final List<dynamic> data = await _client.from('categories').select('*, sub_categories(*)').order('name');
     return data.map((json) => Category.fromJson(json)).toList();
   }
 
-  Future<void> addCategory(Category category) async {
+  Future<Category> addCategoryWithReturn(Category category) async {
     final userId = _client.auth.currentUser!.id;
-    await _client.from('categories').insert({
+    final List<dynamic> data = await _client.from('categories').insert({
       'name': category.name,
       'type': category.type,
       'icon': category.icon,
       'color': category.color,
       'user_id': userId,
-    });
+    }).select();
+    
+    return Category.fromJson(data.first);
   }
 
   // Budgets
@@ -129,6 +134,19 @@ class FinanceRepository {
     });
   }
 
+  Future<void> addSubCategory(SubCategory subCategory) async {
+    final userId = _client.auth.currentUser!.id;
+    await _client.from('sub_categories').insert({
+      'name': subCategory.name,
+      'category_id': subCategory.categoryId,
+      'user_id': userId,
+    });
+  }
+
+  Future<void> deleteSubCategory(String id) async {
+    await _client.from('sub_categories').delete().eq('id', id);
+  }
+
   // Expense Groups
   Future<List<ExpenseGroup>> getExpenseGroups(int month, int year) async {
     final userId = _client.auth.currentUser!.id;
@@ -153,6 +171,14 @@ class FinanceRepository {
       'user_id': userId,
     });
   }
+  
+  Future<void> updateExpenseGroup(String id, Map<String, dynamic> data) async {
+    await _client.from('expense_groups').update(data).eq('id', id);
+  }
+
+  Future<void> deleteExpenseGroup(String id) async {
+    await _client.from('expense_groups').delete().eq('id', id);
+  }
 
   Future<List<Transaction>> getTransactionsByGroup(String groupId) async {
     final List<dynamic> data = await _client
@@ -160,6 +186,16 @@ class FinanceRepository {
         .select()
         .eq('expense_group_id', groupId)
         .order('date', ascending: false);
+    return data.map((json) => Transaction.fromJson(json)).toList();
+  }
+
+  Future<List<Transaction>> getTransactionsForAccount(String accountId, {int limit = 50}) async {
+    final List<dynamic> data = await _client
+        .from('transactions')
+        .select()
+        .eq('account_id', accountId)
+        .order('date', ascending: false)
+        .limit(limit);
     return data.map((json) => Transaction.fromJson(json)).toList();
   }
 
@@ -180,11 +216,11 @@ class FinanceRepository {
     return result.fold<double>(0.0, (sum, item) => sum + (item['amount'] as num).toDouble());
   }
 
-  Future<Map<String, double>> getSpendingByCategory(int month, int year) async {
+  Future<Map<String, CategorySpending>> getSpendingByCategory(int month, int year) async {
     final userId = _client.auth.currentUser!.id;
     final result = await _client
         .from('transactions')
-        .select('category_id, amount')
+        .select('category_id, sub_category_id, amount')
         .eq('user_id', userId)
         .eq('type', 'expense')
         .gte('date', '$year-${month.toString().padLeft(2, '0')}-01')
@@ -192,25 +228,33 @@ class FinanceRepository {
             ? '${year + 1}-01-01' 
             : '$year-${(month + 1).toString().padLeft(2, '0')}-01');
     
-    final Map<String, double> spending = {};
+    final Map<String, CategorySpending> spending = {};
     for (var item in result) {
       final categoryId = item['category_id'] as String?;
+      final subCategoryId = item['sub_category_id'] as String?;
+      final amount = (item['amount'] as num).toDouble();
+      
       if (categoryId != null) {
-        spending.update(
-          categoryId, 
-          (value) => value + (item['amount'] as num).toDouble(),
-          ifAbsent: () => (item['amount'] as num).toDouble(),
-        );
+        spending.putIfAbsent(categoryId, () => CategorySpending());
+        spending[categoryId]!.total += amount;
+        
+        if (subCategoryId != null) {
+          spending[categoryId]!.subCategories.update(
+            subCategoryId, 
+            (val) => val + amount, 
+            ifAbsent: () => amount
+          );
+        }
       }
     }
     return spending;
   }
 
-  Future<Map<String, double>> getIncomeByCategory(int month, int year) async {
+  Future<Map<String, CategorySpending>> getIncomeByCategory(int month, int year) async {
     final userId = _client.auth.currentUser!.id;
     final result = await _client
         .from('transactions')
-        .select('category_id, amount')
+        .select('category_id, sub_category_id, amount')
         .eq('user_id', userId)
         .eq('type', 'income')
         .gte('date', '$year-${month.toString().padLeft(2, '0')}-01')
@@ -218,15 +262,23 @@ class FinanceRepository {
             ? '${year + 1}-01-01' 
             : '$year-${(month + 1).toString().padLeft(2, '0')}-01');
     
-    final Map<String, double> income = {};
+    final Map<String, CategorySpending> income = {};
     for (var item in result) {
       final categoryId = item['category_id'] as String?;
+      final subCategoryId = item['sub_category_id'] as String?;
+      final amount = (item['amount'] as num).toDouble();
+      
       if (categoryId != null) {
-        income.update(
-          categoryId, 
-          (value) => value + (item['amount'] as num).toDouble(),
-          ifAbsent: () => (item['amount'] as num).toDouble(),
-        );
+        income.putIfAbsent(categoryId, () => CategorySpending());
+        income[categoryId]!.total += amount;
+        
+        if (subCategoryId != null) {
+          income[categoryId]!.subCategories.update(
+            subCategoryId, 
+            (val) => val + amount, 
+            ifAbsent: () => amount
+          );
+        }
       }
     }
     return income;
@@ -282,4 +334,110 @@ class FinanceRepository {
   Future<void> deleteTransaction(String id) async {
     await _client.from('transactions').delete().eq('id', id);
   }
+
+  // Recurring Transactions
+  Future<List<RecurringTransaction>> getRecurringTransactions() async {
+    final userId = _client.auth.currentUser!.id;
+    final List<dynamic> data = await _client
+        .from('recurring_transactions')
+        .select()
+        .eq('user_id', userId)
+        .order('next_run_date');
+    return data.map((json) => RecurringTransaction.fromJson(json)).toList();
+  }
+
+  Future<void> addRecurringTransaction(RecurringTransaction transaction) async {
+    final userId = _client.auth.currentUser!.id;
+    await _client.from('recurring_transactions').insert({
+      ...transaction.toJson(),
+      'user_id': userId,
+    });
+  }
+
+  Future<void> updateRecurringTransaction(String id, Map<String, dynamic> data) async {
+    await _client.from('recurring_transactions').update(data).eq('id', id);
+  }
+
+  Future<void> deleteRecurringTransaction(String id) async {
+    await _client.from('recurring_transactions').delete().eq('id', id);
+  }
+
+  // Helper to generate transaction from recurring
+  Future<void> generateTransactionFromRecurring(RecurringTransaction recurring) async {
+    // 1. Create the real transaction
+    await addTransaction({
+      'description': recurring.description,
+      'amount': recurring.amount,
+      'category_id': recurring.categoryId,
+      'account_id': recurring.accountId,
+      'type': recurring.type,
+      // 'movement_type': recurring.movementType, // If we added this to model
+      'date': DateTime.now().toIso8601String().split('T')[0],
+      'status': 'paid', // Or pending based on preference
+      'notes': 'Generated from recurring: ${recurring.description}',
+    });
+
+    // 2. Update the next run date
+    DateTime nextDate = recurring.nextRunDate;
+    switch (recurring.frequency) {
+      case 'daily':
+        nextDate = nextDate.add(const Duration(days: 1));
+        break;
+      case 'weekly':
+        nextDate = nextDate.add(const Duration(days: 7));
+        break;
+      case 'biweekly':
+        nextDate = nextDate.add(const Duration(days: 14));
+        break;
+      case 'monthly':
+        nextDate = DateTime(nextDate.year, nextDate.month + 1, nextDate.day);
+        break;
+      case 'yearly':
+        nextDate = DateTime(nextDate.year + 1, nextDate.month, nextDate.day);
+        break;
+    }
+
+    await updateRecurringTransaction(recurring.id, {
+      'last_run_date': DateTime.now().toIso8601String().split('T')[0],
+      'next_run_date': nextDate.toIso8601String().split('T')[0],
+    });
+  }
+
+  // Dashboard / Analysis
+  Future<List<Map<String, dynamic>>> getYearlySummary(int year) async {
+    final userId = _client.auth.currentUser!.id;
+     final result = await _client
+        .from('transactions')
+        .select('date, amount, type')
+        .eq('user_id', userId)
+        .gte('date', '$year-01-01')
+        .lte('date', '$year-12-31');
+    
+    // Group by month
+    final Map<int, Map<String, double>> monthlyStats = {};
+    for (int i = 1; i <= 12; i++) {
+      monthlyStats[i] = {'income': 0.0, 'expense': 0.0};
+    }
+
+    for (var item in result) {
+      final date = DateTime.parse(item['date']);
+      final amount = (item['amount'] as num).toDouble();
+      final type = item['type'];
+      
+      if (monthlyStats.containsKey(date.month)) {
+        if (type == 'income') {
+          monthlyStats[date.month]!['income'] = monthlyStats[date.month]!['income']! + amount;
+        } else if (type == 'expense') {
+          monthlyStats[date.month]!['expense'] = monthlyStats[date.month]!['expense']! + amount;
+        }
+      }
+    }
+
+    return monthlyStats.entries.map((e) => {
+      'month': e.key,
+      'income': e.value['income'],
+      'expense': e.value['expense'],
+    }).toList();
+  }
 }
+

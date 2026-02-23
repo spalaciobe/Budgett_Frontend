@@ -7,6 +7,9 @@ import 'package:budgett_frontend/presentation/screens/budget_screen.dart';
 import 'package:budgett_frontend/presentation/screens/goals_screen.dart';
 import 'package:budgett_frontend/presentation/screens/analysis_screen.dart';
 import 'package:budgett_frontend/presentation/screens/main_scaffold.dart';
+import 'package:budgett_frontend/presentation/screens/recurring_transactions_screen.dart';
+import 'package:budgett_frontend/presentation/screens/expense_groups_screen.dart';
+import 'package:budgett_frontend/presentation/screens/settings_screen.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/',
@@ -37,6 +40,18 @@ final appRouter = GoRouter(
         GoRoute(
           path: '/analysis',
           builder: (context, state) => const AnalysisScreen(),
+        ),
+        GoRoute(
+          path: '/recurring',
+          builder: (context, state) => const RecurringTransactionsScreen(),
+        ),
+        GoRoute(
+          path: '/expense-groups',
+          builder: (context, state) => const ExpenseGroupsScreen(),
+        ),
+        GoRoute(
+          path: '/settings',
+          builder: (context, state) => const SettingsScreen(),
         ),
       ],
     ),
