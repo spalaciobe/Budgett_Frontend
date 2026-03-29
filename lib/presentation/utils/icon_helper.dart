@@ -69,6 +69,14 @@ class IconHelper {
     'build': Icons.build,
     'mic': Icons.mic,
     'local_bar': Icons.local_bar,
+
+    // Colombian context icons (apartment and wifi already defined above)
+    'local_hospital': Icons.local_hospital,
+    'local_taxi': Icons.local_taxi,
+    'local_parking': Icons.local_parking,
+    'local_fire_department': Icons.local_fire_department,
+    'elderly': Icons.elderly,
+    'delivery_dining': Icons.delivery_dining,
   };
 
   static IconData getIcon(String? name) {

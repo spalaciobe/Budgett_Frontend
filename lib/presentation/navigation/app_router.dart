@@ -12,6 +12,7 @@ import 'package:budgett_frontend/presentation/screens/main_scaffold.dart';
 import 'package:budgett_frontend/presentation/screens/recurring_transactions_screen.dart';
 import 'package:budgett_frontend/presentation/screens/expense_groups_screen.dart';
 import 'package:budgett_frontend/presentation/screens/settings_screen.dart';
+import 'package:budgett_frontend/presentation/screens/categories_screen.dart';
 import 'package:budgett_frontend/presentation/screens/onboarding/bank_onboarding_screen.dart';
 
 const _kOnboardingCompletedKey = 'onboarding_banks_completed';
@@ -72,6 +73,10 @@ final appRouter = GoRouter(
         GoRoute(
           path: '/settings',
           builder: (context, state) => const SettingsScreen(),
+        ),
+        GoRoute(
+          path: '/categories',
+          builder: (context, state) => const CategoriesScreen(),
         ),
       ],
     ),
