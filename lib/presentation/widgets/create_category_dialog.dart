@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/data/models/category_model.dart';
 import 'package:budgett_frontend/data/models/sub_category_model.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
-import 'package:budgett_frontend/presentation/utils/icon_helper.dart';
+import 'package:budgett_frontend/presentation/widgets/common/dialog_header.dart';
+import 'package:budgett_frontend/presentation/widgets/common/dialog_constants.dart';
+import 'package:budgett_frontend/presentation/widgets/common/icon_picker_grid.dart';
+import 'package:budgett_frontend/presentation/widgets/common/color_picker_row.dart';
 
 
 class CreateCategoryDialog extends ConsumerStatefulWidget {
@@ -17,41 +20,14 @@ class _CreateCategoryDialogState extends ConsumerState<CreateCategoryDialog> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _subCategoryController = TextEditingController();
-  
+
   String _selectedType = 'expense';
   String _selectedIcon = 'category';
-  String _selectedColor = '0xFF4CAF50'; // Default Green (Hogar)
-  
+  String _selectedColor = '0xFF4CAF50'; // Default Green
+
   bool _isLoading = false;
   final List<String> _subCategories = [];
 
-  final List<String> _colors = [
-    '0xFF4CAF50', // Green
-    '0xFF2196F3', // Blue
-    '0xFFF44336', // Red
-    '0xFFFF9800', // Orange
-    '0xFF9C27B0', // Purple
-    '0xFF009688', // Teal
-    '0xFFE91E63', // Pink
-    '0xFF3F51B5', // Indigo
-    '0xFFFFC107', // Amber
-  ];
-
-  final List<String> _categoryIcons = [
-    // Generales
-    'home', 'restaurant', 'directions_car', 'health_and_safety', 'bolt',
-    'shopping_cart', 'movie', 'flight', 'school', 'work',
-    'pets', 'fitness_center', 'checkroom', 'credit_card', 'savings',
-    'attach_money', 'card_giftcard', 'smartphone', 'computer', 'build',
-    'palette', 'child_care', 'local_bar', 'music_note', 'subscriptions',
-    'menu_book', 'videogame_asset', 'local_gas_station', 'receipt_long', 'more_horiz',
-    'local_cafe', 'medical_services',
-    // Colombia
-    'apartment', 'water_drop', 'wifi', 'local_hospital', 'elderly',
-    'directions_bus', 'local_taxi', 'local_parking', 'local_fire_department',
-    'kitchen', 'delivery_dining', 'account_balance',
-  ];
-  
   @override
   Widget build(BuildContext context) {
     return Dialog(
@@ -65,16 +41,7 @@ class _CreateCategoryDialogState extends ConsumerState<CreateCategoryDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Header
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Create Category', style: Theme.of(context).textTheme.headlineSmall),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ],
-              ),
+              const DialogHeader(title: 'Create Category'),
               const SizedBox(height: 24),
 
               // Scrollable Content
@@ -97,7 +64,7 @@ class _CreateCategoryDialogState extends ConsumerState<CreateCategoryDialog> {
                         },
                       ),
                       const SizedBox(height: 16),
-                      
+
                       // Name Input
                       TextFormField(
                         controller: _nameController,
@@ -108,73 +75,26 @@ class _CreateCategoryDialogState extends ConsumerState<CreateCategoryDialog> {
                         validator: (value) => value == null || value.isEmpty ? 'Required' : null,
                       ),
                       const SizedBox(height: 16),
-                      
+
                       // Color Picker
                       const Text('Color', style: TextStyle(fontWeight: FontWeight.bold)),
                       const SizedBox(height: 8),
-                      Center(
-                        child: Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          alignment: WrapAlignment.center,
-                          children: _colors.map((colorStr) {
-                            final color = Color(int.parse(colorStr));
-                            final isSelected = _selectedColor == colorStr;
-                            
-                            return GestureDetector(
-                              onTap: () => setState(() => _selectedColor = colorStr),
-                              child: Container(
-                                width: 40,
-                                height: 40,
-                                decoration: BoxDecoration(
-                                  color: color,
-                                  shape: BoxShape.circle,
-                                  border: isSelected ? Border.all(color: Colors.black, width: 2) : null,
-                                ),
-                                child: isSelected ? const Icon(Icons.check, color: Colors.white, size: 20) : null,
-                              ),
-                            );
-                          }).toList(),
-                        ),
+                      ColorPickerRow(
+                        colorOptions: kCategoryColors,
+                        selectedColor: _selectedColor,
+                        onColorSelected: (c) => setState(() => _selectedColor = c),
                       ),
                       const SizedBox(height: 16),
 
                       // Icon Picker
                       Text('Icon', style: Theme.of(context).textTheme.titleSmall),
                       const SizedBox(height: 8),
-                      Container(
+                      SizedBox(
                         width: double.infinity,
-                        // No border decoration here as requested
-                        child: Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          alignment: WrapAlignment.start,
-                          children: _categoryIcons.map((key) {
-                            final iconData = IconHelper.getIcon(key);
-                            final isSelected = _selectedIcon == key;
-                            
-                            return InkWell(
-                              onTap: () => setState(() => _selectedIcon = key),
-                              child: Container(
-                                width: 48,
-                                height: 48,
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                    color: isSelected 
-                                      ? Theme.of(context).colorScheme.primary 
-                                      : Colors.grey.shade300,
-                                    width: isSelected ? 2 : 1,
-                                  ),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Icon(
-                                  iconData,
-                                  color: isSelected ? Theme.of(context).colorScheme.primary : Colors.white,
-                                  size: 24,
-                                ),
-                              ),
-                            );
-                          }).toList(),
+                        child: IconPickerGrid(
+                          iconOptions: kCategoryIcons,
+                          selectedIcon: _selectedIcon,
+                          onIconSelected: (k) => setState(() => _selectedIcon = k),
                         ),
                       ),
                     ],
@@ -183,7 +103,7 @@ class _CreateCategoryDialogState extends ConsumerState<CreateCategoryDialog> {
               ),
 
               const SizedBox(height: 16),
-                      
+
               // Sub Categories
               Text('Sub Categories (Optional)', style: Theme.of(context).textTheme.titleSmall),
               const SizedBox(height: 8),
@@ -255,7 +175,7 @@ class _CreateCategoryDialogState extends ConsumerState<CreateCategoryDialog> {
                   const SizedBox(width: 8),
                   FilledButton(
                     onPressed: _isLoading ? null : _saveCategory,
-                    child: _isLoading 
+                    child: _isLoading
                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                        : const Text('Create'),
                   ),
@@ -270,9 +190,9 @@ class _CreateCategoryDialogState extends ConsumerState<CreateCategoryDialog> {
 
   Future<void> _saveCategory() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     setState(() => _isLoading = true);
-    
+
     try {
       final newCategory = Category(
         id: '', // Supabase will generate this
@@ -283,24 +203,7 @@ class _CreateCategoryDialogState extends ConsumerState<CreateCategoryDialog> {
       );
 
       final repo = ref.read(financeRepositoryProvider);
-      
-      // 1. Add Category
-      // We need the ID back from the database to add subcategories.
-      // Since addCategory currently doesn't return the ID, we might need to change it, 
-      // OR we generate a UUID here if we can (but standard is DB gen).
-      // Assuming for now we update addCategory to return the new Category object or ID (checking repo...).
-      // Checked repo: addCategory is void. updating logic to fetch the category or assume we can rely on standard "insert and fetch" logic update.
-      // For this step, I'll modify the logic to use Supabase's abilities or just make separate calls.
-      // Actually, standard practice: repo.createCategory returning the object.
-      
-      // Workaround without changing repo return type extensively right now:
-      // We'll create the category, then fetch the latest one by name/user (risky concurrency) or Update repo first.
-      // Let's assume I will update the repo immediately after this to return the ID.
-      // For now, I'll write the code assuming `repo.addCategory` returns `Category`. 
-      
-      // WAIT, I should check FinanceRepository again.
-      // It returns Future<void>.
-      // I will update this code block to reflect a repo change I will make next.
+
       final createdCategory = await repo.addCategoryWithReturn(newCategory);
 
       // 2. Add Sub Categories
@@ -311,10 +214,10 @@ class _CreateCategoryDialogState extends ConsumerState<CreateCategoryDialog> {
           name: subName,
         ));
       }
-      
+
       // Invalidate Categories provider to refresh list
       ref.invalidate(categoriesProvider);
-      
+
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -331,7 +234,7 @@ class _CreateCategoryDialogState extends ConsumerState<CreateCategoryDialog> {
       if (mounted) setState(() => _isLoading = false);
     }
   }
-  
+
   @override
   void dispose() {
     _nameController.dispose();

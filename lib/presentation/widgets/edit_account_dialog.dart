@@ -3,6 +3,10 @@ import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/data/models/account_model.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
+import 'package:budgett_frontend/presentation/widgets/common/dialog_header.dart';
+import 'package:budgett_frontend/presentation/widgets/common/currency_form_field.dart';
+import 'package:budgett_frontend/presentation/widgets/common/dialog_action_bar.dart';
+import 'package:budgett_frontend/presentation/widgets/common/confirm_delete_dialog.dart';
 
 class EditAccountDialog extends ConsumerStatefulWidget {
   final Account account;
@@ -20,10 +24,10 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
   late TextEditingController _creditLimitController;
   late TextEditingController _closingDayController;
   late TextEditingController _paymentDueDayController;
-  
+
   late String _selectedType;
   String? _selectedIcon;
-  
+
   bool _isLoading = false;
 
   @override
@@ -35,7 +39,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
     _creditLimitController = TextEditingController(text: CurrencyFormatter.format(acc.creditLimit, includeSymbol: false));
     _closingDayController = TextEditingController(text: acc.closingDay?.toString() ?? '');
     _paymentDueDayController = TextEditingController(text: acc.paymentDueDay?.toString() ?? '');
-    
+
     _selectedType = acc.type;
     _selectedIcon = acc.icon;
   }
@@ -52,7 +56,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
 
   Future<void> _updateAccount() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     setState(() => _isLoading = true);
 
     final accountData = <String, dynamic>{
@@ -63,14 +67,14 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
     };
 
     if (_selectedType == 'credit_card') {
-      accountData['credit_limit'] = _creditLimitController.text.isEmpty 
-          ? 0.0 
+      accountData['credit_limit'] = _creditLimitController.text.isEmpty
+          ? 0.0
           : CurrencyFormatter.parse(_creditLimitController.text);
-      accountData['closing_day'] = _closingDayController.text.isEmpty 
-          ? null 
+      accountData['closing_day'] = _closingDayController.text.isEmpty
+          ? null
           : int.parse(_closingDayController.text);
-      accountData['payment_due_day'] = _paymentDueDayController.text.isEmpty 
-          ? null 
+      accountData['payment_due_day'] = _paymentDueDayController.text.isEmpty
+          ? null
           : int.parse(_paymentDueDayController.text);
     } else {
       // Clear credit card specific fields if type changed
@@ -81,9 +85,9 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
 
     try {
       await ref.read(financeRepositoryProvider).updateAccount(widget.account.id, accountData);
-      
+
       ref.invalidate(accountsProvider);
-      
+
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -102,35 +106,22 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
   }
 
   Future<void> _deleteAccount() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Account?'),
-        content: Text('Are you sure you want to delete "${widget.account.name}"? This heavily impacts your records and might delete all associated transactions.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final confirm = await showConfirmDeleteDialog(
+      context,
+      title: 'Delete Account?',
+      content: 'Are you sure you want to delete "${widget.account.name}"? This heavily impacts your records and might delete all associated transactions.',
     );
 
-    if (confirm != true) return;
+    if (!confirm) return;
 
     setState(() => _isLoading = true);
 
     try {
       await ref.read(financeRepositoryProvider).deleteAccount(widget.account.id);
-      
+
       ref.invalidate(accountsProvider);
       ref.invalidate(recentTransactionsProvider); // Transactions might be gone
-      
+
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -163,16 +154,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Edit Account', style: Theme.of(context).textTheme.headlineSmall),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                  ],
-                ),
+                const DialogHeader(title: 'Edit Account'),
                 const SizedBox(height: 24),
 
                 // Name
@@ -205,21 +187,10 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                 const SizedBox(height: 16),
 
                 // Balance
-                TextFormField(
+                CurrencyFormField(
                   controller: _balanceController,
-                  decoration: const InputDecoration(
-                    labelText: 'Current Balance',
-                    helperText: 'Adjust to reconcile with bank',
-                    prefixText: '\$',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [CurrencyInputFormatter()],
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return 'Required';
-                    if (CurrencyFormatter.parse(value) == 0.0 && value != '0' && value != '0.0') return 'Invalid number';
-                    return null;
-                  },
+                  labelText: 'Current Balance',
+                  helperText: 'Adjust to reconcile with bank',
                 ),
                 const SizedBox(height: 16),
 
@@ -245,7 +216,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                 // Credit Card specific fields
                 if (isCreditCard) ...[
                   const Divider(),
-                  Text('Credit Card Details', 
+                  Text('Credit Card Details',
                     style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 16),
 
@@ -294,30 +265,10 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                 const SizedBox(height: 24),
 
                 // Actions
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    TextButton.icon(
-                      onPressed: _isLoading ? null : _deleteAccount,
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      label: const Text('Delete', style: TextStyle(color: Colors.red)),
-                    ),
-                    Row(
-                      children: [
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: const Text('Cancel'),
-                        ),
-                        const SizedBox(width: 8),
-                        FilledButton(
-                          onPressed: _isLoading ? null : _updateAccount,
-                          child: _isLoading 
-                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                            : const Text('Save Changes'),
-                        ),
-                      ],
-                    ),
-                  ],
+                DialogActionBar(
+                  onDelete: _isLoading ? null : _deleteAccount,
+                  onSave: _isLoading ? null : _updateAccount,
+                  isLoading: _isLoading,
                 ),
               ],
             ),

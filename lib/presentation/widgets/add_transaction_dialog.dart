@@ -9,6 +9,8 @@ import '../../data/models/bank_model.dart';
 import '../../data/repositories/bank_repository.dart';
 import 'package:budgett_frontend/presentation/widgets/credit_card_billing_simulator.dart';
 import 'package:intl/intl.dart';
+import 'package:budgett_frontend/presentation/widgets/common/dialog_header.dart';
+import 'package:budgett_frontend/presentation/widgets/common/currency_form_field.dart';
 
 class AddTransactionDialog extends ConsumerStatefulWidget {
   const AddTransactionDialog({super.key});
@@ -22,7 +24,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
   final _amountController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _notesController = TextEditingController();
-  
+
   DateTime _selectedDate = DateTime.now();
   String _selectedType = 'expense';
   String? _selectedAccountId;
@@ -30,7 +32,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
   String? _selectedCategoryId; // Stores either CategoryId or SubCategoryId
   String? _selectedExpenseGroupId;
   String? _selectedMovementType;
-  
+
   // New fields
   String _status = 'paid';
   bool _isRecurring = false;
@@ -42,20 +44,6 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
     _descriptionController.dispose();
     _notesController.dispose();
     super.dispose();
-  }
-
-  Future<void> _selectDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2030),
-    );
-    if (picked != null && picked != _selectedDate) {
-      setState(() {
-        _selectedDate = picked;
-      });
-    }
   }
 
   Future<void> _saveTransaction() async {
@@ -133,7 +121,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
     try {
       final accounts = ref.read(accountsProvider).value ?? [];
       final account = accounts.firstWhere((a) => a.id == _selectedAccountId);
-      
+
       if (account.type == 'credit_card' && account.creditCardRules != null) {
          try {
            // We try to fetch the bank or fallback
@@ -143,7 +131,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                   (b) => b.id == account.creditCardRules!.bankId,
                   orElse: () => Bank(id: '0', name: 'Unknown', code: 'UNK')
               ));
-              
+
            final billingPeriod = CreditCardCalculator.determineBillingPeriod(
                 _selectedDate,
                 account.creditCardRules!,
@@ -158,10 +146,10 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
             final realCutoffDate = CreditCardCalculator.calculateCutoffDate(
                 account.creditCardRules!,
                 bank,
-                periodYear, 
+                periodYear,
                 periodMonth
             );
-            
+
             final realPaymentDate = CreditCardCalculator.calculatePaymentDate(
                 account.creditCardRules!,
                 bank,
@@ -180,10 +168,10 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
 
     try {
       final repo = ref.read(financeRepositoryProvider);
-      
+
       // 1. Add the actual transaction
       await repo.addTransaction(transactionData);
-      
+
       // 2. Add recurring rule if selected
       if (_isRecurring) {
         // Calculate next run date based on frequency
@@ -207,14 +195,14 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
           nextRunDate: nextDate,
           isActive: true,
         );
-        
+
         await repo.addRecurringTransaction(recurringData);
       }
-      
+
       // Invalidate providers to refresh data
       ref.invalidate(recentTransactionsProvider);
       ref.invalidate(accountsProvider);
-      
+
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -247,33 +235,13 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Add Transaction', style: Theme.of(context).textTheme.headlineSmall),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                  ],
-                ),
+                const DialogHeader(title: 'Add Transaction'),
                 const SizedBox(height: 24),
 
                 // Amount
-                TextFormField(
+                CurrencyFormField(
                   controller: _amountController,
-                  decoration: const InputDecoration(
-                    labelText: 'Amount',
-                    prefixText: '\$',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [CurrencyInputFormatter()],
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return 'Required';
-                    if (CurrencyFormatter.parse(value) == 0.0 && value != '0' && value != '0.0') return 'Invalid number';
-                    return null;
-                  },
+                  labelText: 'Amount',
                 ),
                 const SizedBox(height: 16),
 
@@ -314,14 +282,14 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Add Simulator here
                 if (_selectedAccountId != null && _amountController.text.isNotEmpty) ...[
                    Consumer(
                      builder: (context, ref, _) {
                        final accounts = ref.watch(accountsProvider).valueOrNull ?? [];
                        final account = accounts.firstWhere((a) => a.id == _selectedAccountId, orElse: () => accounts.first); // fallback safe
-                       
+
                        if (account.type == 'credit_card' && account.creditCardRules != null) {
                          return Padding(
                            padding: const EdgeInsets.only(bottom: 16.0),
@@ -352,7 +320,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                   onChanged: (value) => setState(() => _selectedType = value!),
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Status Toggle
                 Row(
                   children: [
@@ -386,7 +354,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                   },
                   contentPadding: EdgeInsets.zero,
                 ),
-                
+
                 if (_isRecurring) ...[
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
@@ -433,7 +401,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                       final filteredCategories = categories
                           .where((cat) => cat.type == _selectedType)
                           .toList();
-                      
+
                       final List<DropdownMenuItem<String>> dropdownItems = [];
                       for (final cat in filteredCategories) {
                         if (cat.subCategories != null && cat.subCategories!.isNotEmpty) {
@@ -450,7 +418,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                           ));
                         }
                       }
-                      
+
                       return DropdownButtonFormField<String>(
                         value: _selectedCategoryId,
                         decoration: const InputDecoration(
@@ -517,7 +485,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                       items: [
                         const DropdownMenuItem<String?>(value: null, child: Text('None')),
                         ...groups.map((ExpenseGroup g) => DropdownMenuItem<String?>(
-                          value: g.id, 
+                          value: g.id,
                           child: Text(g.name),
                         )),
                       ],

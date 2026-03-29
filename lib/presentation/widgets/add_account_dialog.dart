@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import '../../data/repositories/bank_repository.dart';
 import '../../data/models/bank_model.dart';
+import 'package:budgett_frontend/presentation/widgets/common/dialog_header.dart';
+import 'package:budgett_frontend/presentation/widgets/common/currency_form_field.dart';
 
 /// Builds the credit-card rules map for a given bank.
 /// Shared logic used both in [AddAccountDialog] and the onboarding flow.
@@ -176,17 +178,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Header
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Agregar cuenta',
-                        style: Theme.of(context).textTheme.headlineSmall),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                  ],
-                ),
+                const DialogHeader(title: 'Agregar cuenta'),
                 const SizedBox(height: 24),
 
                 // Name
@@ -232,23 +224,15 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                 const SizedBox(height: 16),
 
                 // Balance
-                TextFormField(
+                CurrencyFormField(
                   controller: _balanceController,
-                  decoration: InputDecoration(
-                    labelText: isCreditCard
-                        ? 'Saldo actual (deuda negativa)'
-                        : 'Saldo inicial',
-                    prefixText: '\$',
-                    border: const OutlineInputBorder(),
-                    helperText: isCreditCard
-                        ? 'Ingresa negativo si tienes deuda activa.'
-                        : null,
-                  ),
-                  keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true, signed: true),
-                  inputFormatters: [CurrencyInputFormatter()],
-                  validator: (v) =>
-                      v == null || v.isEmpty ? 'Requerido' : null,
+                  labelText: isCreditCard
+                      ? 'Saldo actual (deuda negativa)'
+                      : 'Saldo inicial',
+                  helperText: isCreditCard
+                      ? 'Ingresa negativo si tienes deuda activa.'
+                      : null,
+                  allowNegative: true,
                 ),
                 const SizedBox(height: 16),
 
@@ -334,16 +318,10 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                   const SizedBox(height: 16),
 
                   // Credit limit
-                  TextFormField(
+                  CurrencyFormField(
                     controller: _creditLimitController,
-                    decoration: const InputDecoration(
-                      labelText: 'Cupo total',
-                      prefixText: '\$',
-                      border: OutlineInputBorder(),
-                    ),
-                    keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true),
-                    inputFormatters: [CurrencyInputFormatter()],
+                    labelText: 'Cupo total',
+                    required: false,
                   ),
 
                   // RappiCard: auto-rules notice

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/data/models/budget_model.dart';
 import 'package:budgett_frontend/presentation/utils/icon_helper.dart';
+import 'package:budgett_frontend/presentation/widgets/common/currency_form_field.dart';
 
 class EditBudgetDialog extends ConsumerStatefulWidget {
   final String categoryId;
@@ -39,8 +40,8 @@ class _EditBudgetDialogState extends ConsumerState<EditBudgetDialog> {
   void initState() {
     super.initState();
     _amountController = TextEditingController(
-      text: widget.currentAmount != null 
-        ? CurrencyFormatter.format(widget.currentAmount!, includeSymbol: false) 
+      text: widget.currentAmount != null
+        ? CurrencyFormatter.format(widget.currentAmount!, includeSymbol: false)
         : '',
     );
   }
@@ -64,10 +65,10 @@ class _EditBudgetDialogState extends ConsumerState<EditBudgetDialog> {
 
     try {
       await ref.read(financeRepositoryProvider).setBudget(budget);
-      
+
       // Invalidate to refresh
       ref.invalidate(budgetsProvider);
-      
+
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -86,10 +87,10 @@ class _EditBudgetDialogState extends ConsumerState<EditBudgetDialog> {
   @override
   Widget build(BuildContext context) {
     final isIncome = widget.categoryType == 'income';
-    final color = widget.categoryColor != null 
+    final color = widget.categoryColor != null
         ? Color(int.parse(widget.categoryColor!))
         : Colors.grey;
-    
+
     return AlertDialog(
       title: Row(
         children: [
@@ -142,21 +143,10 @@ class _EditBudgetDialogState extends ConsumerState<EditBudgetDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextFormField(
+            CurrencyFormField(
               controller: _amountController,
-              decoration: InputDecoration(
-                labelText: isIncome ? 'Expected Income' : 'Budget Amount',
-                prefixText: '\$',
-                border: const OutlineInputBorder(),
-              ),
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: [CurrencyInputFormatter()],
+              labelText: isIncome ? 'Expected Income' : 'Budget Amount',
               autofocus: true,
-              validator: (value) {
-                if (value == null || value.isEmpty) return 'Required';
-                if (CurrencyFormatter.parse(value) == 0.0 && value != '0' && value != '0.0') return 'Invalid number';
-                return null;
-              },
             ),
           ],
         ),

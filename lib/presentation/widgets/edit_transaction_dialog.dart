@@ -3,6 +3,10 @@ import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/data/models/transaction_model.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
+import 'package:budgett_frontend/presentation/widgets/common/dialog_header.dart';
+import 'package:budgett_frontend/presentation/widgets/common/date_picker_field.dart';
+import 'package:budgett_frontend/presentation/widgets/common/dialog_action_bar.dart';
+import 'package:budgett_frontend/presentation/widgets/common/confirm_delete_dialog.dart';
 
 class EditTransactionDialog extends ConsumerStatefulWidget {
   final Transaction transaction;
@@ -18,7 +22,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
   late TextEditingController _amountController;
   late TextEditingController _descriptionController;
   late TextEditingController _notesController;
-  
+
   late DateTime _selectedDate;
   late String _selectedType;
   String? _selectedAccountId;
@@ -26,7 +30,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
   String? _selectedCategoryId;
   String? _selectedMovementType;
   late String _status;
-  
+
   bool _isLoading = false;
 
   @override
@@ -36,7 +40,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
     _amountController = TextEditingController(text: CurrencyFormatter.format(t.amount, includeSymbol: false));
     _descriptionController = TextEditingController(text: t.description);
     _notesController = TextEditingController(text: t.notes ?? '');
-    
+
     _selectedDate = t.date;
     _selectedType = t.type;
     _selectedAccountId = t.accountId;
@@ -54,20 +58,6 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
     _descriptionController.dispose();
     _notesController.dispose();
     super.dispose();
-  }
-
-  Future<void> _selectDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2030),
-    );
-    if (picked != null && picked != _selectedDate) {
-      setState(() {
-        _selectedDate = picked;
-      });
-    }
   }
 
   Future<void> _updateTransaction() async {
@@ -101,7 +91,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
       'movement_type': _selectedType == 'expense' ? _selectedMovementType : null,
       'notes': _notesController.text.isNotEmpty ? _notesController.text : null,
     };
-    
+
     // Logic to distinguish Category vs SubCategory ID (Unified Dropdown)
     if (_selectedType != 'transfer' && _selectedCategoryId != null) {
         final categories = ref.read(categoriesProvider).value ?? [];
@@ -125,7 +115,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
              }
           }
         }
-        
+
         if (finalCategoryId != null) {
           transactionData['category_id'] = finalCategoryId;
           transactionData['sub_category_id'] = finalSubCategoryId; // Can be null
@@ -137,11 +127,11 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
 
     try {
       await ref.read(financeRepositoryProvider).updateTransaction(widget.transaction.id, transactionData);
-      
+
       ref.invalidate(recentTransactionsProvider);
       ref.invalidate(accountsProvider);
       ref.invalidate(budgetsProvider); // Budgets might change
-      
+
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -160,36 +150,23 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
   }
 
   Future<void> _deleteTransaction() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Transaction?'),
-        content: const Text('Are you sure you want to delete this transaction? Account balances will be reverted.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final confirm = await showConfirmDeleteDialog(
+      context,
+      title: 'Delete Transaction?',
+      content: 'Are you sure you want to delete this transaction? Account balances will be reverted.',
     );
 
-    if (confirm != true) return;
+    if (!confirm) return;
 
     setState(() => _isLoading = true);
 
     try {
       await ref.read(financeRepositoryProvider).deleteTransaction(widget.transaction.id);
-      
+
       ref.invalidate(recentTransactionsProvider);
       ref.invalidate(accountsProvider);
       ref.invalidate(budgetsProvider);
-      
+
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -222,18 +199,9 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Edit Transaction', style: Theme.of(context).textTheme.headlineSmall),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ],
-              ),
+              const DialogHeader(title: 'Edit Transaction'),
               const SizedBox(height: 24),
-              
+
               Expanded(
                 child: SingleChildScrollView(
                   child: Column(
@@ -269,40 +237,15 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                       const SizedBox(height: 16),
 
                       // Date
-                      InkWell(
-                        onTap: () => _selectDate(context),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Theme.of(context).dividerColor),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Date',
-                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.6),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    _selectedDate.toLocal().toString().split(' ')[0],
-                                    style: Theme.of(context).textTheme.bodyLarge,
-                                  ),
-                                ],
-                              ),
-                              const Icon(Icons.calendar_today),
-                            ],
-                          ),
-                        ),
+                      DatePickerField(
+                        selectedDate: _selectedDate,
+                        label: 'Date',
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2030),
+                        onDateSelected: (d) => setState(() => _selectedDate = d),
                       ),
                       const SizedBox(height: 16),
-                      
+
                       // Status
                       DropdownButtonFormField<String>(
                         value: ['paid', 'pending'].contains(_status) ? _status : 'paid',
@@ -318,9 +261,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                       ),
                       const SizedBox(height: 16),
 
-                      // Type (Disabled for edit to avoid complex logic changes, or re-enabled if needed)
-                      // Allowing type change requires logic to handle "changing from transfer to expense" etc.
-                      // For now, let's allow it but fields will update.
+                      // Type
                       DropdownButtonFormField<String>(
                         value: _selectedType,
                         decoration: const InputDecoration(
@@ -360,7 +301,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                         categoriesAsync.when(
                           data: (categories) {
                             final filteredCategories = categories.where((cat) => cat.type == _selectedType).toList();
-                            
+
                             final List<DropdownMenuItem<String>> dropdownItems = [];
                             for (final cat in filteredCategories) {
                               if (cat.subCategories != null && cat.subCategories!.isNotEmpty) {
@@ -377,12 +318,10 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                                 ));
                               }
                             }
-                            
-                            // Validate selection exists in new list (type change handling)
-                            // If simpler check needed:
+
                             bool selectionExists = dropdownItems.any((item) => item.value == _selectedCategoryId);
                             String? currentValue = selectionExists ? _selectedCategoryId : null;
-                            
+
                             return DropdownButtonFormField<String>(
                               value: currentValue,
                               decoration: const InputDecoration(
@@ -454,30 +393,10 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
               const SizedBox(height: 24),
 
               // Actions
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  TextButton.icon(
-                    onPressed: _isLoading ? null : _deleteTransaction,
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    label: const Text('Delete', style: TextStyle(color: Colors.red)),
-                  ),
-                  Row(
-                    children: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: const Text('Cancel'),
-                      ),
-                      const SizedBox(width: 8),
-                      FilledButton(
-                        onPressed: _isLoading ? null : _updateTransaction,
-                        child: _isLoading 
-                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                          : const Text('Save Changes'),
-                      ),
-                    ],
-                  ),
-                ],
+              DialogActionBar(
+                onDelete: _isLoading ? null : _deleteTransaction,
+                onSave: _isLoading ? null : _updateTransaction,
+                isLoading: _isLoading,
               ),
             ],
           ),
