@@ -5,6 +5,54 @@ import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import '../../data/repositories/bank_repository.dart';
 import '../../data/models/bank_model.dart';
 
+/// Builds the credit-card rules map for a given bank.
+/// Shared logic used both in [AddAccountDialog] and the onboarding flow.
+Map<String, dynamic> buildCreditCardRulesForBank({
+  required Bank bank,
+  int? cutoffDay,
+  int? paymentDay,
+}) {
+  switch (bank.code) {
+    case 'RAPPICARD':
+      // RappiCard: relative cutoff (penultimate business day), payment 10 calendar days later.
+      return {
+        'banco_id': bank.id,
+        'tipo_corte': 'relativo',
+        'corte_relativo_tipo': 'penultimo_dia_habil',
+        'tipo_pago': 'relativo_dias',
+        'dias_despues_corte': 10,
+        'tipo_offset_pago': 'calendario',
+      };
+
+    case 'NUBANK':
+      // Nubank: fixed cutoff, payment in next month on a business day.
+      return {
+        'banco_id': bank.id,
+        'tipo_corte': 'fijo',
+        'dia_corte_nominal': cutoffDay ?? 25,
+        'tipo_pago': 'fijo',
+        'dia_pago_nominal': paymentDay ?? 7,
+        'mes_pago': 'siguiente',
+        'tipo_offset_pago': 'habiles',
+      };
+
+    case 'BANCOLOMBIA':
+    case 'DAVIVIENDA':
+    case 'BBVA':
+    default:
+      // Most Colombian banks: fixed cutoff & payment, calendar offset.
+      return {
+        'banco_id': bank.id,
+        'tipo_corte': 'fijo',
+        'dia_corte_nominal': cutoffDay ?? 15,
+        'tipo_pago': 'fijo',
+        'dia_pago_nominal': paymentDay ?? 30,
+        'mes_pago': 'siguiente',
+        'tipo_offset_pago': 'calendario',
+      };
+  }
+}
+
 class AddAccountDialog extends ConsumerStatefulWidget {
   const AddAccountDialog({super.key});
 
@@ -17,18 +65,12 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
   final _nameController = TextEditingController();
   final _balanceController = TextEditingController();
   final _creditLimitController = TextEditingController();
-  
-  // Credit Card Controllers
-  final _cutoffDayController = TextEditingController(); // For Fixed
-  final _paymentDayController = TextEditingController(); // For Fixed
-  // For Relative (e.g. RappiCard uses fixed logic for internal display maybe, but actually relative)
-  
+  final _cutoffDayController = TextEditingController();
+  final _paymentDayController = TextEditingController();
+
   String _selectedType = 'checking';
   String? _selectedIcon;
   Bank? _selectedBank;
-  
-  // Custom Config logic
-  bool _useBankDefaults = true;
 
   @override
   void dispose() {
@@ -40,53 +82,72 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
     super.dispose();
   }
 
+  /// True if the selected bank has automatic (non-configurable) rules.
+  bool get _bankHasAutoRules =>
+      _selectedBank != null && _selectedBank!.code == 'RAPPICARD';
+
+  /// True if the user needs to enter cutoff/payment days.
+  bool get _needsManualDays =>
+      _selectedType == 'credit_card' &&
+      _selectedBank != null &&
+      !_bankHasAutoRules;
+
+  /// Pre-fill default days when the bank is selected.
+  void _onBankSelected(Bank? bank) {
+    setState(() {
+      _selectedBank = bank;
+      if (bank == null) return;
+
+      switch (bank.code) {
+        case 'NUBANK':
+          _cutoffDayController.text = '25';
+          _paymentDayController.text = '7';
+          break;
+        case 'BANCOLOMBIA':
+        case 'DAVIVIENDA':
+        case 'BBVA':
+        default:
+          _cutoffDayController.text = '15';
+          _paymentDayController.text = '30';
+      }
+    });
+  }
+
   Future<void> _saveAccount() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final accountData = {
-      'name': _nameController.text,
+    final accountData = <String, dynamic>{
+      'name': _nameController.text.trim(),
       'type': _selectedType,
       'balance': CurrencyFormatter.parse(_balanceController.text),
       'icon': _selectedIcon,
     };
 
-    // Add credit card specific fields
     if (_selectedType == 'credit_card') {
-      accountData['credit_limit'] = _creditLimitController.text.isEmpty 
-          ? 0.0 
+      accountData['credit_limit'] = _creditLimitController.text.isEmpty
+          ? 0.0
           : CurrencyFormatter.parse(_creditLimitController.text);
-      
-      if (_selectedBank != null) {
-        final rules = <String, dynamic>{
-          'banco_id': _selectedBank!.id,
-          'tipo_corte': _selectedBank!.name == 'RappiCard' ? 'relativo' : 'fijo', // Logic simplification for demo
-          'tipo_pago': _selectedBank!.name == 'RappiCard' ? 'relativo_dias' : 'fijo',
-        };
 
-        if (_selectedBank!.name == 'RappiCard') {
-            rules['corte_relativo_tipo'] = 'penultimo_dia_habil';
-            rules['dias_despues_corte'] = 10;
-            rules['tipo_offset_pago'] = 'calendario';
-        } else {
-             // Fixed (Bancolombia, etc.)
-             rules['dia_corte_nominal'] = int.parse(_cutoffDayController.text.isEmpty ? '15' : _cutoffDayController.text);
-             rules['dia_pago_nominal'] = int.parse(_paymentDayController.text.isEmpty ? '30' : _paymentDayController.text);
-             rules['mes_pago'] = 'mismo'; // Default simplification
-        }
-        
-        accountData['credit_card_details'] = rules;
+      if (_selectedBank != null) {
+        final cutoffDay = int.tryParse(_cutoffDayController.text);
+        final paymentDay = int.tryParse(_paymentDayController.text);
+
+        accountData['credit_card_details'] = buildCreditCardRulesForBank(
+          bank: _selectedBank!,
+          cutoffDay: cutoffDay,
+          paymentDay: paymentDay,
+        );
       }
     }
 
     try {
       await ref.read(financeRepositoryProvider).createAccount(accountData);
-      
       ref.invalidate(accountsProvider);
-      
+
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Account created successfully')),
+          const SnackBar(content: Text('Cuenta creada exitosamente')),
         );
       }
     } catch (e) {
@@ -114,10 +175,12 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Header
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Add Account', style: Theme.of(context).textTheme.headlineSmall),
+                    Text('Agregar cuenta',
+                        style: Theme.of(context).textTheme.headlineSmall),
                     IconButton(
                       icon: const Icon(Icons.close),
                       onPressed: () => Navigator.of(context).pop(),
@@ -130,11 +193,12 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                 TextFormField(
                   controller: _nameController,
                   decoration: const InputDecoration(
-                    labelText: 'Account Name',
+                    labelText: 'Nombre de la cuenta',
                     border: OutlineInputBorder(),
-                    hintText: 'e.g., Bancolombia, Nequi',
+                    hintText: 'Ej: Bancolombia Ahorros, Nubank TC',
                   ),
-                  validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                  validator: (v) =>
+                      v == null || v.trim().isEmpty ? 'Requerido' : null,
                 ),
                 const SizedBox(height: 16),
 
@@ -142,40 +206,49 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                 DropdownButtonFormField<String>(
                   value: _selectedType,
                   decoration: const InputDecoration(
-                    labelText: 'Account Type',
+                    labelText: 'Tipo de cuenta',
                     border: OutlineInputBorder(),
                   ),
                   items: const [
-                    DropdownMenuItem(value: 'checking', child: Text('Checking')),
-                    DropdownMenuItem(value: 'savings', child: Text('Savings')),
-                    DropdownMenuItem(value: 'credit_card', child: Text('Credit Card')),
-                    DropdownMenuItem(value: 'cash', child: Text('Cash')),
-                    DropdownMenuItem(value: 'investment', child: Text('Investment')),
+                    DropdownMenuItem(
+                        value: 'checking',
+                        child: Text('Cuenta Corriente')),
+                    DropdownMenuItem(
+                        value: 'savings',
+                        child: Text('Cuenta de Ahorros')),
+                    DropdownMenuItem(
+                        value: 'credit_card',
+                        child: Text('Tarjeta de Crédito')),
+                    DropdownMenuItem(value: 'cash', child: Text('Efectivo')),
+                    DropdownMenuItem(
+                        value: 'investment',
+                        child: Text('Inversión')),
                   ],
-                  onChanged: (value) => setState(() {
-                    _selectedType = value!;
-                    if (value == 'credit_card') {
-                       _selectedIcon = 'credit_card';
-                    }
+                  onChanged: (v) => setState(() {
+                    _selectedType = v!;
+                    if (v == 'credit_card') _selectedIcon = 'credit_card';
                   }),
                 ),
                 const SizedBox(height: 16),
 
-                // Initial Balance
+                // Balance
                 TextFormField(
                   controller: _balanceController,
-                  decoration: const InputDecoration(
-                    labelText: 'Initial Balance / Current Debt (Negative)',
+                  decoration: InputDecoration(
+                    labelText: isCreditCard
+                        ? 'Saldo actual (deuda negativa)'
+                        : 'Saldo inicial',
                     prefixText: '\$',
-                    border: OutlineInputBorder(),
-                    helperText: 'For credit cards, enter negative value if you have debt.'
+                    border: const OutlineInputBorder(),
+                    helperText: isCreditCard
+                        ? 'Ingresa negativo si tienes deuda activa.'
+                        : null,
                   ),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true, signed: true),
                   inputFormatters: [CurrencyInputFormatter()],
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return 'Required';
-                    return null;
-                  },
+                  validator: (v) =>
+                      v == null || v.isEmpty ? 'Requerido' : null,
                 ),
                 const SizedBox(height: 16),
 
@@ -183,126 +256,184 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                 DropdownButtonFormField<String>(
                   value: _selectedIcon,
                   decoration: const InputDecoration(
-                    labelText: 'Icon (optional)',
+                    labelText: 'Ícono (opcional)',
                     border: OutlineInputBorder(),
                   ),
                   items: const [
-                    DropdownMenuItem(value: null, child: Text('Default')),
-                    DropdownMenuItem(value: 'account_balance', child: Row(children: [Icon(Icons.account_balance, size: 18), SizedBox(width: 8), Text('Bank')])),
-                    DropdownMenuItem(value: 'credit_card', child: Row(children: [Icon(Icons.credit_card, size: 18), SizedBox(width: 8), Text('Card')])),
-                    DropdownMenuItem(value: 'money', child: Row(children: [Icon(Icons.money, size: 18), SizedBox(width: 8), Text('Cash')])),
-                    DropdownMenuItem(value: 'savings', child: Row(children: [Icon(Icons.savings, size: 18), SizedBox(width: 8), Text('Savings')])),
-                    DropdownMenuItem(value: 'trending_up', child: Row(children: [Icon(Icons.trending_up, size: 18), SizedBox(width: 8), Text('Investment')])),
+                    DropdownMenuItem(
+                        value: null, child: Text('Por defecto')),
+                    DropdownMenuItem(
+                        value: 'account_balance',
+                        child: Row(children: [
+                          Icon(Icons.account_balance, size: 18),
+                          SizedBox(width: 8),
+                          Text('Banco')
+                        ])),
+                    DropdownMenuItem(
+                        value: 'credit_card',
+                        child: Row(children: [
+                          Icon(Icons.credit_card, size: 18),
+                          SizedBox(width: 8),
+                          Text('Tarjeta')
+                        ])),
+                    DropdownMenuItem(
+                        value: 'money',
+                        child: Row(children: [
+                          Icon(Icons.money, size: 18),
+                          SizedBox(width: 8),
+                          Text('Efectivo')
+                        ])),
+                    DropdownMenuItem(
+                        value: 'savings',
+                        child: Row(children: [
+                          Icon(Icons.savings, size: 18),
+                          SizedBox(width: 8),
+                          Text('Ahorros')
+                        ])),
+                    DropdownMenuItem(
+                        value: 'trending_up',
+                        child: Row(children: [
+                          Icon(Icons.trending_up, size: 18),
+                          SizedBox(width: 8),
+                          Text('Inversión')
+                        ])),
                   ],
-                  onChanged: (value) => setState(() => _selectedIcon = value),
+                  onChanged: (v) => setState(() => _selectedIcon = v),
                 ),
-                const SizedBox(height: 16),
 
-                // Credit Card specific fields
+                // ── Credit card section ───────────────────────────────────
                 if (isCreditCard) ...[
-                  const Divider(),
-                  Text('Credit Card Details', 
-                    style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 16),
-                  
-                  // Bank Selector
+                  const Divider(),
+                  Text('Detalles de la tarjeta',
+                      style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 16),
+
+                  // Bank selector
                   banksAsync.when(
                     data: (banks) => DropdownButtonFormField<Bank>(
                       value: _selectedBank,
                       decoration: const InputDecoration(
-                        labelText: 'Bank',
+                        labelText: 'Banco emisor',
                         border: OutlineInputBorder(),
                       ),
-                      items: banks.map((bank) => DropdownMenuItem(
-                        value: bank,
-                        child: Text(bank.name),
-                      )).toList(),
-                      onChanged: (value) => setState(() {
-                        _selectedBank = value;
-                        // Defaults
-                        if (value?.code == 'RAPPICARD') {
-                           // Set defaults for Rappi (hidden logic)
-                        }
-                      }),
-                      validator: (value) => value == null ? 'Required' : null,
+                      items: banks
+                          .map((b) => DropdownMenuItem(
+                                value: b,
+                                child: Text(b.name),
+                              ))
+                          .toList(),
+                      onChanged: _onBankSelected,
+                      validator: (v) =>
+                          v == null ? 'Selecciona el banco' : null,
                     ),
-                    loading: () => const CircularProgressIndicator(),
-                    error: (e, s) => Text('Error loading banks: $e'),
-                  ),
-                   const SizedBox(height: 16),
-
-                  TextFormField(
-                    controller: _creditLimitController,
-                    decoration: const InputDecoration(
-                      labelText: 'Credit Limit',
-                      prefixText: '\$',
-                      border: OutlineInputBorder(),
-                    ),
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    inputFormatters: [CurrencyInputFormatter()],
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
+                    error: (e, _) => Text('Error cargando bancos: $e'),
                   ),
                   const SizedBox(height: 16),
 
-                  if (_selectedBank != null && _selectedBank!.code != 'RAPPICARD') ...[
-                      Row(
+                  // Credit limit
+                  TextFormField(
+                    controller: _creditLimitController,
+                    decoration: const InputDecoration(
+                      labelText: 'Cupo total',
+                      prefixText: '\$',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true),
+                    inputFormatters: [CurrencyInputFormatter()],
+                  ),
+
+                  // RappiCard: auto-rules notice
+                  if (_bankHasAutoRules) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFF441A).withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                            color:
+                                const Color(0xFFFF441A).withOpacity(0.3)),
+                      ),
+                      child: Row(
                         children: [
+                          const Icon(Icons.auto_awesome,
+                              color: Color(0xFFFF441A), size: 18),
+                          const SizedBox(width: 10),
                           Expanded(
-                            child: TextFormField(
-                              controller: _cutoffDayController,
-                              decoration: const InputDecoration(
-                                labelText: 'Cutoff Day',
-                                border: OutlineInputBorder(),
-                                hintText: '1-31',
-                              ),
-                              keyboardType: TextInputType.number,
-                              validator: (v) => v!.isEmpty ? 'Required' : null,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: TextFormField(
-                              controller: _paymentDayController,
-                              decoration: const InputDecoration(
-                                labelText: 'Payment Day',
-                                border: OutlineInputBorder(),
-                                hintText: '1-31',
-                              ),
-                              keyboardType: TextInputType.number,
-                              validator: (v) => v!.isEmpty ? 'Required' : null,
+                            child: Text(
+                              'RappiCard: corte el penúltimo día hábil del mes, pago 10 días después. Configuración automática.',
+                              style: Theme.of(context).textTheme.bodySmall,
                             ),
                           ),
                         ],
                       ),
-                       const SizedBox(height: 8),
-                       Text('For ${_selectedBank!.name}, weekends/holidays will be adjusted automatically.', 
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600])),
-                   ],
-                   if (_selectedBank != null && _selectedBank!.code == 'RAPPICARD') ...[
-                     const Card(
-                       child: Padding(
-                         padding: EdgeInsets.all(12.0),
-                         child: Column(
-                           children: [
-                             Text('RappiCard Strategy', style: TextStyle(fontWeight: FontWeight.bold)),
-                             Text('Cutoff: Penultimate business day'),
-                             Text('Payment: 10 days after cutoff'),
-                             Text('Dates are calculated automatically.'),
-                           ],
-                         ),
-                       ),
-                     )
-                   ]
+                    ),
+                  ],
+
+                  // Manual cutoff/payment days (non-Rappi)
+                  if (_needsManualDays) ...[
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _cutoffDayController,
+                            decoration: const InputDecoration(
+                              labelText: 'Día de corte',
+                              border: OutlineInputBorder(),
+                              hintText: '1–31',
+                            ),
+                            keyboardType: TextInputType.number,
+                            validator: (v) =>
+                                v == null || v.isEmpty ? 'Requerido' : null,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _paymentDayController,
+                            decoration: const InputDecoration(
+                              labelText: 'Día de pago',
+                              border: OutlineInputBorder(),
+                              hintText: '1–31',
+                            ),
+                            keyboardType: TextInputType.number,
+                            validator: (v) =>
+                                v == null || v.isEmpty ? 'Requerido' : null,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (_selectedBank != null) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        'Festivos y fines de semana se ajustan automáticamente según las reglas de ${_selectedBank!.name}.',
+                        style:
+                            Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurface
+                                      .withOpacity(0.55),
+                                ),
+                      ),
+                    ],
+                  ],
                 ],
 
                 const SizedBox(height: 24),
-                // Save Button
+
+                // Save
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
                     onPressed: _saveAccount,
                     child: const Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: Text('Create Account'),
+                      padding: EdgeInsets.symmetric(vertical: 14),
+                      child: Text('Crear cuenta'),
                     ),
                   ),
                 ),
