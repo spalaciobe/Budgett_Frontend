@@ -405,39 +405,64 @@ class FinanceRepository {
 
   // Dashboard / Analysis
   Future<List<Map<String, dynamic>>> getYearlySummary(int year) async {
-    final userId = _client.auth.currentUser!.id;
-     final result = await _client
-        .from('transactions')
-        .select('date, amount, type')
-        .eq('user_id', userId)
-        .gte('date', '$year-01-01')
-        .lte('date', '$year-12-31');
-    
-    // Group by month
-    final Map<int, Map<String, double>> monthlyStats = {};
-    for (int i = 1; i <= 12; i++) {
-      monthlyStats[i] = {'income': 0.0, 'expense': 0.0};
-    }
+    int attempts = 0;
+    while (true) {
+      try {
+        final userId = _client.auth.currentUser!.id;
+        // Bug fix 1: filter by status='paid' to exclude pending transactions
+        // Bug fix 2: select sub_categories_id is not needed — only date, amount, type
+        final result = await _client
+            .from('transactions')
+            .select('date, amount, type')
+            .eq('user_id', userId)
+            .eq('status', 'paid')
+            .gte('date', '$year-01-01')
+            .lte('date', '$year-12-31');
 
-    for (var item in result) {
-      final date = DateTime.parse(item['date']);
-      final amount = (item['amount'] as num).toDouble();
-      final type = item['type'];
-      
-      if (monthlyStats.containsKey(date.month)) {
-        if (type == 'income') {
-          monthlyStats[date.month]!['income'] = monthlyStats[date.month]!['income']! + amount;
-        } else if (type == 'expense') {
-          monthlyStats[date.month]!['expense'] = monthlyStats[date.month]!['expense']! + amount;
+        // Group by month
+        final Map<int, Map<String, double>> monthlyStats = {
+          for (int i = 1; i <= 12; i++) i: {'income': 0.0, 'expense': 0.0},
+        };
+
+        for (var item in result) {
+          final date = DateTime.parse(item['date'] as String);
+          final amount = (item['amount'] as num).toDouble();
+          final type = item['type'] as String;
+
+          if (type == 'income') {
+            monthlyStats[date.month]!['income'] =
+                monthlyStats[date.month]!['income']! + amount;
+          } else if (type == 'expense') {
+            monthlyStats[date.month]!['expense'] =
+                monthlyStats[date.month]!['expense']! + amount;
+          }
+          // 'transfer' type is intentionally skipped — not income or expense
         }
+
+        // Bug fix 3: sort by month explicitly (map iteration order not guaranteed by contract)
+        final entries = monthlyStats.entries.toList()
+          ..sort((a, b) => a.key.compareTo(b.key));
+
+        return entries
+            .map((e) => {
+                  'month': e.key,
+                  'income': e.value['income'],
+                  'expense': e.value['expense'],
+                })
+            .toList();
+      } on PostgrestException catch (e) {
+        if (attempts < 1 &&
+            (e.message.contains('JWT issued at future') ||
+                e.code == 'PGRST303')) {
+          attempts++;
+          await Future.delayed(const Duration(seconds: 3));
+          continue;
+        }
+        throw Exception('Error fetching yearly summary: $e');
+      } catch (e) {
+        throw Exception('Error fetching yearly summary: $e');
       }
     }
-
-    return monthlyStats.entries.map((e) => {
-      'month': e.key,
-      'income': e.value['income'],
-      'expense': e.value['expense'],
-    }).toList();
   }
 }
 
