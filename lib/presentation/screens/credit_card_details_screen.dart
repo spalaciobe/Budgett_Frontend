@@ -148,7 +148,7 @@ class CreditCardDetailsScreen extends ConsumerWidget {
                                CurrencyFormatter.format(t.amount),
                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                              ),
-                             subtitle: Text(DateFormat.MMMd().format(t.date), style: const TextStyle(fontSize: 11)),
+                             subtitle: Text(DateFormat('d MMM', 'es_CO').format(t.date), style: const TextStyle(fontSize: 11)),
                            );
                          }).toList(),
                       ),
@@ -386,7 +386,7 @@ class CreditCardDetailsScreen extends ConsumerWidget {
       final parts = period.split('-');
       if (parts.length == 2) {
         final date = DateTime(int.parse(parts[0]), int.parse(parts[1]));
-        return DateFormat('MMMM yyyy').format(date);
+        return DateFormat('MMMM yyyy', 'es_CO').format(date);
       }
     } catch (_) {}
     return period;

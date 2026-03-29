@@ -73,7 +73,7 @@ class CreditCardBillingSimulator extends ConsumerWidget {
     final isAfterCutoff = transactionDate.isAfter(cutoffDate);
     final daysToPayment = paymentDate.difference(DateTime.now()).inDays;
 
-    final dateFormat = DateFormat('MMM d, yyyy');
+    final dateFormat = DateFormat('dd/MM/yyyy', 'es_CO');
 
     return Card(
       elevation: 2,
@@ -167,7 +167,7 @@ class CreditCardBillingSimulator extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 4),
-        Text(DateFormat('MMM d').format(date), 
+        Text(DateFormat('d MMM', 'es_CO').format(date), 
           style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: c)),
         Text(label, 
           style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSurfaceVariant)),
