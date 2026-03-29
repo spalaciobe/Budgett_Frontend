@@ -155,6 +155,13 @@ class _Sidebar extends ConsumerWidget {
                 ),
 
                 _SidebarItem(
+                   icon: Icons.category,
+                   label: 'Categorías',
+                   isSelected: currentPath == '/categories',
+                   isExpanded: isExpanded,
+                   onTap: () => context.go('/categories'),
+                ),
+                _SidebarItem(
                    icon: Icons.settings,
                    label: 'Settings',
                    isSelected: currentPath == '/settings',
