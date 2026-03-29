@@ -14,9 +14,9 @@ class CurrencyNotifier extends AsyncNotifier<String> {
   }
 
   Future<void> setCurrency(String currency) async {
+    state = AsyncData(currency); // optimistic update — UI responds instantly
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyCurrency, currency);
-    state = AsyncData(currency);
   }
 }
 
@@ -30,9 +30,9 @@ class ThemeModeNotifier extends AsyncNotifier<bool> {
   }
 
   Future<void> setDarkMode(bool isDark) async {
+    state = AsyncData(isDark); // optimistic update — theme switches instantly
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyDarkMode, isDark);
-    state = AsyncData(isDark);
   }
 }
 
@@ -46,9 +46,9 @@ class CcNotificationsEnabledNotifier extends AsyncNotifier<bool> {
   }
 
   Future<void> setEnabled(bool enabled) async {
+    state = AsyncData(enabled); // optimistic update
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyCcNotificationsEnabled, enabled);
-    state = AsyncData(enabled);
   }
 }
 
@@ -64,9 +64,9 @@ class CcNotificationDaysBeforeNotifier extends AsyncNotifier<int> {
   }
 
   Future<void> setDaysBefore(int days) async {
+    state = AsyncData(days); // optimistic update
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_keyCcNotificationsDaysBefore, days);
-    state = AsyncData(days);
   }
 }
 
