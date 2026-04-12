@@ -6,6 +6,8 @@ class Account {
   final String type;
   final double balance;
   final double creditLimit;
+  final double balanceUsd;
+  final double creditLimitUsd;
   final int? closingDay;
   final int? paymentDueDay;
   final CreditCardRules? creditCardRules;
@@ -17,6 +19,8 @@ class Account {
     required this.type,
     required this.balance,
     this.creditLimit = 0.0,
+    this.balanceUsd = 0.0,
+    this.creditLimitUsd = 0.0,
     this.closingDay,
     this.paymentDueDay,
     this.creditCardRules,
@@ -30,6 +34,8 @@ class Account {
       type: json['type'],
       balance: (json['balance'] as num).toDouble(),
       creditLimit: (json['credit_limit'] as num?)?.toDouble() ?? 0.0,
+      balanceUsd: (json['balance_usd'] as num?)?.toDouble() ?? 0.0,
+      creditLimitUsd: (json['credit_limit_usd'] as num?)?.toDouble() ?? 0.0,
       closingDay: json['closing_day'],
       paymentDueDay: json['payment_due_day'],
       icon: json['icon'],

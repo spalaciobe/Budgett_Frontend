@@ -123,45 +123,103 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
               data: (data) {
                 double totalInc = 0;
                 double totalExp = 0;
+                double totalIncUsd = 0;
+                double totalExpUsd = 0;
                 for (var d in data) {
-                  totalInc += d['income'];
-                  totalExp += d['expense'];
+                  totalInc += (d['income'] as num?)?.toDouble() ?? 0.0;
+                  totalExp += (d['expense'] as num?)?.toDouble() ?? 0.0;
+                  totalIncUsd += (d['income_usd'] as num?)?.toDouble() ?? 0.0;
+                  totalExpUsd += (d['expense_usd'] as num?)?.toDouble() ?? 0.0;
                 }
                 final rate = totalInc > 0 ? ((totalInc - totalExp) / totalInc * 100) : 0.0;
-                
-                return Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      children: [
-                        const Text('Yearly Overview', style: TextStyle(fontWeight: FontWeight.bold)),
-                        const Divider(),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                final hasUsd = totalIncUsd > 0 || totalExpUsd > 0;
+
+                return Column(
+                  children: [
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
                           children: [
-                            const Text('Total Income'),
-                            Text(CurrencyFormatter.format(totalInc), style: const TextStyle(color: Colors.green)),
+                            const Text('Resumen anual — COP', style: TextStyle(fontWeight: FontWeight.bold)),
+                            const Divider(),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('Total ingresos'),
+                                Text(CurrencyFormatter.format(totalInc), style: const TextStyle(color: Colors.green)),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('Total gastos'),
+                                Text(CurrencyFormatter.format(totalExp), style: const TextStyle(color: Colors.red)),
+                              ],
+                            ),
+                            const Divider(),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('Tasa de ahorro'),
+                                Text('${rate.toStringAsFixed(1)}%', style: const TextStyle(fontWeight: FontWeight.bold)),
+                              ],
+                            ),
                           ],
                         ),
-                        const SizedBox(height: 8),
-                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text('Total Expenses'),
-                            Text(CurrencyFormatter.format(totalExp), style: const TextStyle(color: Colors.red)),
-                          ],
-                        ),
-                        const Divider(),
-                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text('Savings Rate'),
-                            Text('${rate.toStringAsFixed(1)}%', style: const TextStyle(fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
+                    if (hasUsd) ...[
+                      const SizedBox(height: 12),
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            children: [
+                              Row(
+                                children: [
+                                  const Text('Resumen anual — USD', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.withOpacity(0.12),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text('USD',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.blue.shade700,
+                                        )),
+                                  ),
+                                ],
+                              ),
+                              const Divider(),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text('Total ingresos USD'),
+                                  Text(CurrencyFormatter.format(totalIncUsd, currency: 'USD'),
+                                      style: const TextStyle(color: Colors.green)),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text('Total gastos USD'),
+                                  Text(CurrencyFormatter.format(totalExpUsd, currency: 'USD'),
+                                      style: const TextStyle(color: Colors.red)),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 );
               },
               loading: () => const SizedBox(),

@@ -27,6 +27,9 @@ Transaction _tx({
   String status = 'cleared',
   String? movementType,
   String? expenseGroupId,
+  String currency = 'COP',
+  String? targetCurrency,
+  double? fxRate,
 }) {
   return Transaction.fromJson({
     'id': id,
@@ -41,6 +44,9 @@ Transaction _tx({
     'status': status,
     'movement_type': movementType,
     'expense_group_id': expenseGroupId,
+    'currency': currency,
+    'target_currency': targetCurrency,
+    'fx_rate': fxRate,
   });
 }
 
@@ -159,6 +165,8 @@ void main() {
         'type': 'savings',
         'balance': 1500000.0,
         'credit_limit': 0,
+        'balance_usd': 0,
+        'credit_limit_usd': 0,
         'closing_day': null,
         'payment_due_day': null,
         'icon': 'account_balance',
@@ -178,6 +186,8 @@ void main() {
         'type': 'credit_card',
         'balance': -350000.0,
         'credit_limit': 2000000,
+        'balance_usd': 0,
+        'credit_limit_usd': 0,
         'closing_day': 25,
         'payment_due_day': 7,
         'icon': null,

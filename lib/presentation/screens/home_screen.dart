@@ -133,12 +133,21 @@ class HomeScreen extends ConsumerWidget {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      CurrencyFormatter.format(acc.balance, decimalDigits: 2), 
+                                      CurrencyFormatter.format(acc.balance, decimalDigits: 2),
                                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 18,
                                       )
                                     ),
+                                    if (acc.type == 'credit_card' && acc.balanceUsd != 0) ...[
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        CurrencyFormatter.format(acc.balanceUsd, currency: 'USD'),
+                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                                        ),
+                                      ),
+                                    ],
                                   ],
                                 )
                               ],

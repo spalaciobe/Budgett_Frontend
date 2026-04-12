@@ -13,7 +13,12 @@ class Transaction {
   final String? expenseGroupId;
   final String? notes;
   final String? place;
-  
+
+  // Currency fields
+  final String currency; // 'COP' or 'USD'
+  final String? targetCurrency; // set on cross-currency transfers
+  final double? fxRate; // COP per 1 USD, required when targetCurrency differs
+
   // Credit Card Specific
   final String? billingPeriod;
   final DateTime? calculatedCutoffDate;
@@ -34,10 +39,16 @@ class Transaction {
     this.expenseGroupId,
     this.notes,
     this.place,
+    this.currency = 'COP',
+    this.targetCurrency,
+    this.fxRate,
     this.billingPeriod,
     this.calculatedCutoffDate,
     this.calculatedPaymentDate,
   });
+
+  bool get isCrossCurrencyPayment =>
+      targetCurrency != null && targetCurrency != currency;
 
   factory Transaction.fromJson(Map<String, dynamic> json) {
     return Transaction(
@@ -55,9 +66,16 @@ class Transaction {
       expenseGroupId: json['expense_group_id'],
       notes: json['notes'],
       place: json['place'],
+      currency: json['currency'] as String? ?? 'COP',
+      targetCurrency: json['target_currency'] as String?,
+      fxRate: (json['fx_rate'] as num?)?.toDouble(),
       billingPeriod: json['periodo_facturacion'],
-      calculatedCutoffDate: json['fecha_corte_calculada'] != null ? DateTime.parse(json['fecha_corte_calculada']) : null,
-      calculatedPaymentDate: json['fecha_pago_calculada'] != null ? DateTime.parse(json['fecha_pago_calculada']) : null,
+      calculatedCutoffDate: json['fecha_corte_calculada'] != null
+          ? DateTime.parse(json['fecha_corte_calculada'])
+          : null,
+      calculatedPaymentDate: json['fecha_pago_calculada'] != null
+          ? DateTime.parse(json['fecha_pago_calculada'])
+          : null,
     );
   }
 }

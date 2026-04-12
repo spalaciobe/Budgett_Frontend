@@ -208,11 +208,12 @@ class FinanceRepository {
         .select('amount')
         .eq('user_id', userId)
         .eq('type', 'income')
+        .eq('currency', 'COP') // Budgets are COP-only
         .gte('date', '$year-${month.toString().padLeft(2, '0')}-01')
-        .lt('date', month == 12 
-            ? '${year + 1}-01-01' 
+        .lt('date', month == 12
+            ? '${year + 1}-01-01'
             : '$year-${(month + 1).toString().padLeft(2, '0')}-01');
-    
+
     if (result.isEmpty) return 0.0;
     return result.fold<double>(0.0, (sum, item) => sum + (item['amount'] as num).toDouble());
   }
@@ -224,9 +225,10 @@ class FinanceRepository {
         .select('category_id, sub_category_id, amount')
         .eq('user_id', userId)
         .eq('type', 'expense')
+        .eq('currency', 'COP') // Budgets are COP-only
         .gte('date', '$year-${month.toString().padLeft(2, '0')}-01')
-        .lt('date', month == 12 
-            ? '${year + 1}-01-01' 
+        .lt('date', month == 12
+            ? '${year + 1}-01-01'
             : '$year-${(month + 1).toString().padLeft(2, '0')}-01');
     
     final Map<String, CategorySpending> spending = {};
@@ -258,9 +260,10 @@ class FinanceRepository {
         .select('category_id, sub_category_id, amount')
         .eq('user_id', userId)
         .eq('type', 'income')
+        .eq('currency', 'COP') // Budgets are COP-only
         .gte('date', '$year-${month.toString().padLeft(2, '0')}-01')
-        .lt('date', month == 12 
-            ? '${year + 1}-01-01' 
+        .lt('date', month == 12
+            ? '${year + 1}-01-01'
             : '$year-${(month + 1).toString().padLeft(2, '0')}-01');
     
     final Map<String, CategorySpending> income = {};
@@ -410,37 +413,51 @@ class FinanceRepository {
     while (true) {
       try {
         final userId = _client.auth.currentUser!.id;
-        // Bug fix 1: filter by status='paid' to exclude pending transactions
-        // Bug fix 2: select sub_categories_id is not needed — only date, amount, type
         final result = await _client
             .from('transactions')
-            .select('date, amount, type')
+            .select('date, amount, type, currency')
             .eq('user_id', userId)
             .eq('status', 'paid')
             .gte('date', '$year-01-01')
             .lte('date', '$year-12-31');
 
-        // Group by month
+        // Group by month — separate COP and USD slices
         final Map<int, Map<String, double>> monthlyStats = {
-          for (int i = 1; i <= 12; i++) i: {'income': 0.0, 'expense': 0.0},
+          for (int i = 1; i <= 12; i++)
+            i: {
+              'income': 0.0,
+              'expense': 0.0,
+              'income_usd': 0.0,
+              'expense_usd': 0.0,
+            },
         };
 
         for (var item in result) {
           final date = DateTime.parse(item['date'] as String);
           final amount = (item['amount'] as num).toDouble();
           final type = item['type'] as String;
+          final currency = (item['currency'] as String?) ?? 'COP';
 
           if (type == 'income') {
-            monthlyStats[date.month]!['income'] =
-                monthlyStats[date.month]!['income']! + amount;
+            if (currency == 'USD') {
+              monthlyStats[date.month]!['income_usd'] =
+                  monthlyStats[date.month]!['income_usd']! + amount;
+            } else {
+              monthlyStats[date.month]!['income'] =
+                  monthlyStats[date.month]!['income']! + amount;
+            }
           } else if (type == 'expense') {
-            monthlyStats[date.month]!['expense'] =
-                monthlyStats[date.month]!['expense']! + amount;
+            if (currency == 'USD') {
+              monthlyStats[date.month]!['expense_usd'] =
+                  monthlyStats[date.month]!['expense_usd']! + amount;
+            } else {
+              monthlyStats[date.month]!['expense'] =
+                  monthlyStats[date.month]!['expense']! + amount;
+            }
           }
           // 'transfer' type is intentionally skipped — not income or expense
         }
 
-        // Bug fix 3: sort by month explicitly (map iteration order not guaranteed by contract)
         final entries = monthlyStats.entries.toList()
           ..sort((a, b) => a.key.compareTo(b.key));
 
@@ -449,6 +466,8 @@ class FinanceRepository {
                   'month': e.key,
                   'income': e.value['income'],
                   'expense': e.value['expense'],
+                  'income_usd': e.value['income_usd'],
+                  'expense_usd': e.value['expense_usd'],
                 })
             .toList();
       } on PostgrestException catch (e) {

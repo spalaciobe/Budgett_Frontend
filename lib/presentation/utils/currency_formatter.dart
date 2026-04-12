@@ -2,45 +2,118 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 class CurrencyFormatter {
-  /// Formats a double value as COP currency with thousands separators.
-  /// Output example: $1.200.000 (no decimals by default, as COP doesn't use them)
-  static String format(double amount, {int decimalDigits = 0, bool includeSymbol = true}) {
-    final formatter = NumberFormat.currency(
-      locale: 'es_CO',
-      symbol: includeSymbol ? '\$' : '',
-      decimalDigits: decimalDigits,
-    );
-    return formatter.format(amount).trim();
+  /// Formats [amount] according to [currency].
+  ///
+  /// COP: es_CO locale, '$' prefix, 0 decimal digits (e.g. $1.200.000)
+  /// USD: en_US locale, 'US$' prefix, 2 decimal digits (e.g. US$1,200.50)
+  static String format(
+    double amount, {
+    int? decimalDigits,
+    bool includeSymbol = true,
+    String currency = 'COP',
+  }) {
+    if (currency == 'USD') {
+      final formatter = NumberFormat.currency(
+        locale: 'en_US',
+        symbol: includeSymbol ? 'US\$' : '',
+        decimalDigits: decimalDigits ?? 2,
+      );
+      return formatter.format(amount).trim();
+    } else {
+      // Default: COP
+      final formatter = NumberFormat.currency(
+        locale: 'es_CO',
+        symbol: includeSymbol ? '\$' : '',
+        decimalDigits: decimalDigits ?? 0,
+      );
+      return formatter.format(amount).trim();
+    }
   }
 
-  static double parse(String value) {
-    // es_CO uses '.' as thousands separator and ',' as decimal separator
-    // Remove thousands separators (dots) and replace decimal comma with dot
-    final cleaned = value
-        .replaceAll(RegExp(r'[^0-9,]'), '')
-        .replaceAll(',', '.');
-    return double.tryParse(cleaned) ?? 0.0;
+  /// Parses a formatted currency string back to a double.
+  ///
+  /// COP: strips dots (thousands) and replaces commas with dots.
+  /// USD: strips commas (thousands), handles dot as decimal separator.
+  static double parse(String value, {String currency = 'COP'}) {
+    if (currency == 'USD') {
+      // en_US: ',' is thousands sep, '.' is decimal
+      final cleaned = value
+          .replaceAll(RegExp(r'[^0-9.]'), '')
+          .replaceAll(RegExp(r'\.(?=.*\.)'), ''); // keep only last dot
+      return double.tryParse(cleaned) ?? 0.0;
+    } else {
+      // es_CO: '.' is thousands sep, ',' is decimal
+      final cleaned = value
+          .replaceAll(RegExp(r'[^0-9,]'), '')
+          .replaceAll(',', '.');
+      return double.tryParse(cleaned) ?? 0.0;
+    }
   }
+
+  /// Returns the prefix text for a currency, for use in TextFormField.
+  static String prefixFor(String currency) =>
+      currency == 'USD' ? 'US\$' : '\$';
 }
 
 class CurrencyInputFormatter extends TextInputFormatter {
+  final String currency;
+
+  const CurrencyInputFormatter({this.currency = 'COP'});
+
   @override
-  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue, TextEditingValue newValue) {
     if (newValue.text.isEmpty) {
       return newValue.copyWith(text: '');
     }
 
-    // In COP inputs we work with whole numbers only (no decimal cents)
-    // Strip everything except digits
-    final digitsOnly = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
-
-    if (digitsOnly.isEmpty) {
-      return newValue.copyWith(text: '');
+    if (currency == 'USD') {
+      return _formatUsd(newValue);
+    } else {
+      return _formatCop(newValue);
     }
+  }
 
-    // Format with es_CO thousands separator (dot)
+  // COP: whole numbers only, es_CO thousands separator (dot)
+  TextEditingValue _formatCop(TextEditingValue value) {
+    final digitsOnly = value.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digitsOnly.isEmpty) return value.copyWith(text: '');
+
     final formatter = NumberFormat('#,###', 'es_CO');
     final formatted = formatter.format(int.parse(digitsOnly));
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+
+  // USD: up to 2 decimal digits, en_US thousands separator (comma)
+  TextEditingValue _formatUsd(TextEditingValue value) {
+    // Allow digits and at most one dot
+    String raw = value.text.replaceAll(RegExp(r'[^0-9.]'), '');
+
+    // Preserve at most one decimal point
+    final dotIndex = raw.indexOf('.');
+    if (dotIndex != -1) {
+      final afterDot = raw.substring(dotIndex + 1).replaceAll('.', '');
+      final truncated = afterDot.length > 2 ? afterDot.substring(0, 2) : afterDot;
+      raw = '${raw.substring(0, dotIndex)}.$truncated';
+    }
+
+    if (raw.isEmpty) return value.copyWith(text: '');
+
+    // Format integer part with en_US thousands separator
+    final parts = raw.split('.');
+    final intPart = parts[0].isEmpty ? '0' : parts[0];
+    final intValue = int.tryParse(intPart) ?? 0;
+    final formatter = NumberFormat('#,###', 'en_US');
+    final formattedInt = intValue == 0 && intPart.isEmpty
+        ? ''
+        : formatter.format(intValue);
+
+    final formatted =
+        parts.length > 1 ? '$formattedInt.${parts[1]}' : formattedInt;
 
     return TextEditingValue(
       text: formatted,

@@ -18,6 +18,8 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
   late TextEditingController _nameController;
   late TextEditingController _balanceController;
   late TextEditingController _creditLimitController;
+  late TextEditingController _balanceUsdController;
+  late TextEditingController _creditLimitUsdController;
   late TextEditingController _closingDayController;
   late TextEditingController _paymentDueDayController;
   
@@ -33,6 +35,12 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
     _nameController = TextEditingController(text: acc.name);
     _balanceController = TextEditingController(text: CurrencyFormatter.format(acc.balance, includeSymbol: false));
     _creditLimitController = TextEditingController(text: CurrencyFormatter.format(acc.creditLimit, includeSymbol: false));
+    _balanceUsdController = TextEditingController(
+      text: acc.balanceUsd != 0.0 ? CurrencyFormatter.format(acc.balanceUsd, includeSymbol: false, currency: 'USD') : '',
+    );
+    _creditLimitUsdController = TextEditingController(
+      text: acc.creditLimitUsd != 0.0 ? CurrencyFormatter.format(acc.creditLimitUsd, includeSymbol: false, currency: 'USD') : '',
+    );
     _closingDayController = TextEditingController(text: acc.closingDay?.toString() ?? '');
     _paymentDueDayController = TextEditingController(text: acc.paymentDueDay?.toString() ?? '');
     
@@ -45,6 +53,8 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
     _nameController.dispose();
     _balanceController.dispose();
     _creditLimitController.dispose();
+    _balanceUsdController.dispose();
+    _creditLimitUsdController.dispose();
     _closingDayController.dispose();
     _paymentDueDayController.dispose();
     super.dispose();
@@ -63,18 +73,26 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
     };
 
     if (_selectedType == 'credit_card') {
-      accountData['credit_limit'] = _creditLimitController.text.isEmpty 
-          ? 0.0 
+      accountData['credit_limit'] = _creditLimitController.text.isEmpty
+          ? 0.0
           : CurrencyFormatter.parse(_creditLimitController.text);
-      accountData['closing_day'] = _closingDayController.text.isEmpty 
-          ? null 
+      accountData['balance_usd'] = _balanceUsdController.text.isEmpty
+          ? 0.0
+          : CurrencyFormatter.parse(_balanceUsdController.text, currency: 'USD');
+      accountData['credit_limit_usd'] = _creditLimitUsdController.text.isEmpty
+          ? 0.0
+          : CurrencyFormatter.parse(_creditLimitUsdController.text, currency: 'USD');
+      accountData['closing_day'] = _closingDayController.text.isEmpty
+          ? null
           : int.parse(_closingDayController.text);
-      accountData['payment_due_day'] = _paymentDueDayController.text.isEmpty 
-          ? null 
+      accountData['payment_due_day'] = _paymentDueDayController.text.isEmpty
+          ? null
           : int.parse(_paymentDueDayController.text);
     } else {
       // Clear credit card specific fields if type changed
       accountData['credit_limit'] = 0.0;
+      accountData['balance_usd'] = 0.0;
+      accountData['credit_limit_usd'] = 0.0;
       accountData['closing_day'] = null;
       accountData['payment_due_day'] = null;
     }
@@ -214,7 +232,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                     border: OutlineInputBorder(),
                   ),
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [CurrencyInputFormatter()],
+                  inputFormatters: [const CurrencyInputFormatter()],
                   validator: (value) {
                     if (value == null || value.isEmpty) return 'Required';
                     if (CurrencyFormatter.parse(value) == 0.0 && value != '0' && value != '0.0') return 'Invalid number';
@@ -252,12 +270,43 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                   TextFormField(
                     controller: _creditLimitController,
                     decoration: const InputDecoration(
-                      labelText: 'Credit Limit',
+                      labelText: 'Cupo total (COP)',
                       prefixText: '\$',
                       border: OutlineInputBorder(),
                     ),
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    inputFormatters: [CurrencyInputFormatter()],
+                    inputFormatters: [const CurrencyInputFormatter()],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // USD slice
+                  const Divider(),
+                  Text('Saldo en USD',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          )),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _balanceUsdController,
+                    decoration: const InputDecoration(
+                      labelText: 'Saldo USD (deuda negativa)',
+                      prefixText: 'US\$',
+                      border: OutlineInputBorder(),
+                      helperText: 'Ajusta manualmente para reconciliar con el banco.',
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                    inputFormatters: [const CurrencyInputFormatter(currency: 'USD')],
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _creditLimitUsdController,
+                    decoration: const InputDecoration(
+                      labelText: 'Cupo USD',
+                      prefixText: 'US\$',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [const CurrencyInputFormatter(currency: 'USD')],
                   ),
                   const SizedBox(height: 16),
 

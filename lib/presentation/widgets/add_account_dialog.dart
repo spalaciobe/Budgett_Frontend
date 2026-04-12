@@ -65,6 +65,8 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
   final _nameController = TextEditingController();
   final _balanceController = TextEditingController();
   final _creditLimitController = TextEditingController();
+  final _balanceUsdController = TextEditingController();
+  final _creditLimitUsdController = TextEditingController();
   final _cutoffDayController = TextEditingController();
   final _paymentDayController = TextEditingController();
 
@@ -77,6 +79,8 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
     _nameController.dispose();
     _balanceController.dispose();
     _creditLimitController.dispose();
+    _balanceUsdController.dispose();
+    _creditLimitUsdController.dispose();
     _cutoffDayController.dispose();
     _paymentDayController.dispose();
     super.dispose();
@@ -127,6 +131,12 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
       accountData['credit_limit'] = _creditLimitController.text.isEmpty
           ? 0.0
           : CurrencyFormatter.parse(_creditLimitController.text);
+      accountData['balance_usd'] = _balanceUsdController.text.isEmpty
+          ? 0.0
+          : CurrencyFormatter.parse(_balanceUsdController.text, currency: 'USD');
+      accountData['credit_limit_usd'] = _creditLimitUsdController.text.isEmpty
+          ? 0.0
+          : CurrencyFormatter.parse(_creditLimitUsdController.text, currency: 'USD');
 
       if (_selectedBank != null) {
         final cutoffDay = int.tryParse(_cutoffDayController.text);
@@ -246,7 +256,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                   ),
                   keyboardType: const TextInputType.numberWithOptions(
                       decimal: true, signed: true),
-                  inputFormatters: [CurrencyInputFormatter()],
+                  inputFormatters: [const CurrencyInputFormatter()],
                   validator: (v) =>
                       v == null || v.isEmpty ? 'Requerido' : null,
                 ),
@@ -337,13 +347,53 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                   TextFormField(
                     controller: _creditLimitController,
                     decoration: const InputDecoration(
-                      labelText: 'Cupo total',
+                      labelText: 'Cupo total (COP)',
                       prefixText: '\$',
                       border: OutlineInputBorder(),
                     ),
                     keyboardType: const TextInputType.numberWithOptions(
                         decimal: true),
-                    inputFormatters: [CurrencyInputFormatter()],
+                    inputFormatters: [const CurrencyInputFormatter()],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // USD slice (optional)
+                  const Divider(),
+                  Text('Saldo en USD (opcional)',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          )),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Si tu tarjeta tiene deuda en dólares, ingrésala aquí.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.7),
+                        ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _balanceUsdController,
+                    decoration: const InputDecoration(
+                      labelText: 'Saldo actual USD (deuda negativa)',
+                      prefixText: 'US\$',
+                      border: OutlineInputBorder(),
+                      helperText: 'Ingresa negativo si tienes deuda activa en USD.',
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true, signed: true),
+                    inputFormatters: [const CurrencyInputFormatter(currency: 'USD')],
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _creditLimitUsdController,
+                    decoration: const InputDecoration(
+                      labelText: 'Cupo USD',
+                      prefixText: 'US\$',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true),
+                    inputFormatters: [const CurrencyInputFormatter(currency: 'USD')],
                   ),
 
                   // RappiCard: auto-rules notice

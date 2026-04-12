@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/data/models/transaction_model.dart';
+import 'package:budgett_frontend/data/models/bank_model.dart';
+import 'package:budgett_frontend/data/repositories/bank_repository.dart';
+import 'package:budgett_frontend/core/utils/credit_card_calculator.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 
 class EditTransactionDialog extends ConsumerStatefulWidget {
@@ -26,26 +29,32 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
   String? _selectedCategoryId;
   String? _selectedMovementType;
   late String _status;
-  
+  late String _currency;
+  bool _isUsdPayment = false;
+  late TextEditingController _fxRateController;
+
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
     final t = widget.transaction;
-    _amountController = TextEditingController(text: CurrencyFormatter.format(t.amount, includeSymbol: false));
+    _currency = t.currency;
+    _amountController = TextEditingController(
+        text: CurrencyFormatter.format(t.amount, includeSymbol: false, currency: t.currency));
     _descriptionController = TextEditingController(text: t.description);
     _notesController = TextEditingController(text: t.notes ?? '');
-    
+    _fxRateController = TextEditingController(
+        text: t.fxRate != null ? t.fxRate!.toStringAsFixed(0) : '');
+
     _selectedDate = t.date;
     _selectedType = t.type;
     _selectedAccountId = t.accountId;
     _selectedTargetAccountId = t.targetAccountId;
-    // Unified selection initialization
     _selectedCategoryId = t.subCategoryId ?? t.categoryId;
     _selectedMovementType = t.movementType;
-    _selectedMovementType = t.movementType;
     _status = t.status;
+    _isUsdPayment = t.isCrossCurrencyPayment;
   }
 
   @override
@@ -53,6 +62,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
     _amountController.dispose();
     _descriptionController.dispose();
     _notesController.dispose();
+    _fxRateController.dispose();
     super.dispose();
   }
 
@@ -90,17 +100,50 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
 
     final transactionData = <String, dynamic>{
       'account_id': _selectedAccountId,
-      'amount': CurrencyFormatter.parse(_amountController.text),
+      'amount': CurrencyFormatter.parse(_amountController.text, currency: _currency),
       'description': _descriptionController.text,
       'date': _selectedDate.toIso8601String().split('T')[0],
       'type': _selectedType,
       'status': _status,
-      'status': _status,
-      // 'category_id' will be set below
+      'currency': _currency,
       'target_account_id': _selectedType == 'transfer' ? _selectedTargetAccountId : null,
       'movement_type': _selectedType == 'expense' ? _selectedMovementType : null,
       'notes': _notesController.text.isNotEmpty ? _notesController.text : null,
     };
+
+    // Cross-currency payment fields
+    if (_isUsdPayment && _selectedType == 'transfer') {
+      final rate = double.tryParse(_fxRateController.text.replaceAll(',', ''));
+      if (rate != null && rate > 0) {
+        transactionData['target_currency'] = 'USD';
+        transactionData['fx_rate'] = rate;
+      }
+    } else {
+      transactionData['target_currency'] = null;
+      transactionData['fx_rate'] = null;
+    }
+
+    // Recalculate billing period for CC transactions
+    try {
+      final accounts = ref.read(accountsProvider).valueOrNull ?? [];
+      final account = accounts.firstWhereOrNull((a) => a.id == _selectedAccountId);
+      if (account != null && account.type == 'credit_card' && account.creditCardRules != null) {
+        final bank = await ref.read(bankRepositoryProvider).getBanks().then(
+            (banks) => banks.firstWhereOrNull((b) => b.id == account.creditCardRules!.bankId));
+        if (bank != null) {
+          final billingPeriod = CreditCardCalculator.determineBillingPeriod(
+              _selectedDate, account.creditCardRules!, bank);
+          final parts = billingPeriod.split('-');
+          final cutoff = CreditCardCalculator.calculateCutoffDate(
+              account.creditCardRules!, bank, int.parse(parts[0]), int.parse(parts[1]));
+          final payment = CreditCardCalculator.calculatePaymentDate(
+              account.creditCardRules!, bank, cutoff);
+          transactionData['periodo_facturacion'] = billingPeriod;
+          transactionData['fecha_corte_calculada'] = cutoff.toIso8601String();
+          transactionData['fecha_pago_calculada'] = payment.toIso8601String();
+        }
+      }
+    } catch (_) {}
     
     // Logic to distinguish Category vs SubCategory ID (Unified Dropdown)
     if (_selectedType != 'transfer' && _selectedCategoryId != null) {
@@ -239,19 +282,48 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Currency toggle (CC transactions)
+                      Builder(builder: (context) {
+                        final accounts = ref.watch(accountsProvider).valueOrNull ?? [];
+                        final account = accounts.firstWhereOrNull(
+                            (a) => a.id == _selectedAccountId);
+                        final isCC = account?.type == 'credit_card';
+                        if (!isCC ||
+                            (_selectedType != 'expense' &&
+                                _selectedType != 'income')) {
+                          return const SizedBox();
+                        }
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: SegmentedButton<String>(
+                            segments: const [
+                              ButtonSegment(value: 'COP', label: Text('COP')),
+                              ButtonSegment(value: 'USD', label: Text('USD')),
+                            ],
+                            selected: {_currency},
+                            onSelectionChanged: (s) => setState(() {
+                              _currency = s.first;
+                              _amountController.clear();
+                            }),
+                          ),
+                        );
+                      }),
+
                       // Amount
                       TextFormField(
                         controller: _amountController,
-                        decoration: const InputDecoration(
-                          labelText: 'Amount',
-                          prefixText: '\$',
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: 'Monto',
+                          prefixText: CurrencyFormatter.prefixFor(_currency),
+                          border: const OutlineInputBorder(),
                         ),
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        inputFormatters: [CurrencyInputFormatter()],
+                        inputFormatters: [CurrencyInputFormatter(currency: _currency)],
                         validator: (value) {
-                          if (value == null || value.isEmpty) return 'Required';
-                          if (CurrencyFormatter.parse(value) == 0.0 && value != '0' && value != '0.0') return 'Invalid number';
+                          if (value == null || value.isEmpty) return 'Requerido';
+                          if (CurrencyFormatter.parse(value, currency: _currency) == 0.0 &&
+                              value != '0' &&
+                              value != '0.0') return 'Número inválido';
                           return null;
                         },
                       ),
@@ -451,7 +523,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                 ),
               ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
 
               // Actions
               Row(
@@ -484,5 +556,14 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
         ),
       ),
     );
+  }
+}
+
+extension _ListExt<T> on List<T> {
+  T? firstWhereOrNull(bool Function(T) test) {
+    for (final e in this) {
+      if (test(e)) return e;
+    }
+    return null;
   }
 }

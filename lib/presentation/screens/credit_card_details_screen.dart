@@ -68,29 +68,59 @@ class CreditCardDetailsScreen extends ConsumerWidget {
 
             const SizedBox(height: 24),
 
-            // 3. Account Stats
+            // 3. Account Stats — COP slice
             Row(
               children: [
                 Expanded(
                   child: _buildStatCard(
                     context,
-                    'Available',
-                    account.creditLimit > 0 ? account.creditLimit + account.balance : 0, // Balance is usually negative for debt
-                    Colors.green
+                    'Disponible COP',
+                    account.creditLimit > 0 ? account.creditLimit + account.balance : 0,
+                    Colors.green,
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: _buildStatCard(
                     context,
-                    'Used',
+                    'Usado COP',
                     account.balance.abs(),
-                    Colors.red
+                    Colors.red,
                   ),
                 ),
               ],
             ),
-             const SizedBox(height: 24),
+
+            // USD slice (only shown when the account has USD activity)
+            if (account.creditLimitUsd > 0 || account.balanceUsd != 0) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildStatCard(
+                      context,
+                      'Disponible USD',
+                      account.creditLimitUsd > 0
+                          ? account.creditLimitUsd + account.balanceUsd
+                          : 0,
+                      Colors.green,
+                      currency: 'USD',
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildStatCard(
+                      context,
+                      'Usado USD',
+                      account.balanceUsd.abs(),
+                      Colors.red,
+                      currency: 'USD',
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 24),
 
             // 4. Transactions / Extracts List
             Text('Recent Transactions',
@@ -99,23 +129,34 @@ class CreditCardDetailsScreen extends ConsumerWidget {
 
             transactionsAsync.when(
               data: (transactions) {
-                if (transactions.isEmpty) return const Text('No transactions found.');
+                if (transactions.isEmpty) return const Text('No hay transacciones.');
 
-                // Group by Billing Period
+                // Group by (billingPeriod, currency) — key = "YYYY-MM::COP"
                 final Map<String, List<Transaction>> grouped = {};
                 for (var t in transactions) {
-                  final period = t.billingPeriod ?? 'Unassigned';
-                  grouped.putIfAbsent(period, () => []).add(t);
+                  final period = t.billingPeriod ?? 'Sin asignar';
+                  final key = '$period::${t.currency}';
+                  grouped.putIfAbsent(key, () => []).add(t);
                 }
 
-                // Sort keys descending (newest period first)
-                final sortedKeys = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
+                // Sort: newest period first, then COP before USD within same period
+                final sortedKeys = grouped.keys.toList()
+                  ..sort((a, b) {
+                    final aParts = a.split('::');
+                    final bParts = b.split('::');
+                    final periodCmp = bParts[0].compareTo(aParts[0]);
+                    if (periodCmp != 0) return periodCmp;
+                    return aParts[1].compareTo(bParts[1]); // COP before USD
+                  });
 
                 return Column(
                   children: sortedKeys.asMap().entries.map((entry) {
                     final index = entry.key;
-                    final period = entry.value;
-                    final periodTransactions = grouped[period]!;
+                    final key = entry.value;
+                    final parts = key.split('::');
+                    final period = parts[0];
+                    final currency = parts.length > 1 ? parts[1] : 'COP';
+                    final periodTransactions = grouped[key]!;
                     final total = periodTransactions.fold(0.0, (sum, t) => sum + t.amount);
 
                     return Card(
@@ -123,34 +164,84 @@ class CreditCardDetailsScreen extends ConsumerWidget {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       elevation: 1,
                       child: ExpansionTile(
-                         initiallyExpanded: index == 0, // Expand first one
-                         shape: const Border(), // Remove default borders
-                         title: Text(
-                           _formatPeriod(period),
-                           style: const TextStyle(fontWeight: FontWeight.bold),
-                         ),
-                         subtitle: Text(
-                           'Total: ${CurrencyFormatter.format(total)}',
-                           style: TextStyle(
-                             color: Theme.of(context).colorScheme.primary,
-                             fontWeight: FontWeight.w600
-                           ),
-                         ),
-                         children: periodTransactions.map((t) {
-                           return ListTile(
-                             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-                             leading: CircleAvatar(
-                                radius: 4,
-                                backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.5),
-                             ),
-                             title: Text(t.description, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-                             trailing: Text(
-                               CurrencyFormatter.format(t.amount),
-                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                             ),
-                             subtitle: Text(DateFormat('d MMM', 'es_CO').format(t.date), style: const TextStyle(fontSize: 11)),
-                           );
-                         }).toList(),
+                        initiallyExpanded: index == 0,
+                        shape: const Border(),
+                        title: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                _formatPeriod(period),
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: currency == 'USD'
+                                    ? Colors.blue.withOpacity(0.12)
+                                    : Theme.of(context).colorScheme.primaryContainer,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                currency,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: currency == 'USD'
+                                      ? Colors.blue.shade700
+                                      : Theme.of(context).colorScheme.primary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        subtitle: Text(
+                          'Total: ${CurrencyFormatter.format(total, currency: currency)}',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        children: periodTransactions.map((t) {
+                          final isCrossPayment = t.isCrossCurrencyPayment;
+                          return ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 0),
+                            leading: CircleAvatar(
+                              radius: 4,
+                              backgroundColor: isCrossPayment
+                                  ? Colors.green.withOpacity(0.6)
+                                  : Theme.of(context)
+                                      .colorScheme
+                                      .primary
+                                      .withOpacity(0.5),
+                            ),
+                            title: Text(t.description,
+                                style: const TextStyle(
+                                    fontSize: 14, fontWeight: FontWeight.w500)),
+                            trailing: Text(
+                              CurrencyFormatter.format(t.amount, currency: t.currency),
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                    DateFormat('d MMM', 'es_CO').format(t.date),
+                                    style: const TextStyle(fontSize: 11)),
+                                if (isCrossPayment && t.fxRate != null)
+                                  Text(
+                                    'Pago en COP @ \$${NumberFormat('#,###', 'es_CO').format(t.fxRate!.toInt())}',
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.green.shade700),
+                                  ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
                       ),
                     );
                   }).toList(),
@@ -393,7 +484,7 @@ class CreditCardDetailsScreen extends ConsumerWidget {
   }
 
 
-  Widget _buildStatCard(BuildContext context, String label, double amount, Color color) {
+  Widget _buildStatCard(BuildContext context, String label, double amount, Color color, {String currency = 'COP'}) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -406,7 +497,7 @@ class CreditCardDetailsScreen extends ConsumerWidget {
           Text(label.toUpperCase(),
                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurfaceVariant)),
           const SizedBox(height: 4),
-          Text(CurrencyFormatter.format(amount),
+          Text(CurrencyFormatter.format(amount, currency: currency),
                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
         ],
       ),

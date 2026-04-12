@@ -9,6 +9,7 @@ class RecurringTransaction {
   final DateTime nextRunDate;
   final DateTime? lastRunDate;
   final bool isActive;
+  final String currency; // 'COP' or 'USD'
 
   RecurringTransaction({
     required this.id,
@@ -21,6 +22,7 @@ class RecurringTransaction {
     required this.nextRunDate,
     this.lastRunDate,
     required this.isActive,
+    this.currency = 'COP',
   });
 
   factory RecurringTransaction.fromJson(Map<String, dynamic> json) {
@@ -35,6 +37,7 @@ class RecurringTransaction {
       nextRunDate: DateTime.parse(json['next_run_date']),
       lastRunDate: json['last_run_date'] != null ? DateTime.parse(json['last_run_date']) : null,
       isActive: json['is_active'] ?? true,
+      currency: json['currency'] as String? ?? 'COP',
     );
   }
 
@@ -48,6 +51,7 @@ class RecurringTransaction {
       'frequency': frequency,
       'next_run_date': nextRunDate.toIso8601String().split('T')[0],
       'is_active': isActive,
+      'currency': currency,
     };
   }
 }
