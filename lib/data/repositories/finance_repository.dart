@@ -107,6 +107,28 @@ class FinanceRepository {
      }, onConflict: 'category_id, month, year, user_id');
   }
 
+  /// Copia los presupuestos del mes anterior al mes/año indicado.
+  /// Si ya existen presupuestos para ese mes, los sobreescribe (upsert).
+  /// Retorna el número de presupuestos copiados.
+  Future<int> copyBudgetsFromPreviousMonth(int month, int year) async {
+    final prevMonth = month == 1 ? 12 : month - 1;
+    final prevYear = month == 1 ? year - 1 : year;
+
+    final previous = await getBudgets(prevMonth, prevYear);
+    if (previous.isEmpty) return 0;
+
+    for (final budget in previous) {
+      await setBudget(Budget(
+        id: '',
+        categoryId: budget.categoryId,
+        amount: budget.amount,
+        month: month,
+        year: year,
+      ));
+    }
+    return previous.length;
+  }
+
   // Goals
   Future<List<Goal>> getGoals() async {
     final userId = _client.auth.currentUser!.id;

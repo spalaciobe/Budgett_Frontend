@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:budgett_frontend/core/app_constants.dart';
 import 'package:budgett_frontend/presentation/navigation/app_router.dart';
 import 'package:budgett_frontend/core/app_theme.dart';
@@ -36,6 +37,9 @@ final ccAlertSchedulerProvider = FutureProvider<void>((ref) async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await initializeDateFormatting('es_CO');
+  await initializeDateFormatting('es');
 
   await Supabase.initialize(
     url: AppConstants.supabaseUrl,
