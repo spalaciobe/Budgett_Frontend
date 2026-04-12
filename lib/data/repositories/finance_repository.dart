@@ -18,7 +18,7 @@ class FinanceRepository {
     int attempts = 0;
     while (true) {
       try {
-        final List<dynamic> data = await _client.from('accounts').select().order('name');
+        final List<dynamic> data = await _client.from('accounts').select().eq('user_id', _client.auth.currentUser!.id).order('name');
         return data.map((json) => Account.fromJson(json)).toList();
       } on PostgrestException catch (e) {
         if (attempts < 1 && (e.message.contains('JWT issued at future') || e.code == 'PGRST303')) {
@@ -40,6 +40,7 @@ class FinanceRepository {
         final List<dynamic> data = await _client
             .from('transactions')
             .select()
+            .eq('user_id', _client.auth.currentUser!.id)
             .order('date', ascending: false)
             .limit(10);
         return data.map((json) => Transaction.fromJson(json)).toList();
@@ -66,7 +67,7 @@ class FinanceRepository {
 
   // Categories
   Future<List<Category>> getCategories() async {
-    final List<dynamic> data = await _client.from('categories').select('*, sub_categories(*)').order('name');
+    final List<dynamic> data = await _client.from('categories').select('*, sub_categories(*)').eq('user_id', _client.auth.currentUser!.id).order('name');
     return data.map((json) => Category.fromJson(json)).toList();
   }
 

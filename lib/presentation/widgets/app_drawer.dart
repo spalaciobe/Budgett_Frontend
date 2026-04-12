@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:budgett_frontend/presentation/screens/recurring_transactions_screen.dart';
 import 'package:budgett_frontend/presentation/screens/expense_groups_screen.dart';
 import 'package:budgett_frontend/presentation/screens/settings_screen.dart';
+import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 
 class AppDrawer extends ConsumerWidget {
   const AppDrawer({super.key});
@@ -93,6 +94,14 @@ class AppDrawer extends ConsumerWidget {
             title: const Text('Logout'),
             onTap: () async {
               Navigator.pop(context);
+              ref.invalidate(accountsProvider);
+              ref.invalidate(recentTransactionsProvider);
+              ref.invalidate(categoriesProvider);
+              ref.invalidate(goalsProvider);
+              ref.invalidate(budgetsProvider);
+              ref.invalidate(expenseGroupsProvider);
+              ref.invalidate(yearlySummaryProvider);
+              ref.invalidate(recurringTransactionsProvider);
               await Supabase.instance.client.auth.signOut();
               if (context.mounted) context.go('/login');
             },

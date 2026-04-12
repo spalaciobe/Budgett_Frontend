@@ -1,4 +1,5 @@
 import 'package:budgett_frontend/presentation/providers/auth_provider.dart';
+import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -177,6 +178,14 @@ class _Sidebar extends ConsumerWidget {
           // User / Logout Section
           InkWell(
             onTap: () async {
+              ref.invalidate(accountsProvider);
+              ref.invalidate(recentTransactionsProvider);
+              ref.invalidate(categoriesProvider);
+              ref.invalidate(goalsProvider);
+              ref.invalidate(budgetsProvider);
+              ref.invalidate(expenseGroupsProvider);
+              ref.invalidate(yearlySummaryProvider);
+              ref.invalidate(recurringTransactionsProvider);
               await Supabase.instance.client.auth.signOut();
               if (context.mounted) context.go('/login');
             },
