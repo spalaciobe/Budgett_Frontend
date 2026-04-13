@@ -13,6 +13,12 @@ import '../../presentation/widgets/add_account_dialog.dart';
 import '../../presentation/widgets/credit_card_billing_simulator.dart';
 import '../../presentation/widgets/edit_account_dialog.dart';
 
+// ─── helpers ──────────────────────────────────────────────────────────────────
+final _monthNames = [
+  'Enero','Febrero','Marzo','Abril','Mayo','Junio',
+  'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre',
+];
+
 // Provider to fetch transactions for a specific account
 final accountTransactionsProvider = FutureProvider.family.autoDispose<List<Transaction>, String>((ref, accountId) async {
   final repo = ref.read(financeRepositoryProvider);
@@ -26,22 +32,27 @@ class CreditCardDetailsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Re-read from the provider on every build so the screen reflects account
+    // updates (e.g. after saving rules) without requiring a manual reload.
+    final freshAccount = ref.watch(accountsProvider).valueOrNull
+            ?.firstWhere((a) => a.id == account.id, orElse: () => account) ??
+        account;
+
     // Watch transactions for this account
-    final transactionsAsync = ref.watch(accountTransactionsProvider(account.id));
+    final transactionsAsync = ref.watch(accountTransactionsProvider(freshAccount.id));
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(account.name),
+        title: Text(freshAccount.name),
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),
             onPressed: () {
                showDialog(
                 context: context,
-                builder: (context) => EditAccountDialog(account: account),
+                builder: (context) => EditAccountDialog(account: freshAccount),
               ).then((_) {
-                 // Refresh account data if needed (usually handled by provider stream/updates)
-                 ref.invalidate(accountsProvider); // Global refresh to be safe
+                 ref.invalidate(accountsProvider);
               });
             },
           ),
@@ -57,14 +68,14 @@ class CreditCardDetailsScreen extends ConsumerWidget {
                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             CreditCardBillingSimulator(
-              account: account,
+              account: freshAccount,
               transactionDate: DateTime.now(),
             ),
 
             const SizedBox(height: 24),
 
             // 2. Reglas de corte y pago
-            _buildRulesSection(context, ref),
+            _buildRulesSection(context, ref, freshAccount),
 
             const SizedBox(height: 24),
 
@@ -75,7 +86,7 @@ class CreditCardDetailsScreen extends ConsumerWidget {
                   child: _buildStatCard(
                     context,
                     'Disponible COP',
-                    account.creditLimit > 0 ? account.creditLimit + account.balance : 0,
+                    freshAccount.creditLimit > 0 ? freshAccount.creditLimit + freshAccount.balance : 0,
                     Colors.green,
                   ),
                 ),
@@ -84,7 +95,7 @@ class CreditCardDetailsScreen extends ConsumerWidget {
                   child: _buildStatCard(
                     context,
                     'Usado COP',
-                    account.balance.abs(),
+                    freshAccount.balance.abs(),
                     Colors.red,
                   ),
                 ),
@@ -92,7 +103,7 @@ class CreditCardDetailsScreen extends ConsumerWidget {
             ),
 
             // USD slice (only shown when the account has USD activity)
-            if (account.creditLimitUsd > 0 || account.balanceUsd != 0) ...[
+            if (freshAccount.creditLimitUsd > 0 || freshAccount.balanceUsd != 0) ...[
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -100,8 +111,8 @@ class CreditCardDetailsScreen extends ConsumerWidget {
                     child: _buildStatCard(
                       context,
                       'Disponible USD',
-                      account.creditLimitUsd > 0
-                          ? account.creditLimitUsd + account.balanceUsd
+                      freshAccount.creditLimitUsd > 0
+                          ? freshAccount.creditLimitUsd + freshAccount.balanceUsd
                           : 0,
                       Colors.green,
                       currency: 'USD',
@@ -112,7 +123,7 @@ class CreditCardDetailsScreen extends ConsumerWidget {
                     child: _buildStatCard(
                       context,
                       'Usado USD',
-                      account.balanceUsd.abs(),
+                      freshAccount.balanceUsd.abs(),
                       Colors.red,
                       currency: 'USD',
                     ),
@@ -256,9 +267,18 @@ class CreditCardDetailsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildRulesSection(BuildContext context, WidgetRef ref) {
-    final rules = account.creditCardRules;
+  Widget _buildRulesSection(BuildContext context, WidgetRef ref, Account acc) {
+    final rules = acc.creditCardRules;
     final banksAsync = ref.watch(banksFutureProvider);
+
+    // Watch calendar overrides so "Próximas fechas" reflects manual edits
+    final now = DateTime.now();
+    final calendarThisYear = ref
+        .watch(billingCalendarProvider((accountId: acc.id, year: now.year)))
+        .valueOrNull ?? {};
+    final calendarNextYear = ref
+        .watch(billingCalendarProvider((accountId: acc.id, year: now.year + 1)))
+        .valueOrNull ?? {};
 
     if (rules == null) {
       return Card(
@@ -278,7 +298,7 @@ class CreditCardDetailsScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
               FilledButton.icon(
-                onPressed: () => _showRulesBottomSheet(context, ref),
+                onPressed: () => _showRulesBottomSheet(context, ref, acc),
                 icon: const Icon(Icons.settings),
                 label: const Text('Configurar reglas'),
               ),
@@ -293,18 +313,20 @@ class CreditCardDetailsScreen extends ConsumerWidget {
         final bank = banks.where((b) => b.id == rules.bankId).firstOrNull;
         final bankName = bank?.name ?? 'Banco desconocido';
 
-        // Calculate next 3 months of dates
-        final now = DateTime.now();
+        // Calculate next 3 months, merging with any calendar overrides
         final upcomingDates = <_CutoffPaymentPair>[];
         if (bank != null) {
           for (int i = 0; i < 3; i++) {
             final targetDate = DateTime(now.year, now.month + i);
-            final cutoff = CreditCardCalculator.calculateCutoffDate(
-              rules, bank, targetDate.year, targetDate.month,
-            );
-            final payment = CreditCardCalculator.calculatePaymentDate(
-              rules, bank, cutoff,
-            );
+            final overrides = targetDate.year == now.year
+                ? calendarThisYear
+                : calendarNextYear;
+            final override = overrides[targetDate.month];
+            final cutoff = override?.cutoff ??
+                CreditCardCalculator.calculateCutoffDate(
+                    rules, bank, targetDate.year, targetDate.month);
+            final payment = override?.payment ??
+                CreditCardCalculator.calculatePaymentDate(rules, bank, cutoff);
             upcomingDates.add(_CutoffPaymentPair(cutoff, payment));
           }
         }
@@ -325,7 +347,7 @@ class CreditCardDetailsScreen extends ConsumerWidget {
                     ),
                     IconButton(
                       icon: const Icon(Icons.edit_outlined, size: 20),
-                      onPressed: () => _showRulesBottomSheet(context, ref),
+                      onPressed: () => _showRulesBottomSheet(context, ref, acc),
                       tooltip: 'Editar reglas',
                     ),
                   ],
@@ -456,7 +478,7 @@ class CreditCardDetailsScreen extends ConsumerWidget {
     return '${rules.daysAfterCutoff} días $offsetLabel después del corte';
   }
 
-  void _showRulesBottomSheet(BuildContext context, WidgetRef ref) {
+  void _showRulesBottomSheet(BuildContext context, WidgetRef ref, Account acc) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -464,7 +486,7 @@ class CreditCardDetailsScreen extends ConsumerWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (sheetContext) => _CreditCardRulesBottomSheet(
-        account: account,
+        account: acc,
         parentRef: ref,
       ),
     );
@@ -750,6 +772,32 @@ class _CreditCardRulesBottomSheetState extends ConsumerState<_CreditCardRulesBot
 
             const SizedBox(height: 24),
 
+            // Calendar override button — only when rules are already saved
+            if (widget.account.creditCardRules != null && _selectedBank != null)
+              OutlinedButton.icon(
+                icon: const Icon(Icons.calendar_month_outlined, size: 18),
+                label: const Text('Ver y editar fechas del año'),
+                onPressed: () {
+                  Navigator.of(context).pop(); // close rules sheet
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    useSafeArea: true,
+                    constraints: const BoxConstraints(maxWidth: 720),
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                    ),
+                    builder: (_) => _BillingCalendarSheet(
+                      account: widget.account,
+                      bank: _selectedBank!,
+                      parentRef: widget.parentRef,
+                    ),
+                  );
+                },
+              ),
+
+            const SizedBox(height: 12),
+
             SizedBox(
               width: double.infinity,
               child: FilledButton(
@@ -765,6 +813,432 @@ class _CreditCardRulesBottomSheetState extends ConsumerState<_CreditCardRulesBot
           ],
         ),
       ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Billing Calendar Sheet
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _BillingCalendarSheet extends ConsumerStatefulWidget {
+  final Account account;
+  final Bank bank;
+  final WidgetRef parentRef;
+
+  const _BillingCalendarSheet({
+    required this.account,
+    required this.bank,
+    required this.parentRef,
+  });
+
+  @override
+  ConsumerState<_BillingCalendarSheet> createState() =>
+      _BillingCalendarSheetState();
+}
+
+class _BillingCalendarSheetState
+    extends ConsumerState<_BillingCalendarSheet> {
+  int _year = DateTime.now().year;
+  final _fmt = DateFormat('d MMM', 'es_CO');
+
+  @override
+  Widget build(BuildContext context) {
+    final rules = widget.account.creditCardRules;
+    if (rules == null) return const SizedBox();
+
+    final calendarAsync = ref.watch(billingCalendarProvider(
+        (accountId: widget.account.id, year: _year)));
+
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.95,
+      minChildSize: 0.5,
+      builder: (ctx, scrollCtrl) => Column(
+        children: [
+          // Handle
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Center(
+              child: Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+          ),
+
+          // Header + year selector
+          Padding(
+            padding: const EdgeInsets.fromLTRB(32, 0, 8, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text('Fechas de corte y pago',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold)),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.chevron_left),
+                  onPressed: () => setState(() => _year--),
+                ),
+                Text('$_year',
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                IconButton(
+                  icon: const Icon(Icons.chevron_right),
+                  onPressed: () => setState(() => _year++),
+                ),
+              ],
+            ),
+          ),
+
+          // Column headers
+          Padding(
+            padding: const EdgeInsets.fromLTRB(32, 0, 32, 4),
+            child: Row(
+              children: [
+                const SizedBox(width: 120),
+                Expanded(
+                  child: Text('Corte',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      )),
+                ),
+                Expanded(
+                  child: Text('Pago',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      )),
+                ),
+                const SizedBox(width: 96),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+
+          // Months list
+          Expanded(
+            child: calendarAsync.when(
+              data: (overrides) => ListView.separated(
+                controller: scrollCtrl,
+                itemCount: 12,
+                separatorBuilder: (_, __) =>
+                    const Divider(height: 1, indent: 20, endIndent: 20),
+                itemBuilder: (ctx, i) {
+                  final month = i + 1;
+                  final calcCutoff = CreditCardCalculator.calculateCutoffDate(
+                      rules, widget.bank, _year, month);
+                  final calcPayment = CreditCardCalculator.calculatePaymentDate(
+                      rules, widget.bank, calcCutoff);
+
+                  final override = overrides[month];
+                  final effectiveCutoff = override?.cutoff ?? calcCutoff;
+                  final effectivePayment = override?.payment ?? calcPayment;
+                  final isOverridden = override != null;
+
+                  return _MonthRow(
+                    monthName: _monthNames[i],
+                    cutoff: effectiveCutoff,
+                    payment: effectivePayment,
+                    isOverridden: isOverridden,
+                    fmt: _fmt,
+                    onEdit: () => _editMonth(
+                      ctx, month, effectiveCutoff, effectivePayment, overrides),
+                    onReset: isOverridden
+                        ? () => _resetMonth(month)
+                        : null,
+                  );
+                },
+              ),
+              loading: () =>
+                  const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(child: Text('Error: $e')),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _editMonth(
+    BuildContext ctx,
+    int month,
+    DateTime currentCutoff,
+    DateTime currentPayment,
+    Map<int, ({DateTime cutoff, DateTime payment})> overrides,
+  ) async {
+    DateTime? newCutoff = currentCutoff;
+    DateTime? newPayment = currentPayment;
+
+    await showDialog<void>(
+      context: ctx,
+      builder: (dCtx) => _EditMonthDialog(
+        monthName: _monthNames[month - 1],
+        year: _year,
+        initialCutoff: currentCutoff,
+        initialPayment: currentPayment,
+        onSave: (cutoff, payment) {
+          newCutoff = cutoff;
+          newPayment = payment;
+        },
+      ),
+    );
+
+    if (newCutoff == null || newPayment == null) return;
+    if (newCutoff == currentCutoff && newPayment == currentPayment &&
+        overrides[month] != null) return;
+
+    try {
+      await ref.read(financeRepositoryProvider).upsertBillingCalendarEntry(
+            widget.account.id, _year, month, newCutoff!, newPayment!);
+      ref.invalidate(billingCalendarProvider(
+          (accountId: widget.account.id, year: _year)));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  Future<void> _resetMonth(int month) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Restablecer fecha'),
+        content: Text(
+            '¿Volver a la fecha calculada automáticamente para ${_monthNames[month - 1]} $_year?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancelar')),
+          FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Restablecer')),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    try {
+      await ref.read(financeRepositoryProvider).deleteBillingCalendarEntry(
+            widget.account.id, _year, month);
+      ref.invalidate(billingCalendarProvider(
+          (accountId: widget.account.id, year: _year)));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Month row widget
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _MonthRow extends StatelessWidget {
+  final String monthName;
+  final DateTime cutoff;
+  final DateTime payment;
+  final bool isOverridden;
+  final DateFormat fmt;
+  final VoidCallback onEdit;
+  final VoidCallback? onReset;
+
+  const _MonthRow({
+    required this.monthName,
+    required this.cutoff,
+    required this.payment,
+    required this.isOverridden,
+    required this.fmt,
+    required this.onEdit,
+    this.onReset,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final overrideColor = Theme.of(context).colorScheme.tertiary;
+    final textStyle = TextStyle(
+      fontSize: 14,
+      fontWeight: FontWeight.w500,
+      color: isOverridden ? overrideColor : null,
+    );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 10),
+      child: Row(
+        children: [
+          // Month name
+          SizedBox(
+            width: 120,
+            child: Row(
+              children: [
+                if (isOverridden)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: Icon(Icons.edit_note, size: 14, color: overrideColor),
+                  ),
+                Flexible(
+                  child: Text(
+                    monthName,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: isOverridden ? overrideColor : null,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Cutoff date
+          Expanded(child: Text(fmt.format(cutoff), style: textStyle)),
+          // Payment date
+          Expanded(child: Text(fmt.format(payment), style: textStyle)),
+          // Actions
+          SizedBox(
+            width: 96,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  visualDensity: VisualDensity.compact,
+                  tooltip: 'Editar',
+                  onPressed: onEdit,
+                ),
+                if (onReset != null)
+                  IconButton(
+                    icon: Icon(Icons.restore, size: 18,
+                        color: Theme.of(context).colorScheme.error),
+                    visualDensity: VisualDensity.compact,
+                    tooltip: 'Restablecer',
+                    onPressed: onReset,
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Edit month dialog
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _EditMonthDialog extends StatefulWidget {
+  final String monthName;
+  final int year;
+  final DateTime initialCutoff;
+  final DateTime initialPayment;
+  final void Function(DateTime cutoff, DateTime payment) onSave;
+
+  const _EditMonthDialog({
+    required this.monthName,
+    required this.year,
+    required this.initialCutoff,
+    required this.initialPayment,
+    required this.onSave,
+  });
+
+  @override
+  State<_EditMonthDialog> createState() => _EditMonthDialogState();
+}
+
+class _EditMonthDialogState extends State<_EditMonthDialog> {
+  late DateTime _cutoff;
+  late DateTime _payment;
+  final _fmt = DateFormat('d MMM yyyy', 'es_CO');
+
+  @override
+  void initState() {
+    super.initState();
+    _cutoff = widget.initialCutoff;
+    _payment = widget.initialPayment;
+  }
+
+  Future<void> _pickDate({required bool isCutoff}) async {
+    final initial = isCutoff ? _cutoff : _payment;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(widget.year - 1),
+      lastDate: DateTime(widget.year + 2),
+      useRootNavigator: false,
+    );
+    if (picked == null) return;
+    setState(() {
+      if (isCutoff) {
+        _cutoff = picked;
+      } else {
+        _payment = picked;
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('${widget.monthName} ${widget.year}'),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+      contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+      content: SizedBox(
+        width: 480,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Cutoff row
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.content_cut, color: Colors.orange),
+              title: const Text('Fecha de corte'),
+              subtitle: Text(_fmt.format(_cutoff),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              trailing: TextButton(
+                onPressed: () => _pickDate(isCutoff: true),
+                child: const Text('Cambiar'),
+              ),
+            ),
+            const SizedBox(height: 8),
+            // Payment row
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.payment, color: Colors.green),
+              title: const Text('Fecha de pago'),
+              subtitle: Text(_fmt.format(_payment),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              trailing: TextButton(
+                onPressed: () => _pickDate(isCutoff: false),
+                child: const Text('Cambiar'),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: () {
+            widget.onSave(_cutoff, _payment);
+            Navigator.of(context).pop();
+          },
+          child: const Text('Guardar'),
+        ),
+      ],
     );
   }
 }

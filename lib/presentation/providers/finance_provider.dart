@@ -53,3 +53,10 @@ final yearlySummaryProvider = FutureProvider.family<List<Map<String, dynamic>>, 
   final repository = ref.watch(financeRepositoryProvider);
   return repository.getYearlySummary(year);
 });
+
+final billingCalendarProvider = FutureProvider.family.autoDispose<
+    Map<int, ({DateTime cutoff, DateTime payment})>,
+    ({String accountId, int year})>((ref, params) async {
+  final repository = ref.watch(financeRepositoryProvider);
+  return repository.getBillingCalendar(params.accountId, params.year);
+});

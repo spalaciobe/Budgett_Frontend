@@ -18,7 +18,11 @@ class FinanceRepository {
     int attempts = 0;
     while (true) {
       try {
-        final List<dynamic> data = await _client.from('accounts').select().eq('user_id', _client.auth.currentUser!.id).order('name');
+        final List<dynamic> data = await _client
+            .from('accounts')
+            .select('*, credit_card_details(*)')
+            .eq('user_id', _client.auth.currentUser!.id)
+            .order('name');
         return data.map((json) => Account.fromJson(json)).toList();
       } on PostgrestException catch (e) {
         if (attempts < 1 && (e.message.contains('JWT issued at future') || e.code == 'PGRST303')) {
@@ -59,10 +63,21 @@ class FinanceRepository {
 
   Future<void> createAccount(Map<String, dynamic> accountData) async {
     final userId = _client.auth.currentUser!.id;
-    await _client.from('accounts').insert({
-      ...accountData,
-      'user_id': userId,
-    });
+    final ccDetails = accountData['credit_card_details'] as Map<String, dynamic>?;
+    final accountRow = Map<String, dynamic>.from(accountData)..remove('credit_card_details');
+
+    final inserted = await _client
+        .from('accounts')
+        .insert({...accountRow, 'user_id': userId})
+        .select('id')
+        .single();
+
+    if (ccDetails != null) {
+      await _client.from('credit_card_details').upsert(
+        {...ccDetails, 'account_id': inserted['id']},
+        onConflict: 'account_id',
+      );
+    }
   }
 
   // Categories
@@ -94,6 +109,49 @@ class FinanceRepository {
         .eq('month', month)
         .eq('year', year);
     return data.map((json) => Budget.fromJson(json)).toList();
+  }
+
+  // ── Billing Calendar (manual overrides) ─────────────────────────────────
+
+  /// Returns overrides for a given account/year, keyed by month (1-12).
+  Future<Map<int, ({DateTime cutoff, DateTime payment})>> getBillingCalendar(
+      String accountId, int year) async {
+    final data = await _client
+        .from('bank_billing_calendar')
+        .select('month, fecha_corte, fecha_pago')
+        .eq('account_id', accountId)
+        .eq('year', year);
+
+    return {
+      for (final row in data)
+        (row['month'] as int): (
+          cutoff: DateTime.parse(row['fecha_corte'] as String),
+          payment: DateTime.parse(row['fecha_pago'] as String),
+        ),
+    };
+  }
+
+  Future<void> upsertBillingCalendarEntry(
+      String accountId, int year, int month, DateTime cutoff, DateTime payment) async {
+    final userId = _client.auth.currentUser!.id;
+    await _client.from('bank_billing_calendar').upsert({
+      'account_id': accountId,
+      'user_id': userId,
+      'year': year,
+      'month': month,
+      'fecha_corte': cutoff.toIso8601String().split('T')[0],
+      'fecha_pago': payment.toIso8601String().split('T')[0],
+    }, onConflict: 'account_id, year, month');
+  }
+
+  Future<void> deleteBillingCalendarEntry(
+      String accountId, int year, int month) async {
+    await _client
+        .from('bank_billing_calendar')
+        .delete()
+        .eq('account_id', accountId)
+        .eq('year', year)
+        .eq('month', month);
   }
 
   Future<void> setBudget(Budget budget) async {
@@ -336,7 +394,19 @@ class FinanceRepository {
 
   // Accounts
   Future<void> updateAccount(String id, Map<String, dynamic> data) async {
-    await _client.from('accounts').update(data).eq('id', id);
+    final ccDetails = data['credit_card_details'] as Map<String, dynamic>?;
+    final accountRow = Map<String, dynamic>.from(data)..remove('credit_card_details');
+
+    if (accountRow.isNotEmpty) {
+      await _client.from('accounts').update(accountRow).eq('id', id);
+    }
+
+    if (ccDetails != null) {
+      await _client.from('credit_card_details').upsert(
+        {...ccDetails, 'account_id': id},
+        onConflict: 'account_id',
+      );
+    }
   }
 
   Future<void> deleteAccount(String id) async {

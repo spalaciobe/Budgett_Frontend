@@ -73,6 +73,8 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
   String _selectedType = 'checking';
   String? _selectedIcon;
   Bank? _selectedBank;
+  // Bancolombia/Davivienda/BBVA have two well-known billing cycles
+  int? _selectedCycle; // 15 or 30 — null until user picks
 
   @override
   void dispose() {
@@ -96,10 +98,18 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
       _selectedBank != null &&
       !_bankHasAutoRules;
 
+  /// True if this bank uses well-known billing cycles (Ciclo 15 / Ciclo 30).
+  bool get _bankHasCycles =>
+      _selectedBank != null &&
+      ['BANCOLOMBIA', 'DAVIVIENDA', 'BBVA'].contains(_selectedBank!.code);
+
   /// Pre-fill default days when the bank is selected.
   void _onBankSelected(Bank? bank) {
     setState(() {
       _selectedBank = bank;
+      _selectedCycle = null;
+      _cutoffDayController.clear();
+      _paymentDayController.clear();
       if (bank == null) return;
 
       switch (bank.code) {
@@ -107,13 +117,26 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
           _cutoffDayController.text = '25';
           _paymentDayController.text = '7';
           break;
+        // BANCOLOMBIA / DAVIVIENDA / BBVA: wait for cycle selection
         case 'BANCOLOMBIA':
         case 'DAVIVIENDA':
         case 'BBVA':
+          break;
         default:
-          _cutoffDayController.text = '15';
-          _paymentDayController.text = '30';
+          // Unknown bank — leave fields empty for manual entry
+          break;
       }
+    });
+  }
+
+  void _onCycleSelected(int cycle) {
+    setState(() {
+      _selectedCycle = cycle;
+      _cutoffDayController.text = cycle.toString();
+      // Correct payment days per Bancolombia 2026 data:
+      // Ciclo 15 → day 2 of next month
+      // Ciclo 30 → day 16 of next month
+      _paymentDayController.text = cycle == 15 ? '2' : '16';
     });
   }
 
@@ -422,6 +445,36 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                         ],
                       ),
                     ),
+                  ],
+
+                  // Cycle selector for banks with well-known cycles (Bancolombia, Davivienda, BBVA)
+                  if (_needsManualDays && _bankHasCycles) ...[
+                    const SizedBox(height: 16),
+                    Text('Ciclo de facturación',
+                        style: Theme.of(context).textTheme.labelLarge),
+                    const SizedBox(height: 8),
+                    SegmentedButton<int>(
+                      segments: const [
+                        ButtonSegment(value: 15, label: Text('Ciclo 15'), icon: Icon(Icons.looks_one_outlined, size: 16)),
+                        ButtonSegment(value: 30, label: Text('Ciclo 30'), icon: Icon(Icons.looks_two_outlined, size: 16)),
+                      ],
+                      selected: _selectedCycle != null ? {_selectedCycle!} : {},
+                      emptySelectionAllowed: true,
+                      onSelectionChanged: (s) {
+                        if (s.isNotEmpty) _onCycleSelected(s.first);
+                      },
+                    ),
+                    if (_selectedCycle != null) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        _selectedCycle == 15
+                            ? 'Corte el 15, pago el 2 del siguiente mes'
+                            : 'Corte el 30, pago el 16 del siguiente mes',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                      ),
+                    ],
                   ],
 
                   // Manual cutoff/payment days (non-Rappi)
