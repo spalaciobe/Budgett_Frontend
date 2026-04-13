@@ -57,11 +57,11 @@ void main() {
       SharedPreferences.setMockInitialValues({});
     });
 
-    test("defaults to false (light mode) when no saved value", () async {
+    test("defaults to null (follow system) when no saved value", () async {
       final container = ProviderContainer();
       addTearDown(container.dispose);
       final result = await container.read(themeModeProvider.future);
-      expect(result, false);
+      expect(result, null);
     });
 
     test("persists dark mode across container instances", () async {
