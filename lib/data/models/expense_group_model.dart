@@ -1,16 +1,16 @@
 class ExpenseGroup {
   final String id;
   final String name;
-  final int month;
-  final int year;
+  final DateTime startDate;
+  final DateTime? endDate;
   final double budgetAmount;
   final String? icon;
 
   ExpenseGroup({
     required this.id,
     required this.name,
-    required this.month,
-    required this.year,
+    required this.startDate,
+    this.endDate,
     this.budgetAmount = 0.0,
     this.icon,
   });
@@ -19,8 +19,8 @@ class ExpenseGroup {
     return ExpenseGroup(
       id: json['id'],
       name: json['name'],
-      month: json['month'],
-      year: json['year'],
+      startDate: DateTime.parse(json['start_date']),
+      endDate: json['end_date'] != null ? DateTime.parse(json['end_date']) : null,
       budgetAmount: (json['budget_amount'] as num?)?.toDouble() ?? 0.0,
       icon: json['icon'],
     );

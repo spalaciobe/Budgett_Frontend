@@ -397,15 +397,15 @@ void main() {
       final eg = ExpenseGroup.fromJson({
         'id': 'grp-1',
         'name': 'Quincena de marzo',
-        'month': 3,
-        'year': 2026,
+        'start_date': '2026-03-01',
+        'end_date': '2026-03-15',
         'budget_amount': 1500000.0,
         'icon': 'calendar_month',
       });
 
       expect(eg.name, 'Quincena de marzo');
-      expect(eg.month, 3);
-      expect(eg.year, 2026);
+      expect(eg.startDate, DateTime(2026, 3, 1));
+      expect(eg.endDate, DateTime(2026, 3, 15));
       expect(eg.budgetAmount, 1500000.0);
     });
 
@@ -413,11 +413,12 @@ void main() {
       final eg = ExpenseGroup.fromJson({
         'id': 'grp-2',
         'name': 'Sin presupuesto',
-        'month': 1,
-        'year': 2026,
+        'start_date': '2026-01-01',
+        'end_date': null,
         'budget_amount': null,
       });
       expect(eg.budgetAmount, 0.0);
+      expect(eg.endDate, isNull);
     });
   });
 

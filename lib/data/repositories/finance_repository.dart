@@ -229,15 +229,13 @@ class FinanceRepository {
   }
 
   // Expense Groups
-  Future<List<ExpenseGroup>> getExpenseGroups(int month, int year) async {
+  Future<List<ExpenseGroup>> getExpenseGroups() async {
     final userId = _client.auth.currentUser!.id;
     final List<dynamic> data = await _client
         .from('expense_groups')
         .select()
         .eq('user_id', userId)
-        .eq('month', month)
-        .eq('year', year)
-        .order('name');
+        .order('start_date', ascending: false);
     return data.map((json) => ExpenseGroup.fromJson(json)).toList();
   }
 
@@ -245,8 +243,8 @@ class FinanceRepository {
     final userId = _client.auth.currentUser!.id;
     await _client.from('expense_groups').insert({
       'name': group.name,
-      'month': group.month,
-      'year': group.year,
+      'start_date': group.startDate.toIso8601String().split('T')[0],
+      'end_date': group.endDate?.toIso8601String().split('T')[0],
       'budget_amount': group.budgetAmount,
       'icon': group.icon,
       'user_id': userId,

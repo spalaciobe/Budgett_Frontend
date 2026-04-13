@@ -2,144 +2,209 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
-import 'package:budgett_frontend/presentation/utils/icon_helper.dart'; // Ensure this exists or use standard icons
+import 'package:budgett_frontend/presentation/utils/icon_helper.dart';
 import 'package:budgett_frontend/data/models/expense_group_model.dart';
 
-class ExpenseGroupsScreen extends ConsumerStatefulWidget {
+class ExpenseGroupsScreen extends ConsumerWidget {
   const ExpenseGroupsScreen({super.key});
 
   @override
-  ConsumerState<ExpenseGroupsScreen> createState() => _ExpenseGroupsScreenState();
-}
-
-class _ExpenseGroupsScreenState extends ConsumerState<ExpenseGroupsScreen> {
-  DateTime _selectedDate = DateTime.now();
-
-  @override
-  Widget build(BuildContext context) {
-    final expenseGroupsAsync = ref.watch(expenseGroupsProvider((month: _selectedDate.month, year: _selectedDate.year)));
+  Widget build(BuildContext context, WidgetRef ref) {
+    final expenseGroupsAsync = ref.watch(expenseGroupsProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Expense Groups'),
+        title: const Text('Grupos de gasto'),
         centerTitle: true,
       ),
-      body: Column(
-        children: [
-          // Month Selector
-          _buildMonthSelector(),
-          
-          Expanded(
-            child: expenseGroupsAsync.when(
-              data: (groups) {
-                if (groups.isEmpty) {
-                  return const Center(child: Text('No expense groups for this month.'));
-                }
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: groups.length,
-                  itemBuilder: (context, index) {
-                    return _ExpenseGroupCard(group: groups[index]);
-                  },
-                );
-              },
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, s) => Center(child: Text('Error: $e')),
-            ),
-          ),
-        ],
+      body: expenseGroupsAsync.when(
+        data: (groups) {
+          if (groups.isEmpty) {
+            return const Center(
+              child: Text('No hay grupos de gasto.\nCrea uno con el botón +.',
+                  textAlign: TextAlign.center),
+            );
+          }
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: groups.length,
+            itemBuilder: (context, index) {
+              return _ExpenseGroupCard(group: groups[index]);
+            },
+          );
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, s) => Center(child: Text('Error: $e')),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddGroupDialog(context),
+        onPressed: () => _showAddGroupDialog(context, ref),
         child: const Icon(Icons.add),
       ),
     );
   }
 
-  Widget _buildMonthSelector() {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      color: Theme.of(context).cardColor,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back_ios, size: 16),
-            onPressed: () {
-              setState(() {
-                _selectedDate = DateTime(_selectedDate.year, _selectedDate.month - 1);
-              });
-            },
-          ),
-          Text(
-            '${_getMonthName(_selectedDate.month)} ${_selectedDate.year}',
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-          IconButton(
-            icon: const Icon(Icons.arrow_forward_ios, size: 16),
-            onPressed: () {
-              setState(() {
-                _selectedDate = DateTime(_selectedDate.year, _selectedDate.month + 1);
-              });
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _getMonthName(int month) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return months[month - 1];
-  }
-
-  Future<void> _showAddGroupDialog(BuildContext context) async {
+  Future<void> _showAddGroupDialog(BuildContext context, WidgetRef ref) async {
     final nameController = TextEditingController();
     final budgetController = TextEditingController();
-    
+    DateTime? startDate;
+    DateTime? endDate;
+
     await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('New Expense Group'),
-        content: Column(
+      builder: (context) => _AddGroupDialog(
+        nameController: nameController,
+        budgetController: budgetController,
+        onConfirm: (start, end) async {
+          startDate = start;
+          endDate = end;
+        },
+      ),
+    );
+
+    if (startDate != null && nameController.text.isNotEmpty) {
+      final budget = double.tryParse(budgetController.text) ?? 0.0;
+      final newGroup = ExpenseGroup(
+        id: '',
+        name: nameController.text,
+        startDate: startDate!,
+        endDate: endDate,
+        budgetAmount: budget,
+        icon: 'folder',
+      );
+      await ref.read(financeRepositoryProvider).createExpenseGroup(newGroup);
+      ref.invalidate(expenseGroupsProvider);
+    }
+  }
+}
+
+/// Separate StatefulWidget so date pickers can update without rebuilding the parent.
+class _AddGroupDialog extends StatefulWidget {
+  final TextEditingController nameController;
+  final TextEditingController budgetController;
+  final Future<void> Function(DateTime start, DateTime? end) onConfirm;
+
+  const _AddGroupDialog({
+    required this.nameController,
+    required this.budgetController,
+    required this.onConfirm,
+  });
+
+  @override
+  State<_AddGroupDialog> createState() => _AddGroupDialogState();
+}
+
+class _AddGroupDialogState extends State<_AddGroupDialog> {
+  DateTime? _startDate;
+  DateTime? _endDate;
+
+  String _formatDate(DateTime? date) {
+    if (date == null) return 'Seleccionar';
+    return '${date.day} ${_monthAbbr(date.month)} ${date.year}';
+  }
+
+  String _monthAbbr(int m) {
+    const abbrs = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    return abbrs[m - 1];
+  }
+
+  Future<void> _pickStartDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _startDate ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+    );
+    if (picked != null) {
+      setState(() {
+        _startDate = picked;
+        // If end date is now before start date, clear it.
+        if (_endDate != null && _endDate!.isBefore(picked)) {
+          _endDate = null;
+        }
+      });
+    }
+  }
+
+  Future<void> _pickEndDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _endDate ?? (_startDate ?? DateTime.now()),
+      firstDate: _startDate ?? DateTime(2020),
+      lastDate: DateTime(2030),
+    );
+    if (picked != null) setState(() => _endDate = picked);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Nuevo grupo de gasto'),
+      content: SingleChildScrollView(
+        child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             TextField(
-              controller: nameController,
-              decoration: const InputDecoration(labelText: 'Name (e.g. Paris Trip)'),
+              controller: widget.nameController,
+              decoration: const InputDecoration(labelText: 'Nombre (ej. Viaje a Cartagena)'),
             ),
             const SizedBox(height: 16),
             TextField(
-              controller: budgetController,
-              decoration: const InputDecoration(labelText: 'Budget Limit', prefixText: '\$'),
+              controller: widget.budgetController,
+              decoration: const InputDecoration(
+                labelText: 'Presupuesto (opcional)',
+                prefixText: '\$',
+              ),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
             ),
+            const SizedBox(height: 20),
+            const Text('Rango de fechas', style: TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.calendar_today, size: 16),
+                    label: Text(_formatDate(_startDate)),
+                    onPressed: _pickStartDate,
+                  ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8),
+                  child: Text('→'),
+                ),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.calendar_today, size: 16),
+                    label: Text(_formatDate(_endDate)),
+                    onPressed: _pickEndDate,
+                  ),
+                ),
+              ],
+            ),
+            if (_endDate == null)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  'Sin fecha de fin = grupo abierto',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () async {
-              if (nameController.text.isNotEmpty) {
-                final budget = double.tryParse(budgetController.text) ?? 0.0;
-                final newGroup = ExpenseGroup(
-                  id: '',
-                  name: nameController.text,
-                  month: _selectedDate.month,
-                  year: _selectedDate.year,
-                  budgetAmount: budget,
-                  icon: 'folder', // Default icon
-                );
-                
-                await ref.read(financeRepositoryProvider).createExpenseGroup(newGroup);
-                ref.invalidate(expenseGroupsProvider);
-                if (context.mounted) Navigator.pop(context);
-              }
-            },
-            child: const Text('Create'),
-          ),
-        ],
       ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+        FilledButton(
+          onPressed: _startDate == null || widget.nameController.text.isEmpty
+              ? null
+              : () async {
+                  await widget.onConfirm(_startDate!, _endDate);
+                  if (context.mounted) Navigator.pop(context);
+                },
+          child: const Text('Crear'),
+        ),
+      ],
     );
   }
 }
@@ -148,12 +213,26 @@ class _ExpenseGroupCard extends ConsumerWidget {
   final ExpenseGroup group;
   const _ExpenseGroupCard({required this.group});
 
+  String _formatDate(DateTime date) {
+    const abbrs = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    return '${date.day} ${abbrs[date.month - 1]} ${date.year}';
+  }
+
+  String get _dateRangeLabel {
+    final start = _formatDate(group.startDate);
+    if (group.endDate == null) return '$start → abierto';
+    final end = _formatDate(group.endDate!);
+    // Omit year in start if same year as end
+    if (group.startDate.year == group.endDate!.year) {
+      const abbrs = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+      final shortStart = '${group.startDate.day} ${abbrs[group.startDate.month - 1]}';
+      return '$shortStart → $end';
+    }
+    return '$start → $end';
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // In a real app we'd fetch actual spending for this group. 
-    // For now, we'll placeholder it or need a new specific provider.
-    // Let's create a FutureBuilder for group spending inside here to keep it simple self-contained.
-    
     return FutureBuilder<List<dynamic>>(
       future: ref.read(financeRepositoryProvider).getTransactionsByGroup(group.id),
       builder: (context, snapshot) {
@@ -182,31 +261,39 @@ class _ExpenseGroupCard extends ConsumerWidget {
                     ),
                     PopupMenuButton(
                       itemBuilder: (context) => [
-                        const PopupMenuItem(value: 'delete', child: Text('Delete')),
+                        const PopupMenuItem(value: 'delete', child: Text('Eliminar')),
                       ],
                       onSelected: (value) async {
-                         if (value == 'delete') {
-                           await ref.read(financeRepositoryProvider).deleteExpenseGroup(group.id);
-                           ref.invalidate(expenseGroupsProvider);
-                         }
+                        if (value == 'delete') {
+                          await ref.read(financeRepositoryProvider).deleteExpenseGroup(group.id);
+                          ref.invalidate(expenseGroupsProvider);
+                        }
                       },
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                LinearProgressIndicator(
-                  value: progress.clamp(0.0, 1.0),
-                  backgroundColor: Colors.grey[200],
-                  color: progress > 1 ? Colors.red : Theme.of(context).primaryColor,
+                const SizedBox(height: 4),
+                Text(
+                  _dateRangeLabel,
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('${CurrencyFormatter.format(spent)} spent'),
-                    Text('of ${CurrencyFormatter.format(group.budgetAmount)}'),
-                  ],
-                ),
+                const SizedBox(height: 12),
+                if (group.budgetAmount > 0) ...[
+                  LinearProgressIndicator(
+                    value: progress.clamp(0.0, 1.0),
+                    backgroundColor: Colors.grey[200],
+                    color: progress > 1 ? Colors.red : Theme.of(context).primaryColor,
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('${CurrencyFormatter.format(spent)} gastado'),
+                      Text('de ${CurrencyFormatter.format(group.budgetAmount)}'),
+                    ],
+                  ),
+                ] else
+                  Text('${CurrencyFormatter.format(spent)} gastado'),
               ],
             ),
           ),

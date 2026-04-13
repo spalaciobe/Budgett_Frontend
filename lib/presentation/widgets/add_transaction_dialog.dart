@@ -279,8 +279,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
   Widget build(BuildContext context) {
     final accountsAsync = ref.watch(accountsProvider);
     final categoriesAsync = ref.watch(categoriesProvider);
-    final expenseGroupsAsync = ref.watch(
-        expenseGroupsProvider((month: _selectedDate.month, year: _selectedDate.year)));
+    final expenseGroupsAsync = ref.watch(expenseGroupsProvider);
 
     return Dialog(
       child: Container(

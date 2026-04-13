@@ -104,9 +104,16 @@ class _FakeFinanceRepository extends FinanceRepository {
     ExpenseGroup.fromJson({
       'id': 'grp-1',
       'name': 'Primera quincena',
-      'month': 3,
-      'year': 2026,
+      'start_date': '2026-03-01',
+      'end_date': '2026-03-15',
       'budget_amount': 1500000.0,
+    }),
+    ExpenseGroup.fromJson({
+      'id': 'grp-2',
+      'name': 'Viaje Cartagena',
+      'start_date': '2026-04-25',
+      'end_date': '2026-05-03',
+      'budget_amount': 2000000.0,
     }),
   ];
 
@@ -141,8 +148,7 @@ class _FakeFinanceRepository extends FinanceRepository {
   Future<List<Goal>> getGoals() async => _goals;
 
   @override
-  Future<List<ExpenseGroup>> getExpenseGroups(int month, int year) async =>
-      _expenseGroups.where((g) => g.month == month && g.year == year).toList();
+  Future<List<ExpenseGroup>> getExpenseGroups() async => _expenseGroups;
 
   @override
   Future<List<RecurringTransaction>> getRecurringTransactions() async =>
@@ -281,26 +287,25 @@ void main() {
     });
   });
 
-  group('expenseGroupsProvider (family)', () {
-    test('resolves with expense groups for matching month/year', () async {
+  group('expenseGroupsProvider', () {
+    test('resolves with all expense groups', () async {
       final container = _makeContainer();
       addTearDown(container.dispose);
 
-      final result = await container.read(
-        expenseGroupsProvider((month: 3, year: 2026)).future,
-      );
-      expect(result, hasLength(1));
+      final result = await container.read(expenseGroupsProvider.future);
+      expect(result, hasLength(2));
       expect(result.first.name, 'Primera quincena');
     });
 
-    test('returns empty for non-matching period', () async {
+    test('groups can span multiple months', () async {
       final container = _makeContainer();
       addTearDown(container.dispose);
 
-      final result = await container.read(
-        expenseGroupsProvider((month: 1, year: 2026)).future,
-      );
-      expect(result, isEmpty);
+      final result = await container.read(expenseGroupsProvider.future);
+      final trip = result.last;
+      expect(trip.name, 'Viaje Cartagena');
+      expect(trip.startDate.month, 4);
+      expect(trip.endDate!.month, 5);
     });
   });
 
@@ -411,7 +416,7 @@ class _ThrowingFinanceRepository extends FinanceRepository {
       throw Exception('Simulated Supabase error');
 
   @override
-  Future<List<ExpenseGroup>> getExpenseGroups(int month, int year) async =>
+  Future<List<ExpenseGroup>> getExpenseGroups() async =>
       throw Exception('Simulated Supabase error');
 
   @override

@@ -44,9 +44,9 @@ final budgetsProvider = FutureProvider.family<List<Budget>, ({int month, int yea
   return repository.getBudgets(date.month, date.year);
 });
 
-final expenseGroupsProvider = FutureProvider.family<List<ExpenseGroup>, ({int month, int year})>((ref, date) async {
+final expenseGroupsProvider = FutureProvider<List<ExpenseGroup>>((ref) async {
   final repository = ref.watch(financeRepositoryProvider);
-  return repository.getExpenseGroups(date.month, date.year);
+  return repository.getExpenseGroups();
 });
 
 final yearlySummaryProvider = FutureProvider.family<List<Map<String, dynamic>>, int>((ref, year) async {
