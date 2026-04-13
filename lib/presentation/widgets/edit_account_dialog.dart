@@ -3,6 +3,10 @@ import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/data/models/account_model.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
+import '../../data/repositories/broker_repository.dart';
+import '../../data/models/broker_model.dart';
+import '../../data/models/investment_details_model.dart';
+import 'add_account_dialog.dart' show buildInvestmentDetailsMap;
 
 class EditAccountDialog extends ConsumerStatefulWidget {
   final Account account;
@@ -22,10 +26,25 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
   late TextEditingController _creditLimitUsdController;
   late TextEditingController _closingDayController;
   late TextEditingController _paymentDueDayController;
-  
+
+  // Investment controllers
+  late TextEditingController _apyRateController;
+  late TextEditingController _principalController;
+  late TextEditingController _interestRateController;
+  late TextEditingController _termDaysController;
+  late TextEditingController _fundCodeController;
+
   late String _selectedType;
   String? _selectedIcon;
-  
+
+  // Investment state
+  InvestmentType _selectedInvestmentType = InvestmentType.highYield;
+  String _investmentBaseCurrency = 'COP';
+  Broker? _selectedBroker;
+  String _investmentInterestPeriod = 'monthly';
+  DateTime? _cdtStartDate;
+  DateTime? _cdtMaturityDate;
+
   bool _isLoading = false;
 
   @override
@@ -43,9 +62,33 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
     );
     _closingDayController = TextEditingController(text: acc.closingDay?.toString() ?? '');
     _paymentDueDayController = TextEditingController(text: acc.paymentDueDay?.toString() ?? '');
-    
+
     _selectedType = acc.type;
     _selectedIcon = acc.icon;
+
+    // Investment fields — initialise from existing details if present
+    final inv = acc.investmentDetails;
+    _apyRateController = TextEditingController(
+      text: inv?.apyRate != null ? (inv!.apyRate! * 100).toStringAsFixed(2) : '',
+    );
+    _principalController = TextEditingController(
+      text: inv?.principal != null
+          ? CurrencyFormatter.format(inv!.principal!, includeSymbol: false)
+          : '',
+    );
+    _interestRateController = TextEditingController(
+      text: inv?.interestRate != null ? (inv!.interestRate! * 100).toStringAsFixed(2) : '',
+    );
+    _termDaysController = TextEditingController(text: inv?.termDays?.toString() ?? '');
+    _fundCodeController = TextEditingController(text: inv?.fundCode ?? '');
+
+    if (inv != null) {
+      _selectedInvestmentType = inv.investmentType;
+      _investmentBaseCurrency = inv.baseCurrency;
+      _investmentInterestPeriod = inv.interestPeriod ?? 'monthly';
+      _cdtStartDate = inv.startDate;
+      _cdtMaturityDate = inv.maturityDate;
+    }
   }
 
   @override
@@ -57,6 +100,11 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
     _creditLimitUsdController.dispose();
     _closingDayController.dispose();
     _paymentDueDayController.dispose();
+    _apyRateController.dispose();
+    _principalController.dispose();
+    _interestRateController.dispose();
+    _termDaysController.dispose();
+    _fundCodeController.dispose();
     super.dispose();
   }
 
@@ -88,6 +136,44 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
       accountData['payment_due_day'] = _paymentDueDayController.text.isEmpty
           ? null
           : int.parse(_paymentDueDayController.text);
+    } else if (_selectedType == 'investment') {
+      // Clear CC-specific fields
+      accountData['credit_limit'] = 0.0;
+      accountData['closing_day'] = null;
+      accountData['payment_due_day'] = null;
+
+      // Apply USD balance if base currency is USD
+      if (_investmentBaseCurrency == 'USD') {
+        accountData['balance_usd'] =
+            CurrencyFormatter.parse(_balanceController.text, currency: 'USD');
+        accountData['balance'] = 0.0;
+      } else {
+        accountData['balance_usd'] = 0.0;
+        accountData['credit_limit_usd'] = 0.0;
+      }
+
+      accountData['investment_details'] = buildInvestmentDetailsMap(
+        investmentType: _selectedInvestmentType,
+        brokerId: _selectedBroker?.id ?? widget.account.investmentDetails?.brokerId,
+        baseCurrency: _investmentBaseCurrency,
+        apyRate: double.tryParse(_apyRateController.text) != null
+            ? double.parse(_apyRateController.text) / 100
+            : widget.account.investmentDetails?.apyRate,
+        interestPeriod: _investmentInterestPeriod,
+        principal: _principalController.text.isEmpty
+            ? widget.account.investmentDetails?.principal
+            : CurrencyFormatter.parse(_principalController.text),
+        interestRate: double.tryParse(_interestRateController.text) != null
+            ? double.parse(_interestRateController.text) / 100
+            : widget.account.investmentDetails?.interestRate,
+        termDays: int.tryParse(_termDaysController.text) ??
+            widget.account.investmentDetails?.termDays,
+        startDate: _cdtStartDate,
+        maturityDate: _cdtMaturityDate,
+        fundCode: _fundCodeController.text.trim().isEmpty
+            ? null
+            : _fundCodeController.text.trim(),
+      );
     } else {
       // Clear credit card specific fields if type changed
       accountData['credit_limit'] = 0.0;
@@ -166,9 +252,19 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
     }
   }
 
+  void _autoComputeMaturity() {
+    final start = _cdtStartDate;
+    final days = int.tryParse(_termDaysController.text);
+    if (start != null && days != null) {
+      setState(() => _cdtMaturityDate = start.add(Duration(days: days)));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isCreditCard = _selectedType == 'credit_card';
+    final isInvestment = _selectedType == 'investment';
+    final brokersAsync = ref.watch(brokersFutureProvider);
 
     return Dialog(
       child: Container(
@@ -270,7 +366,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                   TextFormField(
                     controller: _creditLimitController,
                     decoration: const InputDecoration(
-                      labelText: 'Cupo total (COP)',
+                      labelText: 'Total Credit Limit (COP)',
                       prefixText: '\$',
                       border: OutlineInputBorder(),
                     ),
@@ -281,7 +377,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
 
                   // USD slice
                   const Divider(),
-                  Text('Saldo en USD',
+                  Text('USD Balance',
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
                             color: Theme.of(context).colorScheme.onSurfaceVariant,
                           )),
@@ -289,10 +385,10 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                   TextFormField(
                     controller: _balanceUsdController,
                     decoration: const InputDecoration(
-                      labelText: 'Saldo USD (deuda negativa)',
+                      labelText: 'USD Balance (negative if debt)',
                       prefixText: 'US\$',
                       border: OutlineInputBorder(),
-                      helperText: 'Ajusta manualmente para reconciliar con el banco.',
+                      helperText: 'Adjust manually to reconcile with bank.',
                     ),
                     keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
                     inputFormatters: [const CurrencyInputFormatter(currency: 'USD')],
@@ -301,7 +397,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                   TextFormField(
                     controller: _creditLimitUsdController,
                     decoration: const InputDecoration(
-                      labelText: 'Cupo USD',
+                      labelText: 'USD Credit Limit',
                       prefixText: 'US\$',
                       border: OutlineInputBorder(),
                     ),
@@ -338,6 +434,156 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                     ],
                   ),
                   const SizedBox(height: 16),
+                ],
+
+                // ── Investment section ────────────────────────────────────
+                if (isInvestment) ...[
+                  const Divider(),
+                  Text('Investment Details',
+                      style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 16),
+
+                  DropdownButtonFormField<InvestmentType>(
+                    value: _selectedInvestmentType,
+                    decoration: const InputDecoration(
+                      labelText: 'Investment Type',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: InvestmentType.values
+                        .map((t) => DropdownMenuItem(
+                              value: t,
+                              child: Text(t.displayName),
+                            ))
+                        .toList(),
+                    onChanged: (v) => setState(() {
+                      _selectedInvestmentType = v!;
+                      _investmentBaseCurrency =
+                          v == InvestmentType.stockEtf ? 'USD' : 'COP';
+                    }),
+                  ),
+                  const SizedBox(height: 12),
+
+                  brokersAsync.when(
+                    data: (brokers) {
+                      final filtered = brokers
+                          .where((b) => b.supportedTypes.contains(
+                              _selectedInvestmentType.toDbString()))
+                          .toList();
+                      return DropdownButtonFormField<Broker>(
+                        value: _selectedBroker,
+                        decoration: const InputDecoration(
+                          labelText: 'Platform / Broker',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: filtered
+                            .map((b) => DropdownMenuItem(
+                                  value: b,
+                                  child: Text(b.name),
+                                ))
+                            .toList(),
+                        onChanged: (v) =>
+                            setState(() => _selectedBroker = v),
+                      );
+                    },
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
+                    error: (e, _) => Text('Error: $e'),
+                  ),
+                  const SizedBox(height: 12),
+
+                  if (_selectedInvestmentType == InvestmentType.highYield) ...[
+                    TextFormField(
+                      controller: _apyRateController,
+                      decoration: const InputDecoration(
+                        labelText: 'APY (E.A. %)',
+                        suffixText: '%',
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                    ),
+                  ],
+
+                  if (_selectedInvestmentType == InvestmentType.cdt) ...[
+                    TextFormField(
+                      controller: _principalController,
+                      decoration: const InputDecoration(
+                        labelText: 'Principal Amount',
+                        prefixText: '\$',
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: [const CurrencyInputFormatter()],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _interestRateController,
+                            decoration: const InputDecoration(
+                              labelText: 'Annual Rate (%)',
+                              suffixText: '%',
+                              border: OutlineInputBorder(),
+                            ),
+                            keyboardType:
+                                const TextInputType.numberWithOptions(
+                                    decimal: true),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _termDaysController,
+                            decoration: const InputDecoration(
+                              labelText: 'Term (days)',
+                              border: OutlineInputBorder(),
+                            ),
+                            keyboardType: TextInputType.number,
+                            onChanged: (_) => _autoComputeMaturity(),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    InkWell(
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: _cdtMaturityDate ??
+                              DateTime.now().add(const Duration(days: 180)),
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime(2040),
+                        );
+                        if (picked != null) {
+                          setState(() => _cdtMaturityDate = picked);
+                        }
+                      },
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'Maturity Date',
+                          border: OutlineInputBorder(),
+                          suffixIcon: Icon(Icons.event_available, size: 18),
+                        ),
+                        child: Text(
+                          _cdtMaturityDate != null
+                              ? '${_cdtMaturityDate!.year}-${_cdtMaturityDate!.month.toString().padLeft(2, '0')}-${_cdtMaturityDate!.day.toString().padLeft(2, '0')}'
+                              : 'Select date',
+                        ),
+                      ),
+                    ),
+                  ],
+
+                  if (_selectedInvestmentType == InvestmentType.fic) ...[
+                    TextFormField(
+                      controller: _fundCodeController,
+                      decoration: const InputDecoration(
+                        labelText: 'Fund Code (optional)',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ],
                 ],
 
                 const SizedBox(height: 24),

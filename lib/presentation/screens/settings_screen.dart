@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:budgett_frontend/presentation/providers/settings_provider.dart';
 import 'package:budgett_frontend/presentation/providers/logout_action.dart';
 
@@ -70,7 +71,7 @@ class SettingsScreen extends ConsumerWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Text(
-                    'Notificaciones',
+                    'Notifications',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           color: Theme.of(context).colorScheme.primary,
                         ),
@@ -78,9 +79,9 @@ class SettingsScreen extends ConsumerWidget {
                 ),
                 SwitchListTile(
                   secondary: const Icon(Icons.notifications),
-                  title: const Text('Alertas de pago de tarjeta'),
+                  title: const Text('Credit Card Payment Alerts'),
                   subtitle:
-                      const Text('Recibe recordatorios antes del vencimiento'),
+                      const Text('Receive reminders before payment due date'),
                   value: ccEnabled,
                   onChanged: ccEnabledAsync.isLoading
                       ? null
@@ -92,8 +93,8 @@ class SettingsScreen extends ConsumerWidget {
                 ),
                 ListTile(
                   leading: const Icon(Icons.calendar_today),
-                  title: const Text('Dias de anticipacion'),
-                  subtitle: Text('$ccDays dias antes del pago'),
+                  title: const Text('Days in advance'),
+                  subtitle: Text('$ccDays days before payment'),
                   onTap: ccDaysAsync.isLoading
                       ? null
                       : () {
@@ -111,15 +112,21 @@ class SettingsScreen extends ConsumerWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Text(
-                    'Cuenta',
+                    'Account',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           color: Theme.of(context).colorScheme.primary,
                         ),
                   ),
                 ),
                 ListTile(
+                  leading: const Icon(Icons.person_outline),
+                  title: const Text('Edit profile'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/profile'),
+                ),
+                ListTile(
                   leading: const Icon(Icons.logout),
-                  title: const Text('Cerrar sesión'),
+                  title: const Text('Log out'),
                   onTap: () => performLogout(ref, context),
                 ),
               ],
@@ -134,12 +141,12 @@ class SettingsScreen extends ConsumerWidget {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: const Text('Dias de anticipacion'),
+          title: const Text('Days in advance'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                '${sliderValue.round()} dias',
+                '${sliderValue.round()} days',
                 style: Theme.of(context).textTheme.headlineMedium,
               ),
               Slider(
@@ -157,7 +164,7 @@ class SettingsScreen extends ConsumerWidget {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar'),
+              child: const Text('Cancel'),
             ),
             TextButton(
               onPressed: () {
@@ -166,7 +173,7 @@ class SettingsScreen extends ConsumerWidget {
                     .setDaysBefore(sliderValue.round());
                 Navigator.pop(context);
               },
-              child: const Text('Guardar'),
+              child: const Text('Save'),
             ),
           ],
         ),

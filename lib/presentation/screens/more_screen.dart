@@ -12,7 +12,7 @@ class MoreScreen extends ConsumerWidget {
     final advanced = kNavDestinations.where((d) => !d.showOnMobile).toList();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Más')),
+      appBar: AppBar(title: const Text('More')),
       body: ListView(
         children: [
           ...advanced.map(
@@ -26,7 +26,7 @@ class MoreScreen extends ConsumerWidget {
           const Divider(),
           ListTile(
             leading: const Icon(Icons.logout),
-            title: const Text('Cerrar sesión'),
+            title: const Text('Log out'),
             onTap: () => performLogout(ref, context),
           ),
         ],

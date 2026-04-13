@@ -53,9 +53,9 @@ class RecurringTransactionsScreen extends ConsumerWidget {
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('${_capitalize(item.frequency)} • Próxima: ${DateFormat('dd/MM/yyyy').format(item.nextRunDate)}'),
+                      Text('${_capitalize(item.frequency)} • Next: ${DateFormat('MM/dd/yyyy').format(item.nextRunDate)}'),
                       if (item.lastRunDate != null)
-                        Text('Última: ${DateFormat('dd/MM/yyyy').format(item.lastRunDate!)}', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                        Text('Last: ${DateFormat('MM/dd/yyyy').format(item.lastRunDate!)}', style: const TextStyle(fontSize: 10, color: Colors.grey)),
                     ],
                   ),
                   trailing: Row(

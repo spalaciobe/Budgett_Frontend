@@ -3,7 +3,10 @@ import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import '../../data/repositories/bank_repository.dart';
+import '../../data/repositories/broker_repository.dart';
 import '../../data/models/bank_model.dart';
+import '../../data/models/broker_model.dart';
+import '../../data/models/investment_details_model.dart';
 
 /// Builds the credit-card rules map for a given bank.
 /// Shared logic used both in [AddAccountDialog] and the onboarding flow.
@@ -53,6 +56,48 @@ Map<String, dynamic> buildCreditCardRulesForBank({
   }
 }
 
+/// Builds the investment_details map for a given investment configuration.
+/// Shared logic used both in [AddAccountDialog] and [EditAccountDialog].
+Map<String, dynamic> buildInvestmentDetailsMap({
+  required InvestmentType investmentType,
+  String? brokerId,
+  String baseCurrency = 'COP',
+  double? apyRate,
+  String? interestPeriod,
+  double? principal,
+  double? interestRate,
+  int? termDays,
+  DateTime? startDate,
+  DateTime? maturityDate,
+  bool autoRenew = false,
+  String? fundCode,
+}) {
+  String? startDateStr;
+  String? maturityDateStr;
+  if (startDate != null) {
+    startDateStr = '${startDate.year}-${startDate.month.toString().padLeft(2, '0')}-${startDate.day.toString().padLeft(2, '0')}';
+  }
+  if (maturityDate != null) {
+    maturityDateStr = '${maturityDate.year}-${maturityDate.month.toString().padLeft(2, '0')}-${maturityDate.day.toString().padLeft(2, '0')}';
+  }
+
+  return {
+    'investment_type': investmentType.toDbString(),
+    'broker_id': brokerId,
+    'base_currency': baseCurrency,
+    'apy_rate': investmentType == InvestmentType.highYield ? apyRate : null,
+    'interest_period': investmentType == InvestmentType.highYield ? interestPeriod : null,
+    'principal': investmentType == InvestmentType.cdt ? principal : null,
+    'interest_rate': investmentType == InvestmentType.cdt ? interestRate : null,
+    'term_days': investmentType == InvestmentType.cdt ? termDays : null,
+    'start_date': investmentType == InvestmentType.cdt ? startDateStr : null,
+    'maturity_date': investmentType == InvestmentType.cdt ? maturityDateStr : null,
+    'auto_renew': investmentType == InvestmentType.cdt ? autoRenew : false,
+    'fund_code': investmentType == InvestmentType.fic ? fundCode : null,
+    'nav_currency': investmentType == InvestmentType.fic ? baseCurrency : null,
+  };
+}
+
 class AddAccountDialog extends ConsumerStatefulWidget {
   const AddAccountDialog({super.key});
 
@@ -70,11 +115,26 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
   final _cutoffDayController = TextEditingController();
   final _paymentDayController = TextEditingController();
 
+  // Investment controllers
+  final _apyRateController = TextEditingController();
+  final _principalController = TextEditingController();
+  final _interestRateController = TextEditingController();
+  final _termDaysController = TextEditingController();
+  final _fundCodeController = TextEditingController();
+  DateTime? _cdtStartDate;
+  DateTime? _cdtMaturityDate;
+
   String _selectedType = 'checking';
   String? _selectedIcon;
   Bank? _selectedBank;
   // Bancolombia/Davivienda/BBVA have two well-known billing cycles
   int? _selectedCycle; // 15 or 30 — null until user picks
+
+  // Investment fields
+  InvestmentType _selectedInvestmentType = InvestmentType.highYield;
+  String _investmentBaseCurrency = 'COP';
+  Broker? _selectedBroker;
+  String _investmentInterestPeriod = 'monthly';
 
   @override
   void dispose() {
@@ -85,6 +145,11 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
     _creditLimitUsdController.dispose();
     _cutoffDayController.dispose();
     _paymentDayController.dispose();
+    _apyRateController.dispose();
+    _principalController.dispose();
+    _interestRateController.dispose();
+    _termDaysController.dispose();
+    _fundCodeController.dispose();
     super.dispose();
   }
 
@@ -140,6 +205,14 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
     });
   }
 
+  void _autoComputeMaturity() {
+    final start = _cdtStartDate;
+    final days = int.tryParse(_termDaysController.text);
+    if (start != null && days != null) {
+      setState(() => _cdtMaturityDate = start.add(Duration(days: days)));
+    }
+  }
+
   Future<void> _saveAccount() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -171,6 +244,36 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
           paymentDay: paymentDay,
         );
       }
+    } else if (_selectedType == 'investment') {
+      accountData['investment_details'] = buildInvestmentDetailsMap(
+        investmentType: _selectedInvestmentType,
+        brokerId: _selectedBroker?.id,
+        baseCurrency: _investmentBaseCurrency,
+        // User enters percentage (9.25), DB stores decimal (0.0925)
+        apyRate: double.tryParse(_apyRateController.text) != null
+            ? double.parse(_apyRateController.text) / 100
+            : null,
+        interestPeriod: _investmentInterestPeriod,
+        principal: _principalController.text.isEmpty
+            ? null
+            : CurrencyFormatter.parse(_principalController.text),
+        interestRate: double.tryParse(_interestRateController.text) != null
+            ? double.parse(_interestRateController.text) / 100
+            : null,
+        termDays: int.tryParse(_termDaysController.text),
+        startDate: _cdtStartDate,
+        maturityDate: _cdtMaturityDate,
+        fundCode: _fundCodeController.text.trim().isEmpty
+            ? null
+            : _fundCodeController.text.trim(),
+      );
+      if (_investmentBaseCurrency == 'USD') {
+        accountData['balance_usd'] = CurrencyFormatter.parse(
+          _balanceController.text,
+          currency: 'USD',
+        );
+        accountData['balance'] = 0.0;
+      }
     }
 
     try {
@@ -180,7 +283,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cuenta creada exitosamente')),
+          const SnackBar(content: Text('Account created successfully')),
         );
       }
     } catch (e) {
@@ -195,7 +298,9 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
   @override
   Widget build(BuildContext context) {
     final isCreditCard = _selectedType == 'credit_card';
+    final isInvestment = _selectedType == 'investment';
     final banksAsync = ref.watch(banksFutureProvider);
+    final brokersAsync = ref.watch(brokersFutureProvider);
 
     return Dialog(
       child: Container(
@@ -212,7 +317,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Agregar cuenta',
+                    Text('Add Account',
                         style: Theme.of(context).textTheme.headlineSmall),
                     IconButton(
                       icon: const Icon(Icons.close),
@@ -226,12 +331,12 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                 TextFormField(
                   controller: _nameController,
                   decoration: const InputDecoration(
-                    labelText: 'Nombre de la cuenta',
+                    labelText: 'Account Name',
                     border: OutlineInputBorder(),
-                    hintText: 'Ej: Bancolombia Ahorros, Nubank TC',
+                    hintText: 'e.g. Bancolombia Savings, Nubank CC',
                   ),
                   validator: (v) =>
-                      v == null || v.trim().isEmpty ? 'Requerido' : null,
+                      v == null || v.trim().isEmpty ? 'Required' : null,
                 ),
                 const SizedBox(height: 16),
 
@@ -239,23 +344,23 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                 DropdownButtonFormField<String>(
                   value: _selectedType,
                   decoration: const InputDecoration(
-                    labelText: 'Tipo de cuenta',
+                    labelText: 'Account Type',
                     border: OutlineInputBorder(),
                   ),
                   items: const [
                     DropdownMenuItem(
                         value: 'checking',
-                        child: Text('Cuenta Corriente')),
+                        child: Text('Checking Account')),
                     DropdownMenuItem(
                         value: 'savings',
-                        child: Text('Cuenta de Ahorros')),
+                        child: Text('Savings Account')),
                     DropdownMenuItem(
                         value: 'credit_card',
-                        child: Text('Tarjeta de Crédito')),
-                    DropdownMenuItem(value: 'cash', child: Text('Efectivo')),
+                        child: Text('Credit Card')),
+                    DropdownMenuItem(value: 'cash', child: Text('Cash')),
                     DropdownMenuItem(
                         value: 'investment',
-                        child: Text('Inversión')),
+                        child: Text('Investment')),
                   ],
                   onChanged: (v) => setState(() {
                     _selectedType = v!;
@@ -269,19 +374,29 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                   controller: _balanceController,
                   decoration: InputDecoration(
                     labelText: isCreditCard
-                        ? 'Saldo actual (deuda negativa)'
-                        : 'Saldo inicial',
-                    prefixText: '\$',
+                        ? 'Current Balance (negative if debt)'
+                        : isInvestment
+                            ? 'Cash Balance (uninvested)'
+                            : 'Initial Balance',
+                    prefixText: isInvestment && _investmentBaseCurrency == 'USD'
+                        ? 'US\$'
+                        : '\$',
                     border: const OutlineInputBorder(),
                     helperText: isCreditCard
-                        ? 'Ingresa negativo si tienes deuda activa.'
+                        ? 'Enter negative if you have active debt.'
                         : null,
                   ),
                   keyboardType: const TextInputType.numberWithOptions(
                       decimal: true, signed: true),
-                  inputFormatters: [const CurrencyInputFormatter()],
+                  inputFormatters: [
+                    CurrencyInputFormatter(
+                      currency: isInvestment && _investmentBaseCurrency == 'USD'
+                          ? 'USD'
+                          : 'COP',
+                    ),
+                  ],
                   validator: (v) =>
-                      v == null || v.isEmpty ? 'Requerido' : null,
+                      v == null || v.isEmpty ? 'Required' : null,
                 ),
                 const SizedBox(height: 16),
 
@@ -289,46 +404,46 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                 DropdownButtonFormField<String>(
                   value: _selectedIcon,
                   decoration: const InputDecoration(
-                    labelText: 'Ícono (opcional)',
+                    labelText: 'Icon (optional)',
                     border: OutlineInputBorder(),
                   ),
                   items: const [
                     DropdownMenuItem(
-                        value: null, child: Text('Por defecto')),
+                        value: null, child: Text('Default')),
                     DropdownMenuItem(
                         value: 'account_balance',
                         child: Row(children: [
                           Icon(Icons.account_balance, size: 18),
                           SizedBox(width: 8),
-                          Text('Banco')
+                          Text('Bank')
                         ])),
                     DropdownMenuItem(
                         value: 'credit_card',
                         child: Row(children: [
                           Icon(Icons.credit_card, size: 18),
                           SizedBox(width: 8),
-                          Text('Tarjeta')
+                          Text('Card')
                         ])),
                     DropdownMenuItem(
                         value: 'money',
                         child: Row(children: [
                           Icon(Icons.money, size: 18),
                           SizedBox(width: 8),
-                          Text('Efectivo')
+                          Text('Cash')
                         ])),
                     DropdownMenuItem(
                         value: 'savings',
                         child: Row(children: [
                           Icon(Icons.savings, size: 18),
                           SizedBox(width: 8),
-                          Text('Ahorros')
+                          Text('Savings')
                         ])),
                     DropdownMenuItem(
                         value: 'trending_up',
                         child: Row(children: [
                           Icon(Icons.trending_up, size: 18),
                           SizedBox(width: 8),
-                          Text('Inversión')
+                          Text('Investment')
                         ])),
                   ],
                   onChanged: (v) => setState(() => _selectedIcon = v),
@@ -338,7 +453,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                 if (isCreditCard) ...[
                   const SizedBox(height: 16),
                   const Divider(),
-                  Text('Detalles de la tarjeta',
+                  Text('Card Details',
                       style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 16),
 
@@ -347,7 +462,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                     data: (banks) => DropdownButtonFormField<Bank>(
                       value: _selectedBank,
                       decoration: const InputDecoration(
-                        labelText: 'Banco emisor',
+                        labelText: 'Issuing Bank',
                         border: OutlineInputBorder(),
                       ),
                       items: banks
@@ -358,11 +473,11 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                           .toList(),
                       onChanged: _onBankSelected,
                       validator: (v) =>
-                          v == null ? 'Selecciona el banco' : null,
+                          v == null ? 'Select a bank' : null,
                     ),
                     loading: () =>
                         const Center(child: CircularProgressIndicator()),
-                    error: (e, _) => Text('Error cargando bancos: $e'),
+                    error: (e, _) => Text('Error loading banks: $e'),
                   ),
                   const SizedBox(height: 16),
 
@@ -370,7 +485,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                   TextFormField(
                     controller: _creditLimitController,
                     decoration: const InputDecoration(
-                      labelText: 'Cupo total (COP)',
+                      labelText: 'Total Credit Limit (COP)',
                       prefixText: '\$',
                       border: OutlineInputBorder(),
                     ),
@@ -382,13 +497,13 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
 
                   // USD slice (optional)
                   const Divider(),
-                  Text('Saldo en USD (opcional)',
+                  Text('USD Balance (optional)',
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
                             color: Theme.of(context).colorScheme.onSurfaceVariant,
                           )),
                   const SizedBox(height: 4),
                   Text(
-                    'Si tu tarjeta tiene deuda en dólares, ingrésala aquí.',
+                    'If your card has a USD balance, enter it here.',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.7),
                         ),
@@ -397,10 +512,10 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                   TextFormField(
                     controller: _balanceUsdController,
                     decoration: const InputDecoration(
-                      labelText: 'Saldo actual USD (deuda negativa)',
+                      labelText: 'Current USD Balance (negative if debt)',
                       prefixText: 'US\$',
                       border: OutlineInputBorder(),
-                      helperText: 'Ingresa negativo si tienes deuda activa en USD.',
+                      helperText: 'Enter negative if you have active USD debt.',
                     ),
                     keyboardType: const TextInputType.numberWithOptions(
                         decimal: true, signed: true),
@@ -410,7 +525,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                   TextFormField(
                     controller: _creditLimitUsdController,
                     decoration: const InputDecoration(
-                      labelText: 'Cupo USD',
+                      labelText: 'USD Credit Limit',
                       prefixText: 'US\$',
                       border: OutlineInputBorder(),
                     ),
@@ -438,7 +553,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              'RappiCard: corte el penúltimo día hábil del mes, pago 10 días después. Configuración automática.',
+                              'RappiCard: statement on the second-to-last business day of the month, payment 10 days later. Automatic configuration.',
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
                           ),
@@ -450,13 +565,13 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                   // Cycle selector for banks with well-known cycles (Bancolombia, Davivienda, BBVA)
                   if (_needsManualDays && _bankHasCycles) ...[
                     const SizedBox(height: 16),
-                    Text('Ciclo de facturación',
+                    Text('Billing Cycle',
                         style: Theme.of(context).textTheme.labelLarge),
                     const SizedBox(height: 8),
                     SegmentedButton<int>(
                       segments: const [
-                        ButtonSegment(value: 15, label: Text('Ciclo 15'), icon: Icon(Icons.looks_one_outlined, size: 16)),
-                        ButtonSegment(value: 30, label: Text('Ciclo 30'), icon: Icon(Icons.looks_two_outlined, size: 16)),
+                        ButtonSegment(value: 15, label: Text('Cycle 15'), icon: Icon(Icons.looks_one_outlined, size: 16)),
+                        ButtonSegment(value: 30, label: Text('Cycle 30'), icon: Icon(Icons.looks_two_outlined, size: 16)),
                       ],
                       selected: _selectedCycle != null ? {_selectedCycle!} : {},
                       emptySelectionAllowed: true,
@@ -468,8 +583,8 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                       const SizedBox(height: 6),
                       Text(
                         _selectedCycle == 15
-                            ? 'Corte el 15, pago el 2 del siguiente mes'
-                            : 'Corte el 30, pago el 16 del siguiente mes',
+                            ? 'Statement on the 15th, payment on the 2nd of next month'
+                            : 'Statement on the 30th, payment on the 16th of next month',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: Theme.of(context).colorScheme.primary,
                             ),
@@ -486,13 +601,13 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                           child: TextFormField(
                             controller: _cutoffDayController,
                             decoration: const InputDecoration(
-                              labelText: 'Día de corte',
+                              labelText: 'Statement Day',
                               border: OutlineInputBorder(),
                               hintText: '1–31',
                             ),
                             keyboardType: TextInputType.number,
                             validator: (v) =>
-                                v == null || v.isEmpty ? 'Requerido' : null,
+                                v == null || v.isEmpty ? 'Required' : null,
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -500,13 +615,13 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                           child: TextFormField(
                             controller: _paymentDayController,
                             decoration: const InputDecoration(
-                              labelText: 'Día de pago',
+                              labelText: 'Payment Day',
                               border: OutlineInputBorder(),
                               hintText: '1–31',
                             ),
                             keyboardType: TextInputType.number,
                             validator: (v) =>
-                                v == null || v.isEmpty ? 'Requerido' : null,
+                                v == null || v.isEmpty ? 'Required' : null,
                           ),
                         ),
                       ],
@@ -514,7 +629,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                     if (_selectedBank != null) ...[
                       const SizedBox(height: 6),
                       Text(
-                        'Festivos y fines de semana se ajustan automáticamente según las reglas de ${_selectedBank!.name}.',
+                        'Holidays and weekends are automatically adjusted according to ${_selectedBank!.name} rules.',
                         style:
                             Theme.of(context).textTheme.bodySmall?.copyWith(
                                   color: Theme.of(context)
@@ -527,6 +642,292 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                   ],
                 ],
 
+                // ── Investment section ────────────────────────────────────
+                if (isInvestment) ...[
+                  const SizedBox(height: 16),
+                  const Divider(),
+                  Text('Investment Details',
+                      style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 16),
+
+                  // Investment type
+                  DropdownButtonFormField<InvestmentType>(
+                    value: _selectedInvestmentType,
+                    decoration: const InputDecoration(
+                      labelText: 'Investment Type',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: InvestmentType.values
+                        .map((t) => DropdownMenuItem(
+                              value: t,
+                              child: Text(t.displayName),
+                            ))
+                        .toList(),
+                    onChanged: (v) => setState(() {
+                      _selectedInvestmentType = v!;
+                      _selectedBroker = null;
+                      // Default currency
+                      _investmentBaseCurrency =
+                          (v == InvestmentType.stockEtf) ? 'USD' : 'COP';
+                    }),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Base currency (only for stock_etf / crypto)
+                  if (_selectedInvestmentType == InvestmentType.stockEtf ||
+                      _selectedInvestmentType == InvestmentType.crypto) ...[
+                    DropdownButtonFormField<String>(
+                      value: _investmentBaseCurrency,
+                      decoration: const InputDecoration(
+                        labelText: 'Cash Currency',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'COP', child: Text('COP')),
+                        DropdownMenuItem(value: 'USD', child: Text('USD')),
+                      ],
+                      onChanged: (v) =>
+                          setState(() => _investmentBaseCurrency = v!),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // Broker
+                  brokersAsync.when(
+                    data: (brokers) {
+                      final filtered = brokers
+                          .where((b) => b.supportedTypes
+                              .contains(_selectedInvestmentType.toDbString()))
+                          .toList();
+                      return DropdownButtonFormField<Broker>(
+                        value: _selectedBroker,
+                        decoration: const InputDecoration(
+                          labelText: 'Platform / Broker',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: filtered
+                            .map((b) => DropdownMenuItem(
+                                  value: b,
+                                  child: Text(b.name),
+                                ))
+                            .toList(),
+                        onChanged: (v) =>
+                            setState(() => _selectedBroker = v),
+                      );
+                    },
+                    loading: () => const Center(
+                        child: CircularProgressIndicator()),
+                    error: (e, _) =>
+                        Text('Error loading brokers: $e'),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ── High-yield fields ──────────────────────────────────
+                  if (_selectedInvestmentType == InvestmentType.highYield) ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: TextFormField(
+                            controller: _apyRateController,
+                            decoration: const InputDecoration(
+                              labelText: 'APY (E.A. %)',
+                              suffixText: '%',
+                              border: OutlineInputBorder(),
+                              hintText: 'e.g. 9.25',
+                            ),
+                            keyboardType:
+                                const TextInputType.numberWithOptions(
+                                    decimal: true),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 3,
+                          child: DropdownButtonFormField<String>(
+                            value: _investmentInterestPeriod,
+                            decoration: const InputDecoration(
+                              labelText: 'Interest Period',
+                              border: OutlineInputBorder(),
+                            ),
+                            items: const [
+                              DropdownMenuItem(
+                                  value: 'monthly',
+                                  child: Text('Monthly')),
+                              DropdownMenuItem(
+                                  value: 'daily', child: Text('Daily')),
+                              DropdownMenuItem(
+                                  value: 'on_withdrawal',
+                                  child: Text('On withdrawal')),
+                            ],
+                            onChanged: (v) => setState(
+                                () => _investmentInterestPeriod = v!),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+
+                  // ── CDT fields ─────────────────────────────────────────
+                  if (_selectedInvestmentType == InvestmentType.cdt) ...[
+                    TextFormField(
+                      controller: _principalController,
+                      decoration: const InputDecoration(
+                        labelText: 'Principal Amount',
+                        prefixText: '\$',
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: [const CurrencyInputFormatter()],
+                      validator: (v) =>
+                          v == null || v.isEmpty ? 'Required' : null,
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _interestRateController,
+                            decoration: const InputDecoration(
+                              labelText: 'Annual Rate (E.A. %)',
+                              suffixText: '%',
+                              border: OutlineInputBorder(),
+                            ),
+                            keyboardType:
+                                const TextInputType.numberWithOptions(
+                                    decimal: true),
+                            validator: (v) =>
+                                v == null || v.isEmpty ? 'Required' : null,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _termDaysController,
+                            decoration: const InputDecoration(
+                              labelText: 'Term (days)',
+                              border: OutlineInputBorder(),
+                            ),
+                            keyboardType: TextInputType.number,
+                            validator: (v) =>
+                                v == null || v.isEmpty ? 'Required' : null,
+                            onChanged: (_) => _autoComputeMaturity(),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    // Start date
+                    InkWell(
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: _cdtStartDate ?? DateTime.now(),
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime(2040),
+                        );
+                        if (picked != null) {
+                          setState(() {
+                            _cdtStartDate = picked;
+                            _autoComputeMaturity();
+                          });
+                        }
+                      },
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'Start Date',
+                          border: OutlineInputBorder(),
+                          suffixIcon: Icon(Icons.calendar_today, size: 18),
+                        ),
+                        child: Text(
+                          _cdtStartDate != null
+                              ? '${_cdtStartDate!.year}-${_cdtStartDate!.month.toString().padLeft(2, '0')}-${_cdtStartDate!.day.toString().padLeft(2, '0')}'
+                              : 'Select date',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Maturity date (auto or manual)
+                    InkWell(
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: _cdtMaturityDate ?? DateTime.now().add(const Duration(days: 180)),
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime(2040),
+                        );
+                        if (picked != null) {
+                          setState(() => _cdtMaturityDate = picked);
+                        }
+                      },
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'Maturity Date (auto-computed)',
+                          border: OutlineInputBorder(),
+                          suffixIcon: Icon(Icons.event_available, size: 18),
+                        ),
+                        child: Text(
+                          _cdtMaturityDate != null
+                              ? '${_cdtMaturityDate!.year}-${_cdtMaturityDate!.month.toString().padLeft(2, '0')}-${_cdtMaturityDate!.day.toString().padLeft(2, '0')}'
+                              : 'Auto-computed from start + term',
+                        ),
+                      ),
+                    ),
+                  ],
+
+                  // ── FIC fields ─────────────────────────────────────────
+                  if (_selectedInvestmentType == InvestmentType.fic) ...[
+                    TextFormField(
+                      controller: _fundCodeController,
+                      decoration: const InputDecoration(
+                        labelText: 'Fund Code (optional)',
+                        border: OutlineInputBorder(),
+                        hintText: 'e.g. TYBA-RF',
+                      ),
+                    ),
+                  ],
+
+                  // ── Multi-holding info banner ───────────────────────────
+                  if (_selectedInvestmentType.isMultiHolding) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primaryContainer
+                            .withOpacity(0.4),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .primary
+                              .withOpacity(0.25),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            size: 18,
+                            color:
+                                Theme.of(context).colorScheme.primary,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Add your positions (holdings) from the account detail screen after creating the account.',
+                              style:
+                                  Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+
                 const SizedBox(height: 24),
 
                 // Save
@@ -536,7 +937,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                     onPressed: _saveAccount,
                     child: const Padding(
                       padding: EdgeInsets.symmetric(vertical: 14),
-                      child: Text('Crear cuenta'),
+                      child: Text('Create Account'),
                     ),
                   ),
                 ),

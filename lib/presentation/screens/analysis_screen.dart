@@ -138,12 +138,12 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
                         padding: const EdgeInsets.all(16.0),
                         child: Column(
                           children: [
-                            const Text('Resumen anual — COP', style: TextStyle(fontWeight: FontWeight.bold)),
+                            const Text('Annual Summary — COP', style: TextStyle(fontWeight: FontWeight.bold)),
                             const Divider(),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Text('Total ingresos'),
+                                const Text('Total Income'),
                                 Text(CurrencyFormatter.format(totalInc), style: const TextStyle(color: Colors.green)),
                               ],
                             ),
@@ -151,7 +151,7 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Text('Total gastos'),
+                                const Text('Total Expenses'),
                                 Text(CurrencyFormatter.format(totalExp), style: const TextStyle(color: Colors.red)),
                               ],
                             ),
@@ -159,7 +159,7 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Text('Tasa de ahorro'),
+                                const Text('Savings Rate'),
                                 Text('${rate.toStringAsFixed(1)}%', style: const TextStyle(fontWeight: FontWeight.bold)),
                               ],
                             ),
@@ -176,7 +176,7 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
                             children: [
                               Row(
                                 children: [
-                                  const Text('Resumen anual — USD', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  const Text('Annual Summary — USD', style: TextStyle(fontWeight: FontWeight.bold)),
                                   const SizedBox(width: 8),
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -197,7 +197,7 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  const Text('Total ingresos USD'),
+                                  const Text('Total Income USD'),
                                   Text(CurrencyFormatter.format(totalIncUsd, currency: 'USD'),
                                       style: const TextStyle(color: Colors.green)),
                                 ],
@@ -206,7 +206,7 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  const Text('Total gastos USD'),
+                                  const Text('Total Expenses USD'),
                                   Text(CurrencyFormatter.format(totalExpUsd, currency: 'USD'),
                                       style: const TextStyle(color: Colors.red)),
                                 ],

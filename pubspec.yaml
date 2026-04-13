@@ -43,6 +43,7 @@ dependencies:
   fl_chart: ^0.71.0
   shared_preferences: ^2.3.3
   flutter_local_notifications: ^18.0.1
+  http: ^1.2.0
 
 dev_dependencies:
   flutter_test:

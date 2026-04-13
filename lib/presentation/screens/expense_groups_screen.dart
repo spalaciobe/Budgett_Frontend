@@ -14,14 +14,14 @@ class ExpenseGroupsScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Grupos de gasto'),
+        title: const Text('Expense Groups'),
         centerTitle: true,
       ),
       body: expenseGroupsAsync.when(
         data: (groups) {
           if (groups.isEmpty) {
             return const Center(
-              child: Text('No hay grupos de gasto.\nCrea uno con el botón +.',
+              child: Text('No expense groups.\nCreate one with the + button.',
                   textAlign: TextAlign.center),
             );
           }
@@ -98,12 +98,12 @@ class _AddGroupDialogState extends State<_AddGroupDialog> {
   DateTime? _endDate;
 
   String _formatDate(DateTime? date) {
-    if (date == null) return 'Seleccionar';
+    if (date == null) return 'Select';
     return '${date.day} ${_monthAbbr(date.month)} ${date.year}';
   }
 
   String _monthAbbr(int m) {
-    const abbrs = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    const abbrs = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return abbrs[m - 1];
   }
 
@@ -138,7 +138,7 @@ class _AddGroupDialogState extends State<_AddGroupDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Nuevo grupo de gasto'),
+      title: const Text('New Expense Group'),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -146,19 +146,19 @@ class _AddGroupDialogState extends State<_AddGroupDialog> {
           children: [
             TextField(
               controller: widget.nameController,
-              decoration: const InputDecoration(labelText: 'Nombre (ej. Viaje a Cartagena)'),
+              decoration: const InputDecoration(labelText: 'Name (e.g. Trip to Cartagena)'),
             ),
             const SizedBox(height: 16),
             TextField(
               controller: widget.budgetController,
               decoration: const InputDecoration(
-                labelText: 'Presupuesto (opcional)',
+                labelText: 'Budget (optional)',
                 prefixText: '\$',
               ),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
             ),
             const SizedBox(height: 20),
-            const Text('Rango de fechas', style: TextStyle(fontWeight: FontWeight.w600)),
+            const Text('Date Range', style: TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             Row(
               children: [
@@ -186,7 +186,7 @@ class _AddGroupDialogState extends State<_AddGroupDialog> {
               Padding(
                 padding: const EdgeInsets.only(top: 6),
                 child: Text(
-                  'Sin fecha de fin = grupo abierto',
+                  'No end date = open group',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
@@ -194,7 +194,7 @@ class _AddGroupDialogState extends State<_AddGroupDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
         FilledButton(
           onPressed: _startDate == null || widget.nameController.text.isEmpty
               ? null
@@ -202,7 +202,7 @@ class _AddGroupDialogState extends State<_AddGroupDialog> {
                   await widget.onConfirm(_startDate!, _endDate);
                   if (context.mounted) Navigator.pop(context);
                 },
-          child: const Text('Crear'),
+          child: const Text('Create'),
         ),
       ],
     );
@@ -214,17 +214,17 @@ class _ExpenseGroupCard extends ConsumerWidget {
   const _ExpenseGroupCard({required this.group});
 
   String _formatDate(DateTime date) {
-    const abbrs = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    const abbrs = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return '${date.day} ${abbrs[date.month - 1]} ${date.year}';
   }
 
   String get _dateRangeLabel {
     final start = _formatDate(group.startDate);
-    if (group.endDate == null) return '$start → abierto';
+    if (group.endDate == null) return '$start → open';
     final end = _formatDate(group.endDate!);
     // Omit year in start if same year as end
     if (group.startDate.year == group.endDate!.year) {
-      const abbrs = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+      const abbrs = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
       final shortStart = '${group.startDate.day} ${abbrs[group.startDate.month - 1]}';
       return '$shortStart → $end';
     }
@@ -261,7 +261,7 @@ class _ExpenseGroupCard extends ConsumerWidget {
                     ),
                     PopupMenuButton(
                       itemBuilder: (context) => [
-                        const PopupMenuItem(value: 'delete', child: Text('Eliminar')),
+                        const PopupMenuItem(value: 'delete', child: Text('Delete')),
                       ],
                       onSelected: (value) async {
                         if (value == 'delete') {
@@ -288,12 +288,12 @@ class _ExpenseGroupCard extends ConsumerWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('${CurrencyFormatter.format(spent)} gastado'),
-                      Text('de ${CurrencyFormatter.format(group.budgetAmount)}'),
+                      Text('${CurrencyFormatter.format(spent)} spent'),
+                      Text('of ${CurrencyFormatter.format(group.budgetAmount)}'),
                     ],
                   ),
                 ] else
-                  Text('${CurrencyFormatter.format(spent)} gastado'),
+                  Text('${CurrencyFormatter.format(spent)} spent'),
               ],
             ),
           ),

@@ -16,11 +16,11 @@ class CategoriesScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Categorías'),
+        title: const Text('Categories'),
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
-            tooltip: 'Nueva categoría',
+            tooltip: 'New Category',
             onPressed: () {
               showDialog(
                 context: context,
@@ -47,7 +47,7 @@ class CategoriesScreen extends ConsumerWidget {
             padding: const EdgeInsets.all(16),
             children: [
               _SectionHeader(
-                label: 'Ingresos',
+                label: 'Income',
                 icon: Icons.arrow_downward,
                 color: Colors.green,
                 count: income.length,
@@ -57,7 +57,7 @@ class CategoriesScreen extends ConsumerWidget {
 
               const SizedBox(height: 24),
               _SectionHeader(
-                label: 'Gastos',
+                label: 'Expenses',
                 icon: Icons.arrow_upward,
                 color: Colors.red,
                 count: expense.length,
@@ -78,7 +78,7 @@ class CategoriesScreen extends ConsumerWidget {
           );
         },
         icon: const Icon(Icons.add),
-        label: const Text('Nueva categoría'),
+        label: const Text('New Category'),
       ),
     );
   }
@@ -157,14 +157,14 @@ class _CategoryTile extends StatelessWidget {
             ),
             if (_isSystemCategory)
               const Tooltip(
-                message: 'Categoría del sistema (Colombia)',
+                message: 'System category (Colombia)',
                 child: Icon(Icons.public, size: 14, color: Colors.blueGrey),
               ),
           ],
         ),
         subtitle: subCats.isNotEmpty
             ? Text(
-                '${subCats.length} sub-categoría${subCats.length > 1 ? 's' : ''}',
+                '${subCats.length} sub-categor${subCats.length > 1 ? 'ies' : 'y'}',
                 style: Theme.of(context)
                     .textTheme
                     .bodySmall
@@ -178,7 +178,7 @@ class _CategoryTile extends StatelessWidget {
                 children: [
                   IconButton(
                     icon: const Icon(Icons.edit_outlined, size: 18),
-                    tooltip: 'Editar',
+                    tooltip: 'Edit',
                     onPressed: () {
                       showDialog(
                         context: context,
@@ -188,7 +188,7 @@ class _CategoryTile extends StatelessWidget {
                   ),
                   IconButton(
                     icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
-                    tooltip: 'Eliminar',
+                    tooltip: 'Delete',
                     onPressed: () => _confirmDelete(context),
                   ),
                 ],
@@ -216,20 +216,20 @@ class _CategoryTile extends StatelessWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Eliminar categoría'),
+        title: const Text('Delete Category'),
         content: Text(
-          '¿Eliminar "${category.name}"? Las transacciones asociadas perderán su categoría.',
+          'Delete "${category.name}"? Associated transactions will lose their category.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
+            child: const Text('Cancel'),
           ),
           FilledButton(
             style:
                 FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Eliminar'),
+            child: const Text('Delete'),
           ),
         ],
       ),
@@ -243,13 +243,13 @@ class _CategoryTile extends StatelessWidget {
       ref.invalidate(categoriesProvider);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Categoría "${category.name}" eliminada')),
+          SnackBar(content: Text('Category "${category.name}" deleted')),
         );
       }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al eliminar: $e')),
+          SnackBar(content: Text('Error deleting: $e')),
         );
       }
     }

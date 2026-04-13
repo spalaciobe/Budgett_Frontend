@@ -53,6 +53,35 @@ class CurrencyFormatter {
   /// Returns the prefix text for a currency, for use in TextFormField.
   static String prefixFor(String currency) =>
       currency == 'USD' ? 'US\$' : '\$';
+
+  /// Formats a holding quantity with [decimals] significant decimal places,
+  /// trimming trailing zeros while keeping at least [minDecimals] decimals.
+  ///
+  /// Example: formatQuantity(0.00534823) → '0.00534823'
+  ///          formatQuantity(10.0)        → '10.00'
+  static String formatQuantity(
+    double amount, {
+    int decimals = 8,
+    int minDecimals = 2,
+  }) {
+    final raw = amount.toStringAsFixed(decimals);
+    // Trim trailing zeros after the dot but keep at least minDecimals
+    final parts = raw.split('.');
+    if (parts.length == 1) return raw;
+    final intPart = parts[0];
+    String fracPart = parts[1];
+    // Remove trailing zeros beyond minDecimals
+    while (fracPart.length > minDecimals && fracPart.endsWith('0')) {
+      fracPart = fracPart.substring(0, fracPart.length - 1);
+    }
+    return '$intPart.$fracPart';
+  }
+
+  /// Formats [amount] in [currency] prefixed with '≈ ' to signal that the
+  /// value was derived from an approximate fx conversion.
+  static String formatApprox(double amount, {required String currency}) {
+    return '≈ ${format(amount, currency: currency)}';
+  }
 }
 
 class CurrencyInputFormatter extends TextInputFormatter {

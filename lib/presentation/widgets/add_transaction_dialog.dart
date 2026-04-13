@@ -98,14 +98,14 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedAccountId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor selecciona una cuenta')),
+        const SnackBar(content: Text('Please select an account')),
       );
       return;
     }
 
     if (_selectedType == 'transfer' && _selectedTargetAccountId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor selecciona la cuenta destino')),
+        const SnackBar(content: Text('Please select the destination account')),
       );
       return;
     }
@@ -114,7 +114,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
       final rate = double.tryParse(_fxRateController.text.replaceAll(',', ''));
       if (rate == null || rate <= 0) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ingresa una tasa de cambio válida')),
+          const SnackBar(content: Text('Please enter a valid exchange rate')),
         );
         return;
       }
@@ -262,8 +262,8 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(_isRecurring
-                  ? 'Transacción y recurrencia guardadas'
-                  : 'Transacción guardada')),
+                  ? 'Transaction and recurrence saved'
+                  : 'Transaction saved')),
         );
       }
     } catch (e) {
@@ -295,7 +295,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Agregar Transacción',
+                    Text('Add Transaction',
                         style: Theme.of(context).textTheme.headlineSmall),
                     IconButton(
                       icon: const Icon(Icons.close),
@@ -328,17 +328,17 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                 TextFormField(
                   controller: _amountController,
                   decoration: InputDecoration(
-                    labelText: 'Monto',
+                    labelText: 'Amount',
                     prefixText: CurrencyFormatter.prefixFor(_currency),
                     border: const OutlineInputBorder(),
                   ),
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: [CurrencyInputFormatter(currency: _currency)],
                   validator: (value) {
-                    if (value == null || value.isEmpty) return 'Requerido';
+                    if (value == null || value.isEmpty) return 'Required';
                     if (CurrencyFormatter.parse(value, currency: _currency) == 0.0 &&
                         value != '0' &&
-                        value != '0.0') return 'Número inválido';
+                        value != '0.0') return 'Invalid number';
                     return null;
                   },
                 ),
@@ -348,10 +348,10 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                 TextFormField(
                   controller: _descriptionController,
                   decoration: const InputDecoration(
-                    labelText: 'Descripción',
+                    labelText: 'Description',
                     border: OutlineInputBorder(),
                   ),
-                  validator: (value) => value?.isEmpty ?? true ? 'Requerido' : null,
+                  validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
                 ),
                 const SizedBox(height: 16),
 
@@ -360,7 +360,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                   children: [
                     Expanded(
                       child: Text(
-                        'Fecha: ${DateFormat('dd/MM/yyyy').format(_selectedDate)}',
+                        'Date: ${DateFormat('MM/dd/yyyy').format(_selectedDate)}',
                         style: const TextStyle(fontSize: 16),
                       ),
                     ),
@@ -376,7 +376,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                           setState(() => _selectedDate = picked);
                         }
                       },
-                      child: const Text('Cambiar'),
+                      child: const Text('Change'),
                     ),
                   ],
                 ),
@@ -410,13 +410,13 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                 DropdownButtonFormField<String>(
                   value: _selectedType,
                   decoration: const InputDecoration(
-                    labelText: 'Tipo',
+                    labelText: 'Type',
                     border: OutlineInputBorder(),
                   ),
                   items: const [
-                    DropdownMenuItem(value: 'income', child: Text('Ingreso')),
-                    DropdownMenuItem(value: 'expense', child: Text('Gasto')),
-                    DropdownMenuItem(value: 'transfer', child: Text('Transferencia')),
+                    DropdownMenuItem(value: 'income', child: Text('Income')),
+                    DropdownMenuItem(value: 'expense', child: Text('Expense')),
+                    DropdownMenuItem(value: 'transfer', child: Text('Transfer')),
                   ],
                   onChanged: (value) => setState(() {
                     _selectedType = value!;
@@ -432,11 +432,11 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                   segments: const [
                     ButtonSegment(
                         value: 'paid',
-                        label: Text('Pagado'),
+                        label: Text('Paid'),
                         icon: Icon(Icons.check_circle_outline)),
                     ButtonSegment(
                         value: 'pending',
-                        label: Text('Pendiente'),
+                        label: Text('Pending'),
                         icon: Icon(Icons.pending_outlined)),
                   ],
                   selected: {_status},
@@ -446,8 +446,8 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
 
                 // Recurrence Switch
                 SwitchListTile(
-                  title: const Text('¿Es recurrente?'),
-                  subtitle: const Text('Crea transacciones futuras automáticamente'),
+                  title: const Text('Recurring?'),
+                  subtitle: const Text('Automatically create future transactions'),
                   value: _isRecurring,
                   onChanged: (v) => setState(() => _isRecurring = v),
                   contentPadding: EdgeInsets.zero,
@@ -458,15 +458,15 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                   DropdownButtonFormField<String>(
                     value: _frequency,
                     decoration: const InputDecoration(
-                      labelText: 'Frecuencia',
+                      labelText: 'Frequency',
                       border: OutlineInputBorder(),
                     ),
                     items: const [
-                      DropdownMenuItem(value: 'daily', child: Text('Diario')),
-                      DropdownMenuItem(value: 'weekly', child: Text('Semanal')),
-                      DropdownMenuItem(value: 'biweekly', child: Text('Quincenal')),
-                      DropdownMenuItem(value: 'monthly', child: Text('Mensual')),
-                      DropdownMenuItem(value: 'yearly', child: Text('Anual')),
+                      DropdownMenuItem(value: 'daily', child: Text('Daily')),
+                      DropdownMenuItem(value: 'weekly', child: Text('Weekly')),
+                      DropdownMenuItem(value: 'biweekly', child: Text('Biweekly')),
+                      DropdownMenuItem(value: 'monthly', child: Text('Monthly')),
+                      DropdownMenuItem(value: 'yearly', child: Text('Yearly')),
                     ],
                     onChanged: (v) => setState(() => _frequency = v!),
                   ),
@@ -478,7 +478,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                   data: (accounts) => DropdownButtonFormField<String>(
                     value: _selectedAccountId,
                     decoration: const InputDecoration(
-                      labelText: 'Cuenta',
+                      labelText: 'Account',
                       border: OutlineInputBorder(),
                     ),
                     items: accounts
@@ -528,7 +528,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                       return DropdownButtonFormField<String>(
                         value: _selectedCategoryId,
                         decoration: const InputDecoration(
-                          labelText: 'Categoría',
+                          labelText: 'Category',
                           border: OutlineInputBorder(),
                         ),
                         items: dropdownItems,
@@ -546,7 +546,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                     data: (accounts) => DropdownButtonFormField<String>(
                       value: _selectedTargetAccountId,
                       decoration: const InputDecoration(
-                        labelText: 'Cuenta destino',
+                        labelText: 'Destination Account',
                         border: OutlineInputBorder(),
                       ),
                       items: accounts
@@ -569,8 +569,8 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                   // USD payment section (transfer to CC with USD balance)
                   if (_showUsdPaymentSection) ...[
                     CheckboxListTile(
-                      title: const Text('Es pago de saldo USD'),
-                      subtitle: const Text('Descuenta tu deuda en dólares'),
+                      title: const Text('USD Balance Payment'),
+                      subtitle: const Text('Pays down your USD debt'),
                       value: _isUsdPayment,
                       onChanged: (v) => setState(() {
                         _isUsdPayment = v ?? false;
@@ -582,9 +582,9 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                       TextFormField(
                         controller: _fxRateController,
                         decoration: const InputDecoration(
-                          labelText: 'Tasa de cambio (COP por 1 USD)',
+                          labelText: 'Exchange Rate (COP per 1 USD)',
                           border: OutlineInputBorder(),
-                          hintText: 'Ej: 4200',
+                          hintText: 'e.g. 4200',
                         ),
                         keyboardType:
                             const TextInputType.numberWithOptions(decimal: true),
@@ -594,7 +594,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                           final rate = double.tryParse(
                               v?.replaceAll(',', '') ?? '');
                           if (rate == null || rate <= 0) {
-                            return 'Ingresa una tasa válida mayor a 0';
+                            return 'Enter a valid rate greater than 0';
                           }
                           return null;
                         },
@@ -602,7 +602,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                       if (_usdApplied != null) ...[
                         const SizedBox(height: 8),
                         Text(
-                          'USD aplicados: ${CurrencyFormatter.format(_usdApplied!, currency: 'USD')}',
+                          'USD applied: ${CurrencyFormatter.format(_usdApplied!, currency: 'USD')}',
                           style: TextStyle(
                             color: Theme.of(context).colorScheme.primary,
                             fontWeight: FontWeight.w600,
@@ -619,13 +619,13 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                   DropdownButtonFormField<String>(
                     value: _selectedMovementType,
                     decoration: const InputDecoration(
-                      labelText: 'Tipo de movimiento',
+                      labelText: 'Movement Type',
                       border: OutlineInputBorder(),
                     ),
                     items: const [
-                      DropdownMenuItem(value: 'fixed', child: Text('Gasto Fijo')),
+                      DropdownMenuItem(value: 'fixed', child: Text('Fixed Expense')),
                       DropdownMenuItem(
-                          value: 'variable', child: Text('Gasto Variable')),
+                          value: 'variable', child: Text('Variable Expense')),
                     ],
                     onChanged: (v) => setState(() => _selectedMovementType = v),
                   ),
@@ -638,12 +638,12 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                     data: (groups) => DropdownButtonFormField<String?>(
                       value: _selectedExpenseGroupId,
                       decoration: const InputDecoration(
-                        labelText: 'Grupo de gasto (opcional)',
+                        labelText: 'Expense Group (optional)',
                         border: OutlineInputBorder(),
                       ),
                       items: [
                         const DropdownMenuItem<String?>(
-                            value: null, child: Text('Ninguno')),
+                            value: null, child: Text('None')),
                         ...groups.map((ExpenseGroup g) =>
                             DropdownMenuItem<String?>(
                                 value: g.id, child: Text(g.name))),
@@ -660,7 +660,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                 TextFormField(
                   controller: _notesController,
                   decoration: const InputDecoration(
-                    labelText: 'Notas (opcional)',
+                    labelText: 'Notes (optional)',
                     border: OutlineInputBorder(),
                   ),
                   maxLines: 2,
@@ -674,7 +674,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                     onPressed: _saveTransaction,
                     child: const Padding(
                       padding: EdgeInsets.all(16.0),
-                      child: Text('Guardar Transacción'),
+                      child: Text('Save Transaction'),
                     ),
                   ),
                 ),

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:budgett_frontend/data/repositories/finance_repository.dart';
+import 'package:budgett_frontend/data/models/profile_model.dart';
 import 'package:budgett_frontend/data/models/account_model.dart';
 import 'package:budgett_frontend/data/models/transaction_model.dart';
 import 'package:budgett_frontend/data/models/category_model.dart';
@@ -8,6 +9,7 @@ import 'package:budgett_frontend/data/models/budget_model.dart';
 import 'package:budgett_frontend/data/models/goal_model.dart';
 import 'package:budgett_frontend/data/models/recurring_transaction_model.dart';
 import 'package:budgett_frontend/data/models/expense_group_model.dart';
+import 'package:budgett_frontend/data/models/investment_holding_model.dart';
 
 final financeRepositoryProvider = Provider<FinanceRepository>((ref) {
   return FinanceRepository(Supabase.instance.client);
@@ -59,4 +61,16 @@ final billingCalendarProvider = FutureProvider.family.autoDispose<
     ({String accountId, int year})>((ref, params) async {
   final repository = ref.watch(financeRepositoryProvider);
   return repository.getBillingCalendar(params.accountId, params.year);
+});
+
+final profileProvider = FutureProvider<ProfileModel?>((ref) async {
+  final repository = ref.watch(financeRepositoryProvider);
+  return repository.getProfile();
+});
+
+final accountHoldingsProvider =
+    FutureProvider.family.autoDispose<List<InvestmentHolding>, String>(
+        (ref, accountId) async {
+  final repository = ref.watch(financeRepositoryProvider);
+  return repository.getHoldings(accountId);
 });

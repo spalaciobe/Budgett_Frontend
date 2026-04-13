@@ -30,7 +30,7 @@ const kNavDestinations = <NavDestination>[
     path: '/budget',
     icon: Icons.pie_chart_outline,
     selectedIcon: Icons.pie_chart,
-    label: 'Presupuesto',
+    label: 'Budget',
     showOnMobile: true,
   ),
   NavDestination(
@@ -62,7 +62,7 @@ const kNavDestinations = <NavDestination>[
     path: '/categories',
     icon: Icons.category_outlined,
     selectedIcon: Icons.category,
-    label: 'Categorías',
+    label: 'Categories',
     dividerBefore: true,
   ),
   NavDestination(

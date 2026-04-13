@@ -1,6 +1,7 @@
 import 'package:budgett_frontend/core/responsive.dart';
 import 'package:budgett_frontend/presentation/navigation/nav_destinations.dart';
 import 'package:budgett_frontend/presentation/providers/auth_provider.dart';
+import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/presentation/providers/logout_action.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -83,7 +84,7 @@ class _TabletShell extends ConsumerWidget {
               padding: const EdgeInsets.only(top: 8, bottom: 16),
               child: IconButton(
                 icon: const Icon(Icons.logout),
-                tooltip: 'Cerrar sesión',
+                tooltip: 'Log out',
                 onPressed: () => performLogout(ref, context),
               ),
             ),
@@ -135,16 +136,16 @@ class _MobileShell extends StatelessWidget {
           NavigationDestination(
             icon: Icon(Icons.pie_chart_outline),
             selectedIcon: Icon(Icons.pie_chart),
-            label: 'Presupuesto',
+            label: 'Budget',
           ),
           NavigationDestination(
             icon: Icon(Icons.more_horiz),
-            label: 'Más',
+            label: 'More',
           ),
           NavigationDestination(
             icon: Icon(Icons.settings_outlined),
             selectedIcon: Icon(Icons.settings),
-            label: 'Ajustes',
+            label: 'Settings',
           ),
         ],
       ),
@@ -186,6 +187,13 @@ class _Sidebar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(userProvider);
+    final profile = ref.watch(profileProvider).valueOrNull;
+    final displayName = (profile?.firstName != null)
+        ? [profile!.firstName!, profile?.lastName].whereType<String>().join(' ')
+        : profile?.username ?? user?.email ?? 'User';
+    final displayInitial = displayName.isNotEmpty
+        ? displayName[0].toUpperCase()
+        : 'U';
     final theme = Theme.of(context);
     final currentPath = GoRouterState.of(context).uri.path;
 
@@ -257,56 +265,59 @@ class _Sidebar extends ConsumerWidget {
 
             const Divider(height: 1),
 
-            // User / Logout section
-            InkWell(
-              onTap: () => performLogout(ref, context),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  physics: const NeverScrollableScrollPhysics(),
-                  child: SizedBox(
-                    width: isExpanded ? 240 - 32 : 80 - 32,
-                    child: Row(
-                      mainAxisAlignment: isExpanded
-                          ? MainAxisAlignment.start
-                          : MainAxisAlignment.center,
-                      mainAxisSize:
-                          isExpanded ? MainAxisSize.max : MainAxisSize.min,
-                      children: [
-                        CircleAvatar(
-                          radius: 16,
-                          backgroundColor: theme.colorScheme.secondary,
-                          child: Text(
-                            user?.email?.substring(0, 1).toUpperCase() ?? 'U',
-                            style: const TextStyle(
-                                color: Colors.white, fontSize: 14),
-                          ),
-                        ),
-                        if (isExpanded) ...[
-                          const SizedBox(width: 12),
-                          Flexible(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  user?.email ?? 'User',
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                      fontWeight: FontWeight.bold),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                Text(
-                                  'Logout',
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                      color: theme.colorScheme.error),
-                                ),
-                              ],
+            // User / Profile section
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const NeverScrollableScrollPhysics(),
+                child: SizedBox(
+                  width: isExpanded ? 240 - 16 : 80 - 16,
+                  child: Row(
+                    mainAxisAlignment: isExpanded
+                        ? MainAxisAlignment.start
+                        : MainAxisAlignment.center,
+                    mainAxisSize:
+                        isExpanded ? MainAxisSize.max : MainAxisSize.min,
+                    children: [
+                      InkWell(
+                        onTap: () => context.go('/settings'),
+                        borderRadius: BorderRadius.circular(20),
+                        child: Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: CircleAvatar(
+                            radius: 16,
+                            backgroundColor: theme.colorScheme.secondary,
+                            child: Text(
+                              displayInitial,
+                              style: const TextStyle(
+                                  color: Colors.white, fontSize: 14),
                             ),
                           ),
-                        ],
+                        ),
+                      ),
+                      if (isExpanded) ...[
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            displayName,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                                fontWeight: FontWeight.bold),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        IconButton(
+                          iconSize: 18,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                              minWidth: 32, minHeight: 32),
+                          icon: Icon(Icons.logout,
+                              color: theme.colorScheme.error),
+                          tooltip: 'Log out',
+                          onPressed: () => performLogout(ref, context),
+                        ),
                       ],
-                    ),
+                    ],
                   ),
                 ),
               ),

@@ -313,17 +313,17 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                       TextFormField(
                         controller: _amountController,
                         decoration: InputDecoration(
-                          labelText: 'Monto',
+                          labelText: 'Amount',
                           prefixText: CurrencyFormatter.prefixFor(_currency),
                           border: const OutlineInputBorder(),
                         ),
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         inputFormatters: [CurrencyInputFormatter(currency: _currency)],
                         validator: (value) {
-                          if (value == null || value.isEmpty) return 'Requerido';
+                          if (value == null || value.isEmpty) return 'Required';
                           if (CurrencyFormatter.parse(value, currency: _currency) == 0.0 &&
                               value != '0' &&
-                              value != '0.0') return 'Número inválido';
+                              value != '0.0') return 'Invalid number';
                           return null;
                         },
                       ),

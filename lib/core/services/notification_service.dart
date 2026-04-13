@@ -104,15 +104,15 @@ class CreditCardPaymentNotificationService {
 
       await _plugin.zonedSchedule(
         notificationId,
-        'Pago de tarjeta de crédito',
-        'Tu tarjeta ${account.name} vence en $daysBeforeNotify días',
+        'Credit Card Payment',
+        'Your card ${account.name} is due in $daysBeforeNotify days',
         tz.TZDateTime.from(notificationDate, tz.local),
         const NotificationDetails(
           android: AndroidNotificationDetails(
             'cc_payment_alerts',
-            'Alertas de pago de tarjeta',
+            'Credit Card Payment Alerts',
             channelDescription:
-                'Notificaciones de fechas de pago de tarjetas de crédito',
+                'Credit card payment date notifications',
             importance: Importance.high,
             priority: Priority.high,
           ),

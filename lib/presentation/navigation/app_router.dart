@@ -15,6 +15,8 @@ import 'package:budgett_frontend/presentation/screens/settings_screen.dart';
 import 'package:budgett_frontend/presentation/screens/categories_screen.dart';
 import 'package:budgett_frontend/presentation/screens/more_screen.dart';
 import 'package:budgett_frontend/presentation/screens/credit_card_details_screen.dart';
+import 'package:budgett_frontend/presentation/screens/investment_details_screen.dart';
+import 'package:budgett_frontend/presentation/screens/profile_screen.dart';
 
 class _AuthNotifier extends ChangeNotifier {
   late final StreamSubscription<AuthState> _sub;
@@ -91,6 +93,16 @@ final appRouter = GoRouter(
           builder: (context, state) => CreditCardDetailsScreen(
             accountId: state.pathParameters['id']!,
           ),
+        ),
+        GoRoute(
+          path: '/investment/:id',
+          builder: (context, state) => InvestmentDetailsScreen(
+            accountId: state.pathParameters['id']!,
+          ),
+        ),
+        GoRoute(
+          path: '/profile',
+          builder: (context, state) => const ProfileScreen(),
         ),
       ],
     ),

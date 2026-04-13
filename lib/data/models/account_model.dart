@@ -1,4 +1,5 @@
 import 'credit_card_rules_model.dart';
+import 'investment_details_model.dart';
 
 class Account {
   final String id;
@@ -11,6 +12,7 @@ class Account {
   final int? closingDay;
   final int? paymentDueDay;
   final CreditCardRules? creditCardRules;
+  final InvestmentDetails? investmentDetails;
   final String? icon;
 
   Account({
@@ -24,6 +26,7 @@ class Account {
     this.closingDay,
     this.paymentDueDay,
     this.creditCardRules,
+    this.investmentDetails,
     this.icon,
   });
 
@@ -32,7 +35,7 @@ class Account {
       id: json['id'],
       name: json['name'],
       type: json['type'],
-      balance: (json['balance'] as num).toDouble(),
+      balance: (json['balance'] as num?)?.toDouble() ?? 0.0,
       creditLimit: (json['credit_limit'] as num?)?.toDouble() ?? 0.0,
       balanceUsd: (json['balance_usd'] as num?)?.toDouble() ?? 0.0,
       creditLimitUsd: (json['credit_limit_usd'] as num?)?.toDouble() ?? 0.0,
@@ -41,6 +44,9 @@ class Account {
       icon: json['icon'],
       creditCardRules: json['credit_card_details'] != null
           ? CreditCardRules.fromJson(json['credit_card_details'])
+          : null,
+      investmentDetails: json['investment_details'] != null
+          ? InvestmentDetails.fromJson(json['investment_details'])
           : null,
     );
   }

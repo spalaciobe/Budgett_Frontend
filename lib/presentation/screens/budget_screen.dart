@@ -78,7 +78,7 @@ class BudgetScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.copy_all_outlined),
-            tooltip: 'Copiar del mes anterior',
+            tooltip: 'Copy from previous month',
             onPressed: () async {
               final prevMonth = selectedDate.month == 1 ? 12 : selectedDate.month - 1;
               final prevYear = selectedDate.month == 1 ? selectedDate.year - 1 : selectedDate.year;
@@ -89,20 +89,20 @@ class BudgetScreen extends ConsumerWidget {
               final confirm = await showDialog<bool>(
                 context: context,
                 builder: (ctx) => AlertDialog(
-                  title: const Text('Copiar presupuesto'),
+                  title: const Text('Copy Budget'),
                   content: Text(
                     hasCurrent
-                        ? 'Esto reemplazará los presupuestos de $currMonthName ${selectedDate.year} con los de $prevMonthName $prevYear. ¿Continuar?'
-                        : '¿Copiar los presupuestos de $prevMonthName $prevYear a $currMonthName ${selectedDate.year}?',
+                        ? 'This will replace budgets for $currMonthName ${selectedDate.year} with those from $prevMonthName $prevYear. Continue?'
+                        : 'Copy budgets from $prevMonthName $prevYear to $currMonthName ${selectedDate.year}?',
                   ),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.of(ctx).pop(false),
-                      child: const Text('Cancelar'),
+                      child: const Text('Cancel'),
                     ),
                     FilledButton(
                       onPressed: () => Navigator.of(ctx).pop(true),
-                      child: const Text('Copiar'),
+                      child: const Text('Copy'),
                     ),
                   ],
                 ),
@@ -117,11 +117,11 @@ class BudgetScreen extends ConsumerWidget {
                 ref.invalidate(budgetsProvider((month: selectedDate.month, year: selectedDate.year)));
                 if (count == 0) {
                   messenger.showSnackBar(
-                    SnackBar(content: Text('No hay presupuestos en $prevMonthName $prevYear para copiar.')),
+                    SnackBar(content: Text('No budgets in $prevMonthName $prevYear to copy.')),
                   );
                 } else {
                   messenger.showSnackBar(
-                    SnackBar(content: Text('$count presupuesto${count == 1 ? '' : 's'} copiado${count == 1 ? '' : 's'} de $prevMonthName $prevYear.')),
+                    SnackBar(content: Text('$count budget${count == 1 ? '' : 's'} copied from $prevMonthName $prevYear.')),
                   );
                 }
               } catch (e) {

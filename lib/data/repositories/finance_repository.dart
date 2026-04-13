@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:budgett_frontend/data/models/profile_model.dart';
 import 'package:budgett_frontend/data/models/account_model.dart';
 import 'package:budgett_frontend/data/models/transaction_model.dart';
 import 'package:budgett_frontend/data/models/category_model.dart';
@@ -8,6 +9,7 @@ import 'package:budgett_frontend/data/models/goal_model.dart';
 import 'package:budgett_frontend/data/models/expense_group_model.dart';
 import 'package:budgett_frontend/data/models/recurring_transaction_model.dart';
 import 'package:budgett_frontend/data/models/category_spending.dart';
+import 'package:budgett_frontend/data/models/investment_holding_model.dart';
 
 class FinanceRepository {
   final SupabaseClient _client;
@@ -20,7 +22,7 @@ class FinanceRepository {
       try {
         final List<dynamic> data = await _client
             .from('accounts')
-            .select('*, credit_card_details(*)')
+            .select('*, credit_card_details(*), investment_details(*)')
             .eq('user_id', _client.auth.currentUser!.id)
             .order('name');
         return data.map((json) => Account.fromJson(json)).toList();
@@ -64,7 +66,10 @@ class FinanceRepository {
   Future<void> createAccount(Map<String, dynamic> accountData) async {
     final userId = _client.auth.currentUser!.id;
     final ccDetails = accountData['credit_card_details'] as Map<String, dynamic>?;
-    final accountRow = Map<String, dynamic>.from(accountData)..remove('credit_card_details');
+    final invDetails = accountData['investment_details'] as Map<String, dynamic>?;
+    final accountRow = Map<String, dynamic>.from(accountData)
+      ..remove('credit_card_details')
+      ..remove('investment_details');
 
     final inserted = await _client
         .from('accounts')
@@ -75,6 +80,13 @@ class FinanceRepository {
     if (ccDetails != null) {
       await _client.from('credit_card_details').upsert(
         {...ccDetails, 'account_id': inserted['id']},
+        onConflict: 'account_id',
+      );
+    }
+
+    if (invDetails != null) {
+      await _client.from('investment_details').upsert(
+        {...invDetails, 'account_id': inserted['id']},
         onConflict: 'account_id',
       );
     }
@@ -393,7 +405,10 @@ class FinanceRepository {
   // Accounts
   Future<void> updateAccount(String id, Map<String, dynamic> data) async {
     final ccDetails = data['credit_card_details'] as Map<String, dynamic>?;
-    final accountRow = Map<String, dynamic>.from(data)..remove('credit_card_details');
+    final invDetails = data['investment_details'] as Map<String, dynamic>?;
+    final accountRow = Map<String, dynamic>.from(data)
+      ..remove('credit_card_details')
+      ..remove('investment_details');
 
     if (accountRow.isNotEmpty) {
       await _client.from('accounts').update(accountRow).eq('id', id);
@@ -405,10 +420,166 @@ class FinanceRepository {
         onConflict: 'account_id',
       );
     }
+
+    if (invDetails != null) {
+      await _client.from('investment_details').upsert(
+        {...invDetails, 'account_id': id},
+        onConflict: 'account_id',
+      );
+    }
   }
 
   Future<void> deleteAccount(String id) async {
     await _client.from('accounts').delete().eq('id', id);
+  }
+
+  // ── Investment Holdings ──────────────────────────────────────────────────
+
+  Future<List<InvestmentHolding>> getHoldings(String accountId) async {
+    int attempts = 0;
+    while (true) {
+      try {
+        final List<dynamic> data = await _client
+            .from('investment_holdings')
+            .select()
+            .eq('account_id', accountId)
+            .order('symbol');
+        return data.map((json) => InvestmentHolding.fromJson(json)).toList();
+      } on PostgrestException catch (e) {
+        if (attempts < 1 && (e.message.contains('JWT issued at future') || e.code == 'PGRST303')) {
+          attempts++;
+          await Future.delayed(const Duration(seconds: 3));
+          continue;
+        }
+        throw Exception('Error fetching holdings: $e');
+      } catch (e) {
+        throw Exception('Error fetching holdings: $e');
+      }
+    }
+  }
+
+  Future<InvestmentHolding> createHolding(Map<String, dynamic> data) async {
+    final userId = _client.auth.currentUser!.id;
+    final row = await _client
+        .from('investment_holdings')
+        .insert({...data, 'user_id': userId})
+        .select()
+        .single();
+    return InvestmentHolding.fromJson(row);
+  }
+
+  Future<void> updateHolding(String id, Map<String, dynamic> data) async {
+    await _client
+        .from('investment_holdings')
+        .update({...data, 'updated_at': DateTime.now().toIso8601String()})
+        .eq('id', id);
+  }
+
+  Future<void> deleteHolding(String id) async {
+    await _client.from('investment_holdings').delete().eq('id', id);
+  }
+
+  /// Batch-update current_price for multiple holdings.
+  Future<void> updateHoldingsPrices(
+      List<({String id, double price})> updates) async {
+    for (final u in updates) {
+      await _client.from('investment_holdings').update({
+        'current_price': u.price,
+        'price_updated_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', u.id);
+    }
+  }
+
+  /// Records a buy: creates an expense transaction and updates the holding's
+  /// quantity and avg_cost in one repository call.
+  ///
+  /// [transactionData] should contain at minimum: description, date, category_id.
+  Future<void> buyHolding({
+    required String accountId,
+    required String holdingId,
+    required double quantity,
+    required double pricePerUnit,
+    double fee = 0.0,
+    String currency = 'COP',
+    Map<String, dynamic> transactionData = const {},
+  }) async {
+    final userId = _client.auth.currentUser!.id;
+    final totalAmount = quantity * pricePerUnit + fee;
+
+    // 1. Fetch current holding state
+    final holdingRow = await _client
+        .from('investment_holdings')
+        .select('quantity, avg_cost')
+        .eq('id', holdingId)
+        .single();
+
+    final currentQty = (holdingRow['quantity'] as num).toDouble();
+    final currentAvg = (holdingRow['avg_cost'] as num).toDouble();
+    final newQty = currentQty + quantity;
+    final newAvg = newQty == 0
+        ? 0.0
+        : (currentQty * currentAvg + quantity * pricePerUnit) / newQty;
+
+    // 2. Insert expense transaction (decreases cash in investment account)
+    await _client.from('transactions').insert({
+      ...transactionData,
+      'user_id': userId,
+      'account_id': accountId,
+      'amount': totalAmount,
+      'type': 'expense',
+      'currency': currency,
+      'holding_id': holdingId,
+    });
+
+    // 3. Update holding position
+    await _client.from('investment_holdings').update({
+      'quantity': newQty,
+      'avg_cost': newAvg,
+      'updated_at': DateTime.now().toIso8601String(),
+    }).eq('id', holdingId);
+  }
+
+  /// Records a sell: creates an income transaction and decreases the holding's
+  /// quantity.
+  Future<void> sellHolding({
+    required String accountId,
+    required String holdingId,
+    required double quantity,
+    required double pricePerUnit,
+    double fee = 0.0,
+    String currency = 'COP',
+    Map<String, dynamic> transactionData = const {},
+  }) async {
+    final userId = _client.auth.currentUser!.id;
+    final proceeds = quantity * pricePerUnit - fee;
+
+    // 1. Fetch current holding state
+    final holdingRow = await _client
+        .from('investment_holdings')
+        .select('quantity, avg_cost')
+        .eq('id', holdingId)
+        .single();
+
+    final currentQty = (holdingRow['quantity'] as num).toDouble();
+    final newQty = (currentQty - quantity).clamp(0.0, double.infinity);
+
+    // 2. Insert income transaction (increases cash in investment account)
+    await _client.from('transactions').insert({
+      ...transactionData,
+      'user_id': userId,
+      'account_id': accountId,
+      'amount': proceeds,
+      'type': 'income',
+      'currency': currency,
+      'holding_id': holdingId,
+    });
+
+    // 3. Update holding quantity (avg_cost stays the same on a sell)
+    await _client.from('investment_holdings').update({
+      'quantity': newQty,
+      'updated_at': DateTime.now().toIso8601String(),
+    }).eq('id', holdingId);
   }
 
   // Goals
@@ -572,6 +743,45 @@ class FinanceRepository {
       } catch (e) {
         throw Exception('Error fetching yearly summary: $e');
       }
+    }
+  }
+
+  Future<ProfileModel?> getProfile() async {
+    final userId = _client.auth.currentUser!.id;
+    try {
+      final data = await _client
+          .from('profiles')
+          .select()
+          .eq('id', userId)
+          .maybeSingle();
+      if (data == null) return null;
+      return ProfileModel.fromJson(data);
+    } on PostgrestException catch (e) {
+      throw Exception('Error fetching profile: $e');
+    } catch (e) {
+      throw Exception('Error fetching profile: $e');
+    }
+  }
+
+  Future<void> updateProfile({
+    String? username,
+    String? firstName,
+    String? lastName,
+    String? phone,
+  }) async {
+    final userId = _client.auth.currentUser!.id;
+    try {
+      await _client.from('profiles').upsert({
+        'id': userId,
+        'username': username,
+        'first_name': firstName,
+        'last_name': lastName,
+        'phone': phone,
+      });
+    } on PostgrestException catch (e) {
+      throw Exception('Error updating profile: $e');
+    } catch (e) {
+      throw Exception('Error updating profile: $e');
     }
   }
 }

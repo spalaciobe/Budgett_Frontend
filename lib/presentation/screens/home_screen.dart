@@ -9,6 +9,10 @@ import 'package:budgett_frontend/presentation/widgets/add_transaction_dialog.dar
 import 'package:budgett_frontend/presentation/widgets/add_account_dialog.dart';
 import 'package:budgett_frontend/presentation/widgets/edit_transaction_dialog.dart';
 import 'package:budgett_frontend/presentation/widgets/edit_account_dialog.dart';
+import 'package:budgett_frontend/presentation/widgets/account_card.dart';
+import 'package:budgett_frontend/data/models/account_model.dart';
+import 'package:budgett_frontend/data/models/investment_details_model.dart';
+import 'package:budgett_frontend/core/utils/investment_calculator.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -66,82 +70,21 @@ class HomeScreen extends ConsumerWidget {
                     separatorBuilder: (c, i) => const SizedBox(width: 12),
                     itemBuilder: (context, index) {
                       final acc = accounts[index];
-                      return Card(
-                        elevation: 4,
-                        shadowColor: Colors.black12,
-                        clipBehavior: Clip.antiAlias,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                        child: InkWell(
-                          onTap: () {
-                            if (acc.type == 'credit_card') {
-                              context.go('/credit-card/${acc.id}');
-                            } else {
-                              showDialog(
-                                context: context,
-                                builder: (context) => EditAccountDialog(account: acc),
-                              );
-                            }
-                          },
-                          child: Container(
-                            width: 170,
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  Theme.of(context).colorScheme.surface,
-                                  Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.3),
-                                ],
-                              ),
-                            ),
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Icon(_getIconForType(acc.type), color: Theme.of(context).colorScheme.primary),
-                                ),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      acc.name, 
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w600, 
-                                        color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
-                                        fontSize: 13
-                                      ), 
-                                      overflow: TextOverflow.ellipsis
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      CurrencyFormatter.format(acc.balance, decimalDigits: 2),
-                                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 18,
-                                      )
-                                    ),
-                                    if (acc.type == 'credit_card' && acc.balanceUsd != 0) ...[
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        CurrencyFormatter.format(acc.balanceUsd, currency: 'USD'),
-                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                )
-                              ],
-                            ),
-                          ),
-                        ),
+                      return AccountCard(
+                        account: acc,
+                        subtitle: _buildInvestmentSubtitle(context, acc),
+                        onTap: () {
+                          if (acc.type == 'credit_card') {
+                            context.go('/credit-card/${acc.id}');
+                          } else if (acc.type == 'investment') {
+                            context.go('/investment/${acc.id}');
+                          } else {
+                            showDialog(
+                              context: context,
+                              builder: (context) => EditAccountDialog(account: acc),
+                            );
+                          }
+                        },
                       );
                     },
                   ),
@@ -240,13 +183,47 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  IconData _getIconForType(String type) {
-    switch (type) {
-      case 'credit_card': return Icons.credit_card;
-      case 'cash': return Icons.money;
-      case 'investment': return Icons.trending_up;
-      case 'savings': return Icons.savings;
-      default: return Icons.account_balance;
+  /// Returns a small informational widget shown beneath the balance on the
+  /// account card, specific to investment account types. Returns null for
+  /// non-investment accounts (the card handles credit-card USD balance itself).
+  Widget? _buildInvestmentSubtitle(BuildContext context, Account acc) {
+    if (acc.type != 'investment') return null;
+    final details = acc.investmentDetails;
+    if (details == null) return null;
+
+    final dimColor =
+        Theme.of(context).colorScheme.onSurface.withOpacity(0.55);
+    const subtitleStyle = TextStyle(fontSize: 11);
+
+    switch (details.investmentType) {
+      case InvestmentType.highYield:
+        final apy = details.apyRate;
+        if (apy == null) return null;
+        return Text(
+          '${(apy * 100).toStringAsFixed(2)}% APY',
+          style: subtitleStyle.copyWith(color: Colors.green.shade600),
+        );
+
+      case InvestmentType.cdt:
+        if (InvestmentCalculator.isCdtMatured(details)) {
+          return Text(
+            'Matured — collect',
+            style: subtitleStyle.copyWith(color: Colors.orange.shade700),
+          );
+        }
+        final days = InvestmentCalculator.cdtDaysToMaturity(details);
+        return Text(
+          'Expires in $days days',
+          style: subtitleStyle.copyWith(color: dimColor),
+        );
+
+      case InvestmentType.fic:
+      case InvestmentType.crypto:
+      case InvestmentType.stockEtf:
+        return Text(
+          details.investmentType.displayName,
+          style: subtitleStyle.copyWith(color: dimColor),
+        );
     }
   }
 }

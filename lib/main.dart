@@ -10,7 +10,20 @@ import 'package:budgett_frontend/core/services/notification_service.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/data/repositories/bank_repository.dart';
 
+/// Emits the current session whenever auth state changes.
+/// Used to gate providers that require authentication.
+final _supabaseSessionProvider = StreamProvider<Session?>((ref) {
+  return Supabase.instance.client.auth.onAuthStateChange
+      .map((event) => event.session);
+});
+
 final ccAlertSchedulerProvider = FutureProvider<void>((ref) async {
+  // Do not touch finance providers until the session is confirmed.
+  // This prevents a race condition at startup on Flutter web where
+  // Supabase initializes before the stored session is restored.
+  final session = ref.watch(_supabaseSessionProvider).valueOrNull;
+  if (session == null) return;
+
   final accountsAsync = ref.watch(accountsProvider);
   final enabledAsync = ref.watch(ccNotificationsEnabledProvider);
   final daysBeforeAsync = ref.watch(ccNotificationDaysBeforeProvider);
