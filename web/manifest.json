@@ -1,11 +1,11 @@
 {
-    "name": "budgett_frontend",
-    "short_name": "budgett_frontend",
+    "name": "Budgett Finances",
+    "short_name": "Budgett",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Budgett Finances - Personal Finance App",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
