@@ -64,6 +64,7 @@ Map<String, dynamic> buildInvestmentDetailsMap({
   String baseCurrency = 'COP',
   double? apyRate,
   String? interestPeriod,
+  DateTime? lastInterestDate,
   double? principal,
   double? interestRate,
   int? termDays,
@@ -74,11 +75,15 @@ Map<String, dynamic> buildInvestmentDetailsMap({
 }) {
   String? startDateStr;
   String? maturityDateStr;
+  String? lastInterestDateStr;
   if (startDate != null) {
     startDateStr = '${startDate.year}-${startDate.month.toString().padLeft(2, '0')}-${startDate.day.toString().padLeft(2, '0')}';
   }
   if (maturityDate != null) {
     maturityDateStr = '${maturityDate.year}-${maturityDate.month.toString().padLeft(2, '0')}-${maturityDate.day.toString().padLeft(2, '0')}';
+  }
+  if (lastInterestDate != null) {
+    lastInterestDateStr = '${lastInterestDate.year}-${lastInterestDate.month.toString().padLeft(2, '0')}-${lastInterestDate.day.toString().padLeft(2, '0')}';
   }
 
   return {
@@ -87,6 +92,7 @@ Map<String, dynamic> buildInvestmentDetailsMap({
     'base_currency': baseCurrency,
     'apy_rate': investmentType == InvestmentType.highYield ? apyRate : null,
     'interest_period': investmentType == InvestmentType.highYield ? interestPeriod : null,
+    'last_interest_date': investmentType == InvestmentType.highYield ? lastInterestDateStr : null,
     'principal': investmentType == InvestmentType.cdt ? principal : null,
     'interest_rate': investmentType == InvestmentType.cdt ? interestRate : null,
     'term_days': investmentType == InvestmentType.cdt ? termDays : null,
@@ -123,6 +129,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
   final _fundCodeController = TextEditingController();
   DateTime? _cdtStartDate;
   DateTime? _cdtMaturityDate;
+  DateTime? _highYieldEarningSince;
 
   String _selectedType = 'checking';
   String? _selectedIcon;
@@ -254,6 +261,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
             ? double.parse(_apyRateController.text) / 100
             : null,
         interestPeriod: _investmentInterestPeriod,
+        lastInterestDate: _highYieldEarningSince,
         principal: _principalController.text.isEmpty
             ? null
             : CurrencyFormatter.parse(_principalController.text),
@@ -765,6 +773,48 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 12),
+                    InkWell(
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: _highYieldEarningSince ?? DateTime.now(),
+                          firstDate: DateTime(2000),
+                          lastDate: DateTime.now(),
+                        );
+                        if (picked != null) {
+                          setState(() => _highYieldEarningSince = picked);
+                        }
+                      },
+                      child: InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: 'Earning since (optional)',
+                          border: const OutlineInputBorder(),
+                          suffixIcon: _highYieldEarningSince != null
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear, size: 18),
+                                  onPressed: () => setState(
+                                      () => _highYieldEarningSince = null),
+                                )
+                              : const Icon(Icons.calendar_today, size: 18),
+                          helperText:
+                              'Sets the start date for interest tracking. Leave blank to set it later.',
+                        ),
+                        child: Text(
+                          _highYieldEarningSince != null
+                              ? '${_highYieldEarningSince!.year}-${_highYieldEarningSince!.month.toString().padLeft(2, '0')}-${_highYieldEarningSince!.day.toString().padLeft(2, '0')}'
+                              : 'Not set — will prompt on detail screen',
+                          style: _highYieldEarningSince == null
+                              ? Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withOpacity(0.45),
+                                  )
+                              : null,
+                        ),
+                      ),
                     ),
                   ],
 

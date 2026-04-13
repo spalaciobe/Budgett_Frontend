@@ -76,6 +76,26 @@ class BudgettApp extends ConsumerWidget {
       error: (_, __) => ThemeMode.system,
     );
 
+    // Invalidate all finance providers whenever the user signs in so they always
+    // fetch fresh data for the current session. Without this, providers can
+    // return stale cached data from a previous session after logout + re-login,
+    // because the ref.invalidate() calls in logout_action.dart fire while the
+    // session is still active, causing providers to complete with the old data.
+    ref.listen<AsyncValue<Session?>>(_supabaseSessionProvider, (previous, next) {
+      final wasSignedOut = previous?.valueOrNull == null;
+      final isSignedIn = next.valueOrNull != null;
+      if (wasSignedOut && isSignedIn) {
+        ref.invalidate(accountsProvider);
+        ref.invalidate(recentTransactionsProvider);
+        ref.invalidate(categoriesProvider);
+        ref.invalidate(goalsProvider);
+        ref.invalidate(expenseGroupsProvider);
+        ref.invalidate(recurringTransactionsProvider);
+        ref.invalidate(budgetsProvider);
+        ref.invalidate(yearlySummaryProvider);
+      }
+    });
+
     // Watch the scheduler so it runs whenever dependencies change
     ref.watch(ccAlertSchedulerProvider);
 

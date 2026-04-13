@@ -12,6 +12,7 @@ import '../providers/finance_provider.dart';
 import '../providers/fx_rate_provider.dart';
 import '../utils/currency_formatter.dart';
 import '../widgets/edit_account_dialog.dart';
+import '../widgets/high_yield_interest_dialog.dart';
 import '../widgets/edit_holding_dialog.dart';
 import '../widgets/buy_sell_holding_dialog.dart';
 import '../widgets/update_prices_dialog.dart';
@@ -318,47 +319,207 @@ class _SummaryHeader extends StatelessWidget {
 
 // ── High-yield section ────────────────────────────────────────────────────────
 
-class _HighYieldSection extends StatelessWidget {
+class _HighYieldSection extends ConsumerWidget {
   final Account account;
   final InvestmentDetails? details;
 
   const _HighYieldSection({required this.account, required this.details});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final apy = (details?.apyRate ?? 0) * 100;
-    final annual = InvestmentCalculator.projectedAnnualIncome(
-      account.balance,
-      details?.apyRate ?? 0,
-    );
-    final monthly = annual / 12;
+    if (details == null) return const SizedBox.shrink();
 
+    final apyRate = details!.apyRate ?? 0;
+    final apy = apyRate * 100;
+    final annual =
+        InvestmentCalculator.projectedAnnualIncome(account.balance, apyRate);
+    final daily =
+        InvestmentCalculator.highYieldDailyIncome(account.balance, apyRate);
+    final fromDate = details!.lastInterestDate;
+    final accrued = fromDate != null
+        ? InvestmentCalculator.highYieldAccruedInterest(
+            account.balance, apyRate, fromDate)
+        : null;
+
+    return Column(
+      children: [
+        // ── Stats row ──────────────────────────────────────────────────
+        Card(
+          elevation: 1,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: _StatItem(
+                        label: 'APY',
+                        value: '${apy.toStringAsFixed(2)}% E.A.',
+                        color: Colors.green.shade600,
+                      ),
+                    ),
+                    Expanded(
+                      child: _StatItem(
+                        label: 'Daily Earnings',
+                        value: CurrencyFormatter.format(daily),
+                        color: Colors.green.shade600,
+                      ),
+                    ),
+                    Expanded(
+                      child: _StatItem(
+                        label: 'Annual Est.',
+                        value: CurrencyFormatter.format(annual),
+                      ),
+                    ),
+                  ],
+                ),
+
+                // ── Accrued interest row (only when tracking date is set) ──
+                if (accrued != null) ...[
+                  const SizedBox(height: 12),
+                  const Divider(height: 1),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: _StatItem(
+                          label: 'Accrued Interest',
+                          value: CurrencyFormatter.format(accrued),
+                          color: Colors.green.shade600,
+                        ),
+                      ),
+                      Expanded(
+                        flex: 3,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Since',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.onSurface
+                                    .withOpacity(0.55),
+                              ),
+                            ),
+                            Text(
+                              DateFormat('MMM d, y').format(fromDate!),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            Text(
+                              '${DateTime.now().difference(fromDate).inDays} days',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurface
+                                    .withOpacity(0.55),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+
+        // ── Record Interest button / Set start date prompt ─────────────
+        const SizedBox(height: 8),
+        if (fromDate != null)
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.tonal(
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (_) => HighYieldInterestDialog(
+                    account: account,
+                    details: details!,
+                  ),
+                ).then((recorded) {
+                  if (recorded == true) {
+                    ref.invalidate(accountsProvider);
+                    ref.invalidate(recentTransactionsProvider);
+                  }
+                });
+              },
+              child: const Text('Record Interest'),
+            ),
+          )
+        else
+          _SetStartDateBanner(account: account, details: details!),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+}
+
+/// Shown when [lastInterestDate] is null — prompts the user to set a start date
+/// so the app can begin tracking accrued interest.
+class _SetStartDateBanner extends ConsumerWidget {
+  final Account account;
+  final InvestmentDetails details;
+
+  const _SetStartDateBanner({required this.account, required this.details});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     return Card(
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      color: theme.colorScheme.secondaryContainer.withOpacity(0.5),
+      elevation: 0,
+      shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
           children: [
+            Icon(Icons.calendar_today,
+                size: 18,
+                color: theme.colorScheme.onSecondaryContainer
+                    .withOpacity(0.7)),
+            const SizedBox(width: 12),
             Expanded(
-              child: _StatItem(
-                label: 'APY',
-                value: '${apy.toStringAsFixed(2)}% E.A.',
-                color: Colors.green.shade600,
+              child: Text(
+                'Set a start date to begin tracking daily accrued interest.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSecondaryContainer
+                      .withOpacity(0.8),
+                ),
               ),
             ),
-            Expanded(
-              child: _StatItem(
-                label: 'Annual Income',
-                value: CurrencyFormatter.format(annual),
-              ),
-            ),
-            Expanded(
-              child: _StatItem(
-                label: 'Monthly Est.',
-                value: CurrencyFormatter.format(monthly),
-              ),
+            const SizedBox(width: 8),
+            TextButton(
+              onPressed: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: DateTime.now(),
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime.now(),
+                );
+                if (picked == null || !context.mounted) return;
+                try {
+                  final dateStr =
+                      '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+                  await ref
+                      .read(financeRepositoryProvider)
+                      .rawUpdateInvestmentDetails(details.id,
+                          {'last_interest_date': dateStr});
+                  ref.invalidate(accountsProvider);
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Error: $e')));
+                  }
+                }
+              },
+              child: const Text('Set date'),
             ),
           ],
         ),

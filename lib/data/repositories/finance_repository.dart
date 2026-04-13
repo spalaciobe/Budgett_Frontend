@@ -227,6 +227,46 @@ class FinanceRepository {
     });
   }
 
+  /// Records high-yield interest as an [income] transaction and advances
+  /// [investment_details.last_interest_date] to [date].
+  ///
+  /// Call this whenever the user formalises accrued interest. The next
+  /// accrual calculation will start from [date] going forward, which handles
+  /// APY rate changes correctly: record outstanding interest first, then
+  /// update the rate via [updateAccount].
+  Future<void> recordHighYieldInterest({
+    required String accountId,
+    required String detailsId,
+    required double amount,
+    required DateTime date,
+    required String currency,
+    required String accountName,
+  }) async {
+    final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+
+    // 1. Create the income transaction
+    await addTransaction({
+      'account_id': accountId,
+      'amount': amount,
+      'type': 'income',
+      'currency': currency,
+      'description': 'High-Yield Interest — $accountName',
+      'date': dateStr,
+      'movement_type': 'income',
+    });
+
+    // 2. Advance last_interest_date so future accruals start from here
+    await _client
+        .from('investment_details')
+        .update({'last_interest_date': dateStr})
+        .eq('id', detailsId);
+  }
+
+  Future<void> rawUpdateInvestmentDetails(
+      String id, Map<String, dynamic> data) async {
+    await _client.from('investment_details').update(data).eq('id', id);
+  }
+
   Future<void> addSubCategory(SubCategory subCategory) async {
     final userId = _client.auth.currentUser!.id;
     await _client.from('sub_categories').insert({

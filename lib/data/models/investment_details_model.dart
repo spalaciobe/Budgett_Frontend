@@ -82,6 +82,10 @@ class InvestmentDetails {
   final String? fundCode;
   final String? navCurrency;
 
+  /// The date through which high-yield interest has been formally recorded.
+  /// Null means no interest has ever been recorded (UI will prompt for a start date).
+  final DateTime? lastInterestDate;
+
   final String? notes;
 
   InvestmentDetails({
@@ -100,6 +104,7 @@ class InvestmentDetails {
     this.autoRenew = false,
     this.fundCode,
     this.navCurrency,
+    this.lastInterestDate,
     this.notes,
   });
 
@@ -124,6 +129,9 @@ class InvestmentDetails {
       autoRenew: json['auto_renew'] ?? false,
       fundCode: json['fund_code'],
       navCurrency: json['nav_currency'],
+      lastInterestDate: json['last_interest_date'] != null
+          ? DateTime.parse(json['last_interest_date'])
+          : null,
       notes: json['notes'],
     );
   }

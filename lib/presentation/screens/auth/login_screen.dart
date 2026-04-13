@@ -22,7 +22,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
-      if (mounted) context.go('/');
+      // Do NOT navigate manually here. The GoRouter _AuthNotifier listens to
+      // onAuthStateChange and redirects to '/' once currentUser is fully set.
+      // Navigating immediately after signInWithPassword() can cause a race on
+      // Flutter web where currentUser is still null when HomeScreen first builds.
     } on AuthException catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
     } catch (e) {

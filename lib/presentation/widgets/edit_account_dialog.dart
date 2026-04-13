@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:budgett_frontend/data/models/account_model.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import '../../data/repositories/broker_repository.dart';
@@ -44,6 +45,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
   String _investmentInterestPeriod = 'monthly';
   DateTime? _cdtStartDate;
   DateTime? _cdtMaturityDate;
+  DateTime? _highYieldLastInterestDate;
 
   bool _isLoading = false;
 
@@ -88,6 +90,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
       _investmentInterestPeriod = inv.interestPeriod ?? 'monthly';
       _cdtStartDate = inv.startDate;
       _cdtMaturityDate = inv.maturityDate;
+      _highYieldLastInterestDate = inv.lastInterestDate;
     }
   }
 
@@ -160,6 +163,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
             ? double.parse(_apyRateController.text) / 100
             : widget.account.investmentDetails?.apyRate,
         interestPeriod: _investmentInterestPeriod,
+        lastInterestDate: _highYieldLastInterestDate,
         principal: _principalController.text.isEmpty
             ? widget.account.investmentDetails?.principal
             : CurrencyFormatter.parse(_principalController.text),
@@ -501,6 +505,50 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                       ),
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
+                    ),
+                    const SizedBox(height: 12),
+                    InkWell(
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate:
+                              _highYieldLastInterestDate ?? DateTime.now(),
+                          firstDate: DateTime(2000),
+                          lastDate: DateTime.now(),
+                        );
+                        if (picked != null) {
+                          setState(() => _highYieldLastInterestDate = picked);
+                        }
+                      },
+                      child: InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: 'Last interest recorded',
+                          border: const OutlineInputBorder(),
+                          suffixIcon: _highYieldLastInterestDate != null
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear, size: 18),
+                                  onPressed: () => setState(
+                                      () => _highYieldLastInterestDate = null),
+                                )
+                              : const Icon(Icons.calendar_today, size: 18),
+                          helperText:
+                              'If changing the APY, record interest first then update here.',
+                        ),
+                        child: Text(
+                          _highYieldLastInterestDate != null
+                              ? DateFormat('MMM d, y')
+                                  .format(_highYieldLastInterestDate!)
+                              : 'Not set',
+                          style: _highYieldLastInterestDate == null
+                              ? Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withOpacity(0.45),
+                                  )
+                              : null,
+                        ),
+                      ),
                     ),
                   ],
 

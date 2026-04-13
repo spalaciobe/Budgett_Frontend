@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import '../../data/models/account_model.dart';
 import '../../data/models/investment_details_model.dart';
 import '../../data/models/investment_holding_model.dart';
@@ -213,6 +214,37 @@ class InvestmentCalculator {
   static double projectedMonthlyIncome(double balance, double apyRate) {
     return projectedAnnualIncome(balance, apyRate) / 12;
   }
+
+  /// Daily income using the E.A. (Efectiva Anual) compound formula.
+  ///
+  ///   dailyRate = (1 + apyRate)^(1/365) - 1
+  ///   dailyIncome = balance × dailyRate
+  static double highYieldDailyIncome(double balance, double apyRate) {
+    if (apyRate <= 0 || balance <= 0) return 0;
+    final dailyRate = math.pow(1 + apyRate, 1 / 365).toDouble() - 1;
+    return balance * dailyRate;
+  }
+
+  /// Accrued interest from [fromDate] to today using the E.A. compound formula.
+  ///
+  ///   interest = balance × ((1 + apyRate)^(n/365) - 1)
+  ///
+  /// Uses current [balance] as the base (approximation; does not account for
+  /// intra-period deposits or withdrawals). Returns 0 when [fromDate] is today
+  /// or in the future.
+  static double highYieldAccruedInterest(
+    double balance,
+    double apyRate,
+    DateTime fromDate,
+  ) {
+    if (apyRate <= 0 || balance <= 0) return 0;
+    final days = DateTime.now()
+        .difference(DateTime(fromDate.year, fromDate.month, fromDate.day))
+        .inDays;
+    if (days <= 0) return 0;
+    return balance * (math.pow(1 + apyRate, days / 365).toDouble() - 1);
+  }
+
 
   // ── avg_cost recalculation on buy ────────────────────────────────────────
 

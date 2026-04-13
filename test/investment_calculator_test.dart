@@ -288,6 +288,55 @@ void main() {
     test('projectedAnnualIncome with zero APY returns 0', () {
       expect(InvestmentCalculator.projectedAnnualIncome(1000000.0, 0.0), 0.0);
     });
+
+    test('highYieldDailyIncome uses E.A. compound daily rate', () {
+      // dailyRate = (1 + 0.0925)^(1/365) - 1 ≈ 0.000242...
+      // dailyIncome = 1_000_000 × dailyRate ≈ 242.xx
+      final income =
+          InvestmentCalculator.highYieldDailyIncome(1000000.0, 0.0925);
+      expect(income, closeTo(242.0, 2.0)); // within ±2 COP tolerance
+    });
+
+    test('highYieldDailyIncome returns 0 for zero balance', () {
+      expect(InvestmentCalculator.highYieldDailyIncome(0.0, 0.0925), 0.0);
+    });
+
+    test('highYieldDailyIncome returns 0 for zero APY', () {
+      expect(InvestmentCalculator.highYieldDailyIncome(1000000.0, 0.0), 0.0);
+    });
+
+    test('highYieldAccruedInterest for 30 days at 9.25% E.A.', () {
+      // interest = 1_000_000 × ((1.0925)^(30/365) - 1)
+      // ≈ 1_000_000 × 0.007268 ≈ 7268
+      final fromDate = DateTime.now().subtract(const Duration(days: 30));
+      final interest = InvestmentCalculator.highYieldAccruedInterest(
+          1000000.0, 0.0925, fromDate);
+      expect(interest, closeTo(7268.0, 50.0)); // ±50 COP tolerance
+    });
+
+    test('highYieldAccruedInterest returns 0 when fromDate is today', () {
+      final today = DateTime.now();
+      final interest =
+          InvestmentCalculator.highYieldAccruedInterest(1000000.0, 0.0925, today);
+      expect(interest, 0.0);
+    });
+
+    test('highYieldAccruedInterest returns 0 for future fromDate', () {
+      final future = DateTime.now().add(const Duration(days: 5));
+      final interest =
+          InvestmentCalculator.highYieldAccruedInterest(1000000.0, 0.0925, future);
+      expect(interest, 0.0);
+    });
+
+    test('highYieldAccruedInterest is greater for longer periods', () {
+      final from30 = DateTime.now().subtract(const Duration(days: 30));
+      final from60 = DateTime.now().subtract(const Duration(days: 60));
+      final interest30 = InvestmentCalculator.highYieldAccruedInterest(
+          1000000.0, 0.0925, from30);
+      final interest60 = InvestmentCalculator.highYieldAccruedInterest(
+          1000000.0, 0.0925, from60);
+      expect(interest60, greaterThan(interest30));
+    });
   });
 
   // ── newAvgCost ───────────────────────────────────────────────────────────────
