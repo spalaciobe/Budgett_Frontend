@@ -4,8 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 
-import 'package:budgett_frontend/presentation/widgets/app_drawer.dart';
-
 class AnalysisScreen extends ConsumerStatefulWidget {
   const AnalysisScreen({super.key});
 
@@ -21,7 +19,6 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
     final historyAsync = ref.watch(yearlySummaryProvider(_selectedYear));
 
     return Scaffold(
-      drawer: const AppDrawer(),
       appBar: AppBar(title: const Text('Analysis')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),

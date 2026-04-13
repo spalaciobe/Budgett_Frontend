@@ -22,21 +22,22 @@ class CurrencyNotifier extends AsyncNotifier<String> {
 
 final currencyProvider = AsyncNotifierProvider<CurrencyNotifier, String>(CurrencyNotifier.new);
 
-class ThemeModeNotifier extends AsyncNotifier<bool> {
+class ThemeModeNotifier extends AsyncNotifier<bool?> {
   @override
-  Future<bool> build() async {
+  Future<bool?> build() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_keyDarkMode) ?? false;
+    if (!prefs.containsKey(_keyDarkMode)) return null; // null = seguir sistema
+    return prefs.getBool(_keyDarkMode);
   }
 
   Future<void> setDarkMode(bool isDark) async {
-    state = AsyncData(isDark); // optimistic update — theme switches instantly
+    state = AsyncData(isDark);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyDarkMode, isDark);
   }
 }
 
-final themeModeProvider = AsyncNotifierProvider<ThemeModeNotifier, bool>(ThemeModeNotifier.new);
+final themeModeProvider = AsyncNotifierProvider<ThemeModeNotifier, bool?>(ThemeModeNotifier.new);
 
 class CcNotificationsEnabledNotifier extends AsyncNotifier<bool> {
   @override

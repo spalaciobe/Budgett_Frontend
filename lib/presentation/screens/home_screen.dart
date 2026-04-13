@@ -9,13 +9,6 @@ import 'package:budgett_frontend/presentation/widgets/add_transaction_dialog.dar
 import 'package:budgett_frontend/presentation/widgets/add_account_dialog.dart';
 import 'package:budgett_frontend/presentation/widgets/edit_transaction_dialog.dart';
 import 'package:budgett_frontend/presentation/widgets/edit_account_dialog.dart';
-import 'package:budgett_frontend/presentation/widgets/app_drawer.dart';
-
-import 'package:budgett_frontend/presentation/screens/recurring_transactions_screen.dart';
-import 'package:budgett_frontend/presentation/screens/expense_groups_screen.dart';
-import 'package:budgett_frontend/presentation/screens/settings_screen.dart';
-import 'package:budgett_frontend/presentation/screens/analysis_screen.dart';
-import 'package:budgett_frontend/presentation/screens/credit_card_details_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -31,7 +24,6 @@ class HomeScreen extends ConsumerWidget {
         title: const Text('Budgett'),
       ),
       backgroundColor: Theme.of(context).colorScheme.surface,
-      // Drawer is handled by MainScaffold
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -82,11 +74,7 @@ class HomeScreen extends ConsumerWidget {
                         child: InkWell(
                           onTap: () {
                             if (acc.type == 'credit_card') {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (context) => CreditCardDetailsScreen(account: acc),
-                                ),
-                              );
+                              context.go('/credit-card/${acc.id}');
                             } else {
                               showDialog(
                                 context: context,

@@ -58,10 +58,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           constraints: const BoxConstraints(maxWidth: 400),
           padding: const EdgeInsets.all(24),
           child: AutofillGroup(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
                 Icon(Icons.account_balance_wallet, size: 64, color: Theme.of(context).colorScheme.primary),
                 const SizedBox(height: 32),
                 TextField(
@@ -100,6 +101,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         ),
       ),
+    ),
     ),
     );
   }

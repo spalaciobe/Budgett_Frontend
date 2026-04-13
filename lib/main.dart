@@ -58,7 +58,7 @@ class BudgettApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final themeModeAsync = ref.watch(themeModeProvider);
     final themeMode = themeModeAsync.when(
-      data: (isDark) => isDark ? ThemeMode.dark : ThemeMode.light,
+      data: (isDark) => isDark == null ? ThemeMode.system : (isDark ? ThemeMode.dark : ThemeMode.light),
       loading: () => ThemeMode.system,
       error: (_, __) => ThemeMode.system,
     );
@@ -67,6 +67,7 @@ class BudgettApp extends ConsumerWidget {
     ref.watch(ccAlertSchedulerProvider);
 
     return MaterialApp.router(
+      debugShowCheckedModeBanner: false,
       title: 'Budgett',
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,

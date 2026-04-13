@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/presentation/providers/settings_provider.dart';
+import 'package:budgett_frontend/presentation/providers/logout_action.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -14,7 +15,7 @@ class SettingsScreen extends ConsumerWidget {
 
     // Derive values with safe fallbacks — no nested when() to avoid full-screen spinners
     final currency = currencyAsync.valueOrNull ?? 'COP';
-    final isDark = isDarkAsync.valueOrNull ?? false;
+    final isDark = isDarkAsync.valueOrNull ?? (MediaQuery.platformBrightnessOf(context) == Brightness.dark);
     final ccEnabled = ccEnabledAsync.valueOrNull ?? true;
     final ccDays = ccDaysAsync.valueOrNull ?? 3;
     final isLoading = currencyAsync.isLoading || isDarkAsync.isLoading;
@@ -104,6 +105,22 @@ class SettingsScreen extends ConsumerWidget {
                   leading: Icon(Icons.info),
                   title: Text('About'),
                   subtitle: Text('Budgett v1.0.0'),
+                ),
+                const Divider(),
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Text(
+                    'Cuenta',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.logout),
+                  title: const Text('Cerrar sesión'),
+                  onTap: () => performLogout(ref, context),
                 ),
               ],
             ),

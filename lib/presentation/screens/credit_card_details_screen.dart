@@ -26,17 +26,23 @@ final accountTransactionsProvider = FutureProvider.family.autoDispose<List<Trans
 });
 
 class CreditCardDetailsScreen extends ConsumerWidget {
-  final Account account;
+  final String accountId;
 
-  const CreditCardDetailsScreen({super.key, required this.account});
+  const CreditCardDetailsScreen({super.key, required this.accountId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Re-read from the provider on every build so the screen reflects account
-    // updates (e.g. after saving rules) without requiring a manual reload.
-    final freshAccount = ref.watch(accountsProvider).valueOrNull
-            ?.firstWhere((a) => a.id == account.id, orElse: () => account) ??
-        account;
+    final matches = ref
+        .watch(accountsProvider)
+        .valueOrNull
+        ?.where((a) => a.id == accountId)
+        .toList();
+
+    if (matches == null || matches.isEmpty) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    final Account freshAccount = matches.first;
 
     // Watch transactions for this account
     final transactionsAsync = ref.watch(accountTransactionsProvider(freshAccount.id));

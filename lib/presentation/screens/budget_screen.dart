@@ -7,7 +7,6 @@ import 'package:budgett_frontend/presentation/widgets/create_category_dialog.dar
 import 'package:budgett_frontend/presentation/widgets/edit_budget_dialog.dart';
 import 'package:budgett_frontend/presentation/widgets/budget_comparison_widget.dart';
 import 'package:budgett_frontend/presentation/widgets/edit_category_dialog.dart';
-import 'package:budgett_frontend/presentation/widgets/app_drawer.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:budgett_frontend/data/models/category_spending.dart';
 

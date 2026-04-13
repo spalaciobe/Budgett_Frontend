@@ -6,8 +6,6 @@ import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:budgett_frontend/presentation/widgets/edit_goal_dialog.dart';
 import 'package:budgett_frontend/presentation/utils/icon_helper.dart';
 
-import 'package:budgett_frontend/presentation/widgets/app_drawer.dart';
-
 class GoalsScreen extends ConsumerWidget {
   const GoalsScreen({super.key});
 
@@ -16,7 +14,6 @@ class GoalsScreen extends ConsumerWidget {
     final goalsAsync = ref.watch(goalsProvider);
 
     return Scaffold(
-      drawer: const AppDrawer(),
       appBar: AppBar(title: const Text('Financial Goals')),
       body: goalsAsync.when(
         data: (goals) {
