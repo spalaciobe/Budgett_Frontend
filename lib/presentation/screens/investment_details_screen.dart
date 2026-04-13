@@ -658,7 +658,7 @@ class _TxTile extends StatelessWidget {
         style: theme.textTheme.bodyMedium,
       ),
       subtitle: Text(
-        DateFormat('MMM d, y').format(DateTime.parse(tx.date)),
+        DateFormat('MMM d, y').format(tx.date),
         style: theme.textTheme.bodySmall
             ?.copyWith(color: theme.colorScheme.onSurface.withOpacity(0.6)),
       ),

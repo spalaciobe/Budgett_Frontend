@@ -5,6 +5,7 @@ import 'dart:async';
 
 import 'package:budgett_frontend/presentation/screens/home_screen.dart';
 import 'package:budgett_frontend/presentation/screens/auth/login_screen.dart';
+import 'package:budgett_frontend/presentation/screens/auth/register_screen.dart';
 import 'package:budgett_frontend/presentation/screens/budget_screen.dart';
 import 'package:budgett_frontend/presentation/screens/goals_screen.dart';
 import 'package:budgett_frontend/presentation/screens/analysis_screen.dart';
@@ -44,6 +45,10 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/login',
       builder: (context, state) => const LoginScreen(),
+    ),
+    GoRoute(
+      path: '/register',
+      builder: (context, state) => const RegisterScreen(),
     ),
 
     // ── Main app shell ────────────────────────────────────────────────────
@@ -112,10 +117,10 @@ final appRouter = GoRouter(
     final path = state.uri.path;
 
     if (session == null) {
-      return path == '/login' ? null : '/login';
+      return (path == '/login' || path == '/register') ? null : '/login';
     }
 
-    if (path == '/login') return '/';
+    if (path == '/login' || path == '/register') return '/';
 
     return null;
   },
