@@ -28,9 +28,19 @@ class HomeScreen extends ConsumerWidget {
         title: const Text('Budgett'),
       ),
       backgroundColor: Theme.of(context).colorScheme.surface,
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
+      body: RefreshIndicator(
+        onRefresh: () async {
+          ref.invalidate(accountsProvider);
+          ref.invalidate(recentTransactionsProvider);
+          await Future.wait([
+            ref.read(accountsProvider.future),
+            ref.read(recentTransactionsProvider.future),
+          ]);
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             
@@ -169,6 +179,7 @@ class HomeScreen extends ConsumerWidget {
                error: (err, stack) => Text('Error: $err'),
              ),
           ],
+        ),
         ),
       ),
       floatingActionButton: FloatingActionButton(

@@ -129,11 +129,12 @@ class _BuySellHoldingDialogState extends ConsumerState<BuySellHoldingDialog> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      isBuy ? 'Buy ${h.symbol}' : 'Sell ${h.symbol}',
-                      style: Theme.of(context).textTheme.headlineSmall,
+                    Expanded(
+                      child: Text(
+                        isBuy ? 'Buy ${h.symbol}' : 'Sell ${h.symbol}',
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
                     ),
                     IconButton(
                       icon: const Icon(Icons.close),

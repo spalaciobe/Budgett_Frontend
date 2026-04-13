@@ -1,7 +1,10 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../data/repositories/bank_repository.dart';
 import '../../data/repositories/broker_repository.dart';
 import '../../data/models/bank_model.dart';
@@ -133,6 +136,8 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
 
   String _selectedType = 'checking';
   String? _selectedIcon;
+  Uint8List? _pendingIconBytes;
+  bool _isLoading = false;
   Bank? _selectedBank;
   // Bancolombia/Davivienda/BBVA have two well-known billing cycles
   int? _selectedCycle; // 15 or 30 — null until user picks
@@ -212,6 +217,20 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
     });
   }
 
+  Future<void> _pickIcon() async {
+    final picked = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 512,
+      maxHeight: 512,
+    );
+    if (picked == null) return;
+    final bytes = await picked.readAsBytes();
+    setState(() {
+      _pendingIconBytes = bytes;
+      _selectedIcon = null;
+    });
+  }
+
   void _autoComputeMaturity() {
     final start = _cdtStartDate;
     final days = int.tryParse(_termDaysController.text);
@@ -231,12 +250,14 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
     };
 
     if (_selectedType == 'credit_card') {
+      // User enters debt as a positive amount — store it as negative.
+      accountData['balance'] = -(CurrencyFormatter.parse(_balanceController.text));
       accountData['credit_limit'] = _creditLimitController.text.isEmpty
           ? 0.0
           : CurrencyFormatter.parse(_creditLimitController.text);
       accountData['balance_usd'] = _balanceUsdController.text.isEmpty
           ? 0.0
-          : CurrencyFormatter.parse(_balanceUsdController.text, currency: 'USD');
+          : -(CurrencyFormatter.parse(_balanceUsdController.text, currency: 'USD'));
       accountData['credit_limit_usd'] = _creditLimitUsdController.text.isEmpty
           ? 0.0
           : CurrencyFormatter.parse(_creditLimitUsdController.text, currency: 'USD');
@@ -284,8 +305,16 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
       }
     }
 
+    setState(() => _isLoading = true);
     try {
-      await ref.read(financeRepositoryProvider).createAccount(accountData);
+      final repo = ref.read(financeRepositoryProvider);
+      final accountId = await repo.createAccount(accountData);
+
+      if (_pendingIconBytes != null) {
+        final url = await repo.uploadAccountIcon(accountId, _pendingIconBytes!);
+        await repo.updateAccount(accountId, {'icon': url});
+      }
+
       ref.invalidate(accountsProvider);
 
       if (mounted) {
@@ -300,7 +329,76 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
           SnackBar(content: Text('Error: $e')),
         );
       }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Widget _buildIconPicker() {
+    final theme = Theme.of(context);
+    final hasImage = _pendingIconBytes != null;
+    final hasUrl = _selectedIcon != null && _selectedIcon!.startsWith('http');
+
+    Widget preview;
+    if (hasImage) {
+      preview = ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Image.memory(_pendingIconBytes!, width: 48, height: 48, fit: BoxFit.cover),
+      );
+    } else if (hasUrl) {
+      preview = ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Image.network(_selectedIcon!, width: 48, height: 48, fit: BoxFit.cover),
+      );
+    } else {
+      preview = Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(Icons.image_outlined, color: theme.colorScheme.onSurfaceVariant),
+      );
+    }
+
+    return Row(
+      children: [
+        preview,
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                hasImage ? 'Image selected' : (hasUrl ? 'Custom icon' : 'No icon selected'),
+                style: theme.textTheme.bodyMedium,
+              ),
+              Text(
+                'Optional — 256×256 image (JPG/PNG)',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (hasImage || hasUrl)
+          IconButton(
+            icon: const Icon(Icons.close),
+            tooltip: 'Remove icon',
+            onPressed: () => setState(() {
+              _pendingIconBytes = null;
+              _selectedIcon = null;
+            }),
+          ),
+        TextButton.icon(
+          onPressed: _pickIcon,
+          icon: const Icon(Icons.upload, size: 18),
+          label: Text(hasImage || hasUrl ? 'Change' : 'Choose'),
+        ),
+      ],
+    );
   }
 
   @override
@@ -323,10 +421,11 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
               children: [
                 // Header
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Add Account',
-                        style: Theme.of(context).textTheme.headlineSmall),
+                    Expanded(
+                      child: Text('Add Account',
+                          style: Theme.of(context).textTheme.headlineSmall),
+                    ),
                     IconButton(
                       icon: const Icon(Icons.close),
                       onPressed: () => Navigator.of(context).pop(),
@@ -370,10 +469,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                         value: 'investment',
                         child: Text('Investment')),
                   ],
-                  onChanged: (v) => setState(() {
-                    _selectedType = v!;
-                    if (v == 'credit_card') _selectedIcon = 'credit_card';
-                  }),
+                  onChanged: (v) => setState(() => _selectedType = v!),
                 ),
                 const SizedBox(height: 16),
 
@@ -382,7 +478,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                   controller: _balanceController,
                   decoration: InputDecoration(
                     labelText: isCreditCard
-                        ? 'Current Balance (negative if debt)'
+                        ? 'Current Debt (amount owed)'
                         : isInvestment
                             ? 'Cash Balance (uninvested)'
                             : 'Initial Balance',
@@ -391,11 +487,11 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                         : '\$',
                     border: const OutlineInputBorder(),
                     helperText: isCreditCard
-                        ? 'Enter negative if you have active debt.'
+                        ? 'Enter how much you currently owe on this card.'
                         : null,
                   ),
-                  keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true, signed: true),
+                  keyboardType: TextInputType.numberWithOptions(
+                      decimal: true, signed: !isCreditCard),
                   inputFormatters: [
                     CurrencyInputFormatter(
                       currency: isInvestment && _investmentBaseCurrency == 'USD'
@@ -408,54 +504,8 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                 ),
                 const SizedBox(height: 16),
 
-                // Icon selector
-                DropdownButtonFormField<String>(
-                  value: _selectedIcon,
-                  decoration: const InputDecoration(
-                    labelText: 'Icon (optional)',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: const [
-                    DropdownMenuItem(
-                        value: null, child: Text('Default')),
-                    DropdownMenuItem(
-                        value: 'account_balance',
-                        child: Row(children: [
-                          Icon(Icons.account_balance, size: 18),
-                          SizedBox(width: 8),
-                          Text('Bank')
-                        ])),
-                    DropdownMenuItem(
-                        value: 'credit_card',
-                        child: Row(children: [
-                          Icon(Icons.credit_card, size: 18),
-                          SizedBox(width: 8),
-                          Text('Card')
-                        ])),
-                    DropdownMenuItem(
-                        value: 'money',
-                        child: Row(children: [
-                          Icon(Icons.money, size: 18),
-                          SizedBox(width: 8),
-                          Text('Cash')
-                        ])),
-                    DropdownMenuItem(
-                        value: 'savings',
-                        child: Row(children: [
-                          Icon(Icons.savings, size: 18),
-                          SizedBox(width: 8),
-                          Text('Savings')
-                        ])),
-                    DropdownMenuItem(
-                        value: 'trending_up',
-                        child: Row(children: [
-                          Icon(Icons.trending_up, size: 18),
-                          SizedBox(width: 8),
-                          Text('Investment')
-                        ])),
-                  ],
-                  onChanged: (v) => setState(() => _selectedIcon = v),
-                ),
+                // Icon picker
+                _buildIconPicker(),
 
                 // ── Credit card section ───────────────────────────────────
                 if (isCreditCard) ...[
@@ -520,13 +570,12 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                   TextFormField(
                     controller: _balanceUsdController,
                     decoration: const InputDecoration(
-                      labelText: 'Current USD Balance (negative if debt)',
+                      labelText: 'Current USD Debt',
                       prefixText: 'US\$',
                       border: OutlineInputBorder(),
-                      helperText: 'Enter negative if you have active USD debt.',
+                      helperText: 'Leave empty if no USD balance.',
                     ),
-                    keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true, signed: true),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     inputFormatters: [const CurrencyInputFormatter(currency: 'USD')],
                   ),
                   const SizedBox(height: 12),
@@ -984,10 +1033,16 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
-                    onPressed: _saveAccount,
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 14),
-                      child: Text('Create Account'),
+                    onPressed: _isLoading ? null : _saveAccount,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      child: _isLoading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Text('Create Account'),
                     ),
                   ),
                 ),

@@ -20,8 +20,14 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Analysis')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          ref.invalidate(yearlySummaryProvider(_selectedYear));
+          await ref.read(yearlySummaryProvider(_selectedYear).future);
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16),
         child: Column(
           children: [
             // Year Selector
@@ -223,6 +229,7 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
               error: (_,__) => const SizedBox(),
             ),
           ],
+        ),
         ),
       ),
     );

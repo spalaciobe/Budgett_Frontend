@@ -293,10 +293,11 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Add Transaction',
-                        style: Theme.of(context).textTheme.headlineSmall),
+                    Expanded(
+                      child: Text('Add Transaction',
+                          style: Theme.of(context).textTheme.headlineSmall),
+                    ),
                     IconButton(
                       icon: const Icon(Icons.close),
                       onPressed: () => Navigator.of(context).pop(),

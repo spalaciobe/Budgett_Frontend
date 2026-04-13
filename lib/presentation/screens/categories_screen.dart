@@ -30,20 +30,20 @@ class CategoriesScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: categoriesAsync.when(
+      body: RefreshIndicator(
+        onRefresh: () async {
+          ref.invalidate(categoriesProvider);
+          await ref.read(categoriesProvider.future);
+        },
+        child: categoriesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
         data: (categories) {
           final income = categories.where((c) => c.type == 'income').toList();
           final expense = categories.where((c) => c.type == 'expense').toList();
 
-          // Separate system (global) categories from user-owned ones
-          // System categories have a fixed UUID prefix pattern but we detect them
-          // by checking if name comes from the well-known Colombian set.
-          // In practice, "user_id" is not exposed in the model; we differentiate
-          // by noting system categories are read-only (no delete/edit).
-
           return ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(16),
             children: [
               _SectionHeader(
@@ -69,6 +69,7 @@ class CategoriesScreen extends ConsumerWidget {
             ],
           );
         },
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {

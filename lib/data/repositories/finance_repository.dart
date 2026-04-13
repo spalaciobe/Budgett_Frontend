@@ -1,3 +1,6 @@
+import 'dart:typed_data';
+
+import 'package:image/image.dart' as img;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:budgett_frontend/data/models/profile_model.dart';
 import 'package:budgett_frontend/data/models/account_model.dart';
@@ -63,7 +66,7 @@ class FinanceRepository {
     }
   }
 
-  Future<void> createAccount(Map<String, dynamic> accountData) async {
+  Future<String> createAccount(Map<String, dynamic> accountData) async {
     final userId = _client.auth.currentUser!.id;
     final ccDetails = accountData['credit_card_details'] as Map<String, dynamic>?;
     final invDetails = accountData['investment_details'] as Map<String, dynamic>?;
@@ -77,19 +80,44 @@ class FinanceRepository {
         .select('id')
         .single();
 
+    final accountId = inserted['id'] as String;
+
     if (ccDetails != null) {
       await _client.from('credit_card_details').upsert(
-        {...ccDetails, 'account_id': inserted['id']},
+        {...ccDetails, 'account_id': accountId},
         onConflict: 'account_id',
       );
     }
 
     if (invDetails != null) {
       await _client.from('investment_details').upsert(
-        {...invDetails, 'account_id': inserted['id']},
+        {...invDetails, 'account_id': accountId},
         onConflict: 'account_id',
       );
     }
+
+    return accountId;
+  }
+
+  /// Resizes [bytes] to 256×256, uploads to the account-icons bucket, and
+  /// returns the public URL. Overwrites any previous icon for this account.
+  Future<String> uploadAccountIcon(String accountId, Uint8List bytes) async {
+    final userId = _client.auth.currentUser!.id;
+
+    // Decode → center-crop to square → resize to 256×256 → encode as JPEG.
+    final decoded = img.decodeImage(bytes);
+    if (decoded == null) throw Exception('Could not decode image');
+    final cropped = img.copyResizeCropSquare(decoded, size: 256);
+    final compressed = Uint8List.fromList(img.encodeJpg(cropped, quality: 85));
+
+    final path = '$userId/$accountId.jpg';
+    await _client.storage.from('account-icons').uploadBinary(
+      path,
+      compressed,
+      fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: true),
+    );
+
+    return _client.storage.from('account-icons').getPublicUrl(path);
   }
 
   // Categories

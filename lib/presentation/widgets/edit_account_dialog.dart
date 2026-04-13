@@ -1,6 +1,9 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:budgett_frontend/data/models/account_model.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
@@ -37,6 +40,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
 
   late String _selectedType;
   String? _selectedIcon;
+  Uint8List? _pendingIconBytes;
 
   // Investment state
   InvestmentType _selectedInvestmentType = InvestmentType.highYield;
@@ -54,10 +58,17 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
     super.initState();
     final acc = widget.account;
     _nameController = TextEditingController(text: acc.name);
-    _balanceController = TextEditingController(text: CurrencyFormatter.format(acc.balance, includeSymbol: false));
+    // Credit cards store debt as a negative balance; show the positive debt
+    // amount so the field is consistent with the "add" dialog.
+    final isCc = acc.type == 'credit_card';
+    _balanceController = TextEditingController(
+      text: CurrencyFormatter.format(isCc ? acc.balance.abs() : acc.balance, includeSymbol: false),
+    );
     _creditLimitController = TextEditingController(text: CurrencyFormatter.format(acc.creditLimit, includeSymbol: false));
     _balanceUsdController = TextEditingController(
-      text: acc.balanceUsd != 0.0 ? CurrencyFormatter.format(acc.balanceUsd, includeSymbol: false, currency: 'USD') : '',
+      text: acc.balanceUsd != 0.0
+          ? CurrencyFormatter.format(isCc ? acc.balanceUsd.abs() : acc.balanceUsd, includeSymbol: false, currency: 'USD')
+          : '',
     );
     _creditLimitUsdController = TextEditingController(
       text: acc.creditLimitUsd != 0.0 ? CurrencyFormatter.format(acc.creditLimitUsd, includeSymbol: false, currency: 'USD') : '',
@@ -111,15 +122,117 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
     super.dispose();
   }
 
+  Future<void> _pickIcon() async {
+    final picked = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 512,
+      maxHeight: 512,
+    );
+    if (picked == null) return;
+    final bytes = await picked.readAsBytes();
+    setState(() {
+      _pendingIconBytes = bytes;
+      _selectedIcon = null;
+    });
+  }
+
+  Widget _buildIconPicker() {
+    final theme = Theme.of(context);
+    final hasImage = _pendingIconBytes != null;
+    final hasUrl = _selectedIcon != null && _selectedIcon!.startsWith('http');
+
+    Widget preview;
+    if (hasImage) {
+      preview = ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Image.memory(_pendingIconBytes!, width: 48, height: 48, fit: BoxFit.cover),
+      );
+    } else if (hasUrl) {
+      preview = ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Image.network(_selectedIcon!, width: 48, height: 48, fit: BoxFit.cover),
+      );
+    } else {
+      preview = Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(Icons.image_outlined, color: theme.colorScheme.onSurfaceVariant),
+      );
+    }
+
+    return Row(
+      children: [
+        preview,
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                hasImage ? 'Image selected' : (hasUrl ? 'Custom icon' : 'No icon selected'),
+                style: theme.textTheme.bodyMedium,
+              ),
+              Text(
+                'Optional — 256×256 image (JPG/PNG)',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (hasImage || hasUrl)
+          IconButton(
+            icon: const Icon(Icons.close),
+            tooltip: 'Remove icon',
+            onPressed: () => setState(() {
+              _pendingIconBytes = null;
+              _selectedIcon = null;
+            }),
+          ),
+        TextButton.icon(
+          onPressed: _pickIcon,
+          icon: const Icon(Icons.upload, size: 18),
+          label: Text(hasImage || hasUrl ? 'Change' : 'Choose'),
+        ),
+      ],
+    );
+  }
+
   Future<void> _updateAccount() async {
     if (!_formKey.currentState!.validate()) return;
     
     setState(() => _isLoading = true);
 
+    // Upload pending icon before building accountData so the URL is included.
+    if (_pendingIconBytes != null) {
+      try {
+        final url = await ref
+            .read(financeRepositoryProvider)
+            .uploadAccountIcon(widget.account.id, _pendingIconBytes!);
+        _selectedIcon = url;
+        _pendingIconBytes = null;
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Icon upload failed: $e')),
+          );
+        }
+        setState(() => _isLoading = false);
+        return;
+      }
+    }
+
+    // For credit cards the user enters a positive debt amount; store as negative.
+    final rawBalance = CurrencyFormatter.parse(_balanceController.text);
     final accountData = <String, dynamic>{
       'name': _nameController.text,
       'type': _selectedType,
-      'balance': CurrencyFormatter.parse(_balanceController.text), // Allows manual adjustment/reconciliation
+      'balance': _selectedType == 'credit_card' ? -rawBalance : rawBalance,
       'icon': _selectedIcon,
     };
 
@@ -129,7 +242,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
           : CurrencyFormatter.parse(_creditLimitController.text);
       accountData['balance_usd'] = _balanceUsdController.text.isEmpty
           ? 0.0
-          : CurrencyFormatter.parse(_balanceUsdController.text, currency: 'USD');
+          : -(CurrencyFormatter.parse(_balanceUsdController.text, currency: 'USD'));
       accountData['credit_limit_usd'] = _creditLimitUsdController.text.isEmpty
           ? 0.0
           : CurrencyFormatter.parse(_creditLimitUsdController.text, currency: 'USD');
@@ -282,9 +395,10 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Edit Account', style: Theme.of(context).textTheme.headlineSmall),
+                    Expanded(
+                      child: Text('Edit Account', style: Theme.of(context).textTheme.headlineSmall),
+                    ),
                     IconButton(
                       icon: const Icon(Icons.close),
                       onPressed: () => Navigator.of(context).pop(),
@@ -325,13 +439,16 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                 // Balance
                 TextFormField(
                   controller: _balanceController,
-                  decoration: const InputDecoration(
-                    labelText: 'Current Balance',
-                    helperText: 'Adjust to reconcile with bank',
+                  decoration: InputDecoration(
+                    labelText: isCreditCard ? 'Current Debt (amount owed)' : 'Current Balance',
+                    helperText: isCreditCard
+                        ? 'Enter how much you currently owe on this card.'
+                        : 'Adjust to reconcile with bank',
                     prefixText: '\$',
-                    border: OutlineInputBorder(),
+                    border: const OutlineInputBorder(),
                   ),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: TextInputType.numberWithOptions(
+                      decimal: true, signed: !isCreditCard),
                   inputFormatters: [const CurrencyInputFormatter()],
                   validator: (value) {
                     if (value == null || value.isEmpty) return 'Required';
@@ -341,23 +458,8 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                 ),
                 const SizedBox(height: 16),
 
-                // Icon selector
-                DropdownButtonFormField<String>(
-                  value: _selectedIcon,
-                  decoration: const InputDecoration(
-                    labelText: 'Icon (optional)',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: null, child: Text('Default')),
-                    DropdownMenuItem(value: 'account_balance', child: Row(children: [Icon(Icons.account_balance, size: 18), SizedBox(width: 8), Text('Bank')])),
-                    DropdownMenuItem(value: 'credit_card', child: Row(children: [Icon(Icons.credit_card, size: 18), SizedBox(width: 8), Text('Card')])),
-                    DropdownMenuItem(value: 'money', child: Row(children: [Icon(Icons.money, size: 18), SizedBox(width: 8), Text('Cash')])),
-                    DropdownMenuItem(value: 'savings', child: Row(children: [Icon(Icons.savings, size: 18), SizedBox(width: 8), Text('Savings')])),
-                    DropdownMenuItem(value: 'trending_up', child: Row(children: [Icon(Icons.trending_up, size: 18), SizedBox(width: 8), Text('Investment')])),
-                  ],
-                  onChanged: (value) => setState(() => _selectedIcon = value),
-                ),
+                // Icon picker
+                _buildIconPicker(),
                 const SizedBox(height: 16),
 
                 // Credit Card specific fields
@@ -389,12 +491,12 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                   TextFormField(
                     controller: _balanceUsdController,
                     decoration: const InputDecoration(
-                      labelText: 'USD Balance (negative if debt)',
+                      labelText: 'Current USD Debt',
                       prefixText: 'US\$',
                       border: OutlineInputBorder(),
-                      helperText: 'Adjust manually to reconcile with bank.',
+                      helperText: 'Leave empty if no USD balance.',
                     ),
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     inputFormatters: [const CurrencyInputFormatter(currency: 'USD')],
                   ),
                   const SizedBox(height: 12),
@@ -637,8 +739,10 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                 const SizedBox(height: 24),
 
                 // Actions
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                OverflowBar(
+                  alignment: MainAxisAlignment.spaceBetween,
+                  overflowAlignment: OverflowBarAlignment.end,
+                  spacing: 8,
                   children: [
                     TextButton.icon(
                       onPressed: _isLoading ? null : _deleteAccount,
@@ -646,6 +750,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                       label: const Text('Delete', style: TextStyle(color: Colors.red)),
                     ),
                     Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         TextButton(
                           onPressed: () => Navigator.of(context).pop(),
@@ -654,7 +759,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                         const SizedBox(width: 8),
                         FilledButton(
                           onPressed: _isLoading ? null : _updateAccount,
-                          child: _isLoading 
+                          child: _isLoading
                             ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                             : const Text('Save Changes'),
                         ),

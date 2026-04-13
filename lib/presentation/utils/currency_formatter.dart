@@ -34,19 +34,24 @@ class CurrencyFormatter {
   ///
   /// COP: strips dots (thousands) and replaces commas with dots.
   /// USD: strips commas (thousands), handles dot as decimal separator.
+  /// Preserves a leading minus sign so negative balances (e.g. credit-card
+  /// debt entered as a negative number) round-trip correctly.
   static double parse(String value, {String currency = 'COP'}) {
+    final isNegative = value.startsWith('-');
     if (currency == 'USD') {
       // en_US: ',' is thousands sep, '.' is decimal
       final cleaned = value
           .replaceAll(RegExp(r'[^0-9.]'), '')
           .replaceAll(RegExp(r'\.(?=.*\.)'), ''); // keep only last dot
-      return double.tryParse(cleaned) ?? 0.0;
+      final result = double.tryParse(cleaned) ?? 0.0;
+      return isNegative ? -result : result;
     } else {
       // es_CO: '.' is thousands sep, ',' is decimal
       final cleaned = value
           .replaceAll(RegExp(r'[^0-9,]'), '')
           .replaceAll(',', '.');
-      return double.tryParse(cleaned) ?? 0.0;
+      final result = double.tryParse(cleaned) ?? 0.0;
+      return isNegative ? -result : result;
     }
   }
 
@@ -93,7 +98,7 @@ class CurrencyInputFormatter extends TextInputFormatter {
   TextEditingValue formatEditUpdate(
       TextEditingValue oldValue, TextEditingValue newValue) {
     if (newValue.text.isEmpty) {
-      return newValue.copyWith(text: '');
+      return TextEditingValue.empty;
     }
 
     if (currency == 'USD') {
@@ -105,11 +110,18 @@ class CurrencyInputFormatter extends TextInputFormatter {
 
   // COP: whole numbers only, es_CO thousands separator (dot)
   TextEditingValue _formatCop(TextEditingValue value) {
+    final isNegative = value.text.startsWith('-');
     final digitsOnly = value.text.replaceAll(RegExp(r'[^0-9]'), '');
-    if (digitsOnly.isEmpty) return value.copyWith(text: '');
+    if (digitsOnly.isEmpty) {
+      final text = isNegative ? '-' : '';
+      return TextEditingValue(
+        text: text,
+        selection: TextSelection.collapsed(offset: text.length),
+      );
+    }
 
     final formatter = NumberFormat('#,###', 'es_CO');
-    final formatted = formatter.format(int.parse(digitsOnly));
+    final formatted = (isNegative ? '-' : '') + formatter.format(int.parse(digitsOnly));
 
     return TextEditingValue(
       text: formatted,
@@ -119,6 +131,7 @@ class CurrencyInputFormatter extends TextInputFormatter {
 
   // USD: up to 2 decimal digits, en_US thousands separator (comma)
   TextEditingValue _formatUsd(TextEditingValue value) {
+    final isNegative = value.text.startsWith('-');
     // Allow digits and at most one dot
     String raw = value.text.replaceAll(RegExp(r'[^0-9.]'), '');
 
@@ -130,7 +143,13 @@ class CurrencyInputFormatter extends TextInputFormatter {
       raw = '${raw.substring(0, dotIndex)}.$truncated';
     }
 
-    if (raw.isEmpty) return value.copyWith(text: '');
+    if (raw.isEmpty) {
+      final text = isNegative ? '-' : '';
+      return TextEditingValue(
+        text: text,
+        selection: TextSelection.collapsed(offset: text.length),
+      );
+    }
 
     // Format integer part with en_US thousands separator
     final parts = raw.split('.');
@@ -141,8 +160,8 @@ class CurrencyInputFormatter extends TextInputFormatter {
         ? ''
         : formatter.format(intValue);
 
-    final formatted =
-        parts.length > 1 ? '$formattedInt.${parts[1]}' : formattedInt;
+    final formatted = (isNegative ? '-' : '') +
+        (parts.length > 1 ? '$formattedInt.${parts[1]}' : formattedInt);
 
     return TextEditingValue(
       text: formatted,

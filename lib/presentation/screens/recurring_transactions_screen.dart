@@ -13,25 +13,39 @@ class RecurringTransactionsScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Recurring Transactions')),
-      body: recurringAsync.when(
-        data: (transactions) {
-          if (transactions.isEmpty) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.repeat, size: 64, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text('No recurring transactions yet.'),
-                  Text('Add one when creating a new transaction.', style: TextStyle(color: Colors.grey)),
-                ],
-              ),
-            );
-          }
-          return ListView.separated(
-            itemCount: transactions.length,
-            padding: const EdgeInsets.all(16),
-            separatorBuilder: (context, index) => const SizedBox(height: 12),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          ref.invalidate(recurringTransactionsProvider);
+          await ref.read(recurringTransactionsProvider.future);
+        },
+        child: recurringAsync.when(
+          data: (transactions) {
+            if (transactions.isEmpty) {
+              return LayoutBuilder(
+                builder: (context, constraints) => SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: SizedBox(
+                    height: constraints.maxHeight,
+                    child: const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.repeat, size: 64, color: Colors.grey),
+                          SizedBox(height: 16),
+                          Text('No recurring transactions yet.'),
+                          Text('Add one when creating a new transaction.', style: TextStyle(color: Colors.grey)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }
+            return ListView.separated(
+              physics: const AlwaysScrollableScrollPhysics(),
+              itemCount: transactions.length,
+              padding: const EdgeInsets.all(16),
+              separatorBuilder: (context, index) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
               final item = transactions[index];
               return Card(
@@ -142,8 +156,9 @@ class RecurringTransactionsScreen extends ConsumerWidget {
             },
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, s) => Center(child: Text('Error: $e')),
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, s) => Center(child: Text('Error: $e')),
+        ),
       ),
     );
   }

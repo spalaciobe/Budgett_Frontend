@@ -30,14 +30,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   void _populate(AsyncValue profileAsync) {
     if (_initialized) return;
-    final profile = profileAsync.valueOrNull;
+    if (!profileAsync.hasValue) return;
+    _initialized = true;
+    final profile = profileAsync.value;
     if (profile != null) {
       _usernameController.text = profile.username ?? '';
       _firstNameController.text = profile.firstName ?? '';
       _lastNameController.text = profile.lastName ?? '';
       _phoneController.text = profile.phone ?? '';
     }
-    _initialized = true;
   }
 
   Future<void> _save() async {

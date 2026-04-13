@@ -17,24 +17,39 @@ class ExpenseGroupsScreen extends ConsumerWidget {
         title: const Text('Expense Groups'),
         centerTitle: true,
       ),
-      body: expenseGroupsAsync.when(
-        data: (groups) {
-          if (groups.isEmpty) {
-            return const Center(
-              child: Text('No expense groups.\nCreate one with the + button.',
-                  textAlign: TextAlign.center),
-            );
-          }
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: groups.length,
-            itemBuilder: (context, index) {
-              return _ExpenseGroupCard(group: groups[index]);
-            },
-          );
+      body: RefreshIndicator(
+        onRefresh: () async {
+          ref.invalidate(expenseGroupsProvider);
+          await ref.read(expenseGroupsProvider.future);
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, s) => Center(child: Text('Error: $e')),
+        child: expenseGroupsAsync.when(
+          data: (groups) {
+            if (groups.isEmpty) {
+              return LayoutBuilder(
+                builder: (context, constraints) => SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: SizedBox(
+                    height: constraints.maxHeight,
+                    child: const Center(
+                      child: Text('No expense groups.\nCreate one with the + button.',
+                          textAlign: TextAlign.center),
+                    ),
+                  ),
+                ),
+              );
+            }
+            return ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16),
+              itemCount: groups.length,
+              itemBuilder: (context, index) {
+                return _ExpenseGroupCard(group: groups[index]);
+              },
+            );
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, s) => Center(child: Text('Error: $e')),
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddGroupDialog(context, ref),

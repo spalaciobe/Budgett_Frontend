@@ -110,10 +110,11 @@ class _AddGoalDialogState extends ConsumerState<AddGoalDialog> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Add Financial Goal', 
-                      style: Theme.of(context).textTheme.headlineSmall),
+                    Expanded(
+                      child: Text('Add Financial Goal',
+                        style: Theme.of(context).textTheme.headlineSmall),
+                    ),
                     IconButton(
                       icon: const Icon(Icons.close),
                       onPressed: () => Navigator.of(context).pop(),

@@ -131,7 +131,16 @@ class BudgetScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: budgetsAsync.when(
+      body: RefreshIndicator(
+        onRefresh: () async {
+          ref.invalidate(budgetsProvider((month: selectedDate.month, year: selectedDate.year)));
+          ref.invalidate(categoriesProvider);
+          await Future.wait([
+            ref.read(budgetsProvider((month: selectedDate.month, year: selectedDate.year)).future),
+            ref.read(categoriesProvider.future),
+          ]);
+        },
+        child: budgetsAsync.when(
         data: (budgets) {
           return categoriesAsync.when(
             data: (categories) {
@@ -419,6 +428,7 @@ class BudgetScreen extends ConsumerWidget {
         },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, stack) => Center(child: Text('Error: $err')),
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {

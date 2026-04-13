@@ -60,15 +60,13 @@ class AccountCard extends StatelessWidget {
             children: [
               // Icon
               Container(
-                padding: const EdgeInsets.all(8),
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
                   color: theme.colorScheme.primary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
-                  _iconForType(acc.type),
-                  color: theme.colorScheme.primary,
-                ),
+                child: _buildIcon(acc, theme),
               ),
 
               // Name + balance + subtitle
@@ -111,6 +109,33 @@ class AccountCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildIcon(Account acc, ThemeData theme) {
+    final iconValue = acc.icon;
+    if (iconValue != null && iconValue.startsWith('http')) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Image.network(
+          iconValue,
+          width: 40,
+          height: 40,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Icon(
+            _iconForType(acc.type),
+            color: theme.colorScheme.primary,
+            size: 20,
+          ),
+        ),
+      );
+    }
+    return Center(
+      child: Icon(
+        _iconForType(acc.type),
+        color: theme.colorScheme.primary,
+        size: 20,
       ),
     );
   }

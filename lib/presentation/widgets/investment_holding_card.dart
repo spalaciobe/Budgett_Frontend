@@ -104,21 +104,27 @@ class InvestmentHoldingCard extends StatelessWidget {
             // Quantity row
             Row(
               children: [
-                _InfoChip(
-                  label: 'Qty',
-                  value: CurrencyFormatter.formatQuantity(holding.quantity),
+                Flexible(
+                  child: _InfoChip(
+                    label: 'Qty',
+                    value: CurrencyFormatter.formatQuantity(holding.quantity),
+                  ),
                 ),
                 const SizedBox(width: 8),
-                _InfoChip(
-                  label: 'Avg cost',
-                  value: CurrencyFormatter.format(holding.avgCost,
-                      currency: holding.currency),
+                Flexible(
+                  child: _InfoChip(
+                    label: 'Avg cost',
+                    value: CurrencyFormatter.format(holding.avgCost,
+                        currency: holding.currency),
+                  ),
                 ),
                 const SizedBox(width: 8),
-                _InfoChip(
-                  label: 'Price',
-                  value: CurrencyFormatter.format(holding.currentPrice,
-                      currency: holding.currency),
+                Flexible(
+                  child: _InfoChip(
+                    label: 'Price',
+                    value: CurrencyFormatter.format(holding.currentPrice,
+                        currency: holding.currency),
+                  ),
                 ),
               ],
             ),

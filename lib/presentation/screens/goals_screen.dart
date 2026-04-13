@@ -15,12 +15,26 @@ class GoalsScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Financial Goals')),
-      body: goalsAsync.when(
+      body: RefreshIndicator(
+        onRefresh: () async {
+          ref.invalidate(goalsProvider);
+          await ref.read(goalsProvider.future);
+        },
+        child: goalsAsync.when(
         data: (goals) {
           if (goals.isEmpty) {
-            return const Center(child: Text('No goals set yet. Start dreaming!'));
+            return LayoutBuilder(
+              builder: (context, constraints) => SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: SizedBox(
+                  height: constraints.maxHeight,
+                  child: const Center(child: Text('No goals set yet. Start dreaming!')),
+                ),
+              ),
+            );
           }
           return ListView.separated(
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(16),
             itemCount: goals.length,
             separatorBuilder: (context, index) => const SizedBox(height: 12),
@@ -287,8 +301,9 @@ class GoalsScreen extends ConsumerWidget {
             },
           );
         },
-        loading: () => Center(child: CircularProgressIndicator()),
+        loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, stack) => Center(child: Text('Error: $err')),
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
