@@ -11,6 +11,10 @@ class InvestmentHolding {
   final double currentPrice;
   final DateTime? priceUpdatedAt;
   final String? notes;
+  /// Optional external-source lookup key. For FICs this is the exact
+  /// `nombre_patrimonio` on datos.gov.co (dataset qhpu-8ixx) used by the
+  /// `update-prices` Edge Function. Null for crypto/stocks.
+  final String? sourceSymbol;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -27,6 +31,7 @@ class InvestmentHolding {
     required this.currentPrice,
     this.priceUpdatedAt,
     this.notes,
+    this.sourceSymbol,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -47,6 +52,7 @@ class InvestmentHolding {
           ? DateTime.parse(json['price_updated_at'])
           : null,
       notes: json['notes'],
+      sourceSymbol: json['source_symbol'],
       createdAt: DateTime.parse(json['created_at']),
       updatedAt: DateTime.parse(json['updated_at']),
     );

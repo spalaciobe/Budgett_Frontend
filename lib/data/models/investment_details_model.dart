@@ -1,5 +1,4 @@
 enum InvestmentType {
-  highYield,
   cdt,
   fic,
   crypto,
@@ -7,8 +6,6 @@ enum InvestmentType {
 
   static InvestmentType fromString(String value) {
     switch (value) {
-      case 'high_yield':
-        return InvestmentType.highYield;
       case 'cdt':
         return InvestmentType.cdt;
       case 'fic':
@@ -18,14 +15,12 @@ enum InvestmentType {
       case 'stock_etf':
         return InvestmentType.stockEtf;
       default:
-        return InvestmentType.highYield;
+        return InvestmentType.cdt;
     }
   }
 
   String toDbString() {
     switch (this) {
-      case InvestmentType.highYield:
-        return 'high_yield';
       case InvestmentType.cdt:
         return 'cdt';
       case InvestmentType.fic:
@@ -39,8 +34,6 @@ enum InvestmentType {
 
   String get displayName {
     switch (this) {
-      case InvestmentType.highYield:
-        return 'High-Yield Savings';
       case InvestmentType.cdt:
         return 'CDT / Term Deposit';
       case InvestmentType.fic:
@@ -66,10 +59,6 @@ class InvestmentDetails {
   final InvestmentType investmentType;
   final String baseCurrency;
 
-  // High-yield
-  final double? apyRate;
-  final String? interestPeriod;
-
   // CDT
   final double? principal;
   final double? interestRate;
@@ -82,10 +71,6 @@ class InvestmentDetails {
   final String? fundCode;
   final String? navCurrency;
 
-  /// The date through which high-yield interest has been formally recorded.
-  /// Null means no interest has ever been recorded (UI will prompt for a start date).
-  final DateTime? lastInterestDate;
-
   final String? notes;
 
   InvestmentDetails({
@@ -94,8 +79,6 @@ class InvestmentDetails {
     this.brokerId,
     required this.investmentType,
     this.baseCurrency = 'COP',
-    this.apyRate,
-    this.interestPeriod,
     this.principal,
     this.interestRate,
     this.termDays,
@@ -104,7 +87,6 @@ class InvestmentDetails {
     this.autoRenew = false,
     this.fundCode,
     this.navCurrency,
-    this.lastInterestDate,
     this.notes,
   });
 
@@ -113,10 +95,9 @@ class InvestmentDetails {
       id: json['id'],
       accountId: json['account_id'],
       brokerId: json['broker_id'],
-      investmentType: InvestmentType.fromString(json['investment_type'] ?? 'high_yield'),
+      investmentType:
+          InvestmentType.fromString(json['investment_type'] ?? 'cdt'),
       baseCurrency: json['base_currency'] ?? 'COP',
-      apyRate: (json['apy_rate'] as num?)?.toDouble(),
-      interestPeriod: json['interest_period'],
       principal: (json['principal'] as num?)?.toDouble(),
       interestRate: (json['interest_rate'] as num?)?.toDouble(),
       termDays: json['term_days'] as int?,
@@ -129,9 +110,6 @@ class InvestmentDetails {
       autoRenew: json['auto_renew'] ?? false,
       fundCode: json['fund_code'],
       navCurrency: json['nav_currency'],
-      lastInterestDate: json['last_interest_date'] != null
-          ? DateTime.parse(json['last_interest_date'])
-          : null,
       notes: json['notes'],
     );
   }

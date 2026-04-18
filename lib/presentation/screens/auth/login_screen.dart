@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
@@ -59,7 +60,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       body: Center(
         child: Container(
           constraints: const BoxConstraints(maxWidth: 400),
-          padding: const EdgeInsets.all(24),
+          padding: kDialogPadding,
           child: AutofillGroup(
             child: SingleChildScrollView(
               child: Column(
@@ -67,14 +68,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                 Icon(Icons.account_balance_wallet, size: 64, color: Theme.of(context).colorScheme.primary),
-                const SizedBox(height: 32),
+                const SizedBox(height: 20),
                 TextField(
                   controller: _emailController,
                   decoration: const InputDecoration(labelText: 'Email', border: OutlineInputBorder()),
                   keyboardType: TextInputType.emailAddress,
                   autofillHints: const [AutofillHints.email],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
                 TextField(
                   controller: _passwordController,
                   decoration: const InputDecoration(labelText: 'Password', border: OutlineInputBorder()),
@@ -82,7 +83,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   autofillHints: const [AutofillHints.password],
                   onSubmitted: (_) => _signIn(),
                 ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
               if (_isLoading)
                 const Center(child: CircularProgressIndicator())
               else

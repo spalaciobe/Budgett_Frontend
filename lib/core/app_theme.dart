@@ -20,6 +20,7 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
+      visualDensity: VisualDensity.compact,
       colorScheme: const ColorScheme.light(
         primary: _primary,
         onPrimary: Colors.white,
@@ -36,12 +37,26 @@ class AppTheme {
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
+        toolbarHeight: 48,
       ),
       cardTheme: CardThemeData(
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         color: Colors.white,
         margin: EdgeInsets.zero,
+      ),
+      listTileTheme: const ListTileThemeData(
+        dense: true,
+        visualDensity: VisualDensity.compact,
+        minVerticalPadding: 4,
+        contentPadding: EdgeInsets.symmetric(horizontal: 12),
+      ),
+      dividerTheme: const DividerThemeData(
+        space: 8,
+        thickness: 1,
+      ),
+      chipTheme: const ChipThemeData(
+        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 0),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -58,14 +73,14 @@ class AppTheme {
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: _primary, width: 2),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           elevation: 0,
           backgroundColor: _primary,
           foregroundColor: Colors.white,
-          minimumSize: const Size(double.infinity, 50),
+          minimumSize: const Size(double.infinity, 44),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
@@ -77,6 +92,7 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
+      visualDensity: VisualDensity.compact,
       scaffoldBackgroundColor: _darkBackground,
       colorScheme: const ColorScheme.dark(
         primary: _primary,
@@ -100,6 +116,7 @@ class AppTheme {
         elevation: 0,
         centerTitle: false,
         scrolledUnderElevation: 0,
+        toolbarHeight: 48,
         iconTheme: const IconThemeData(color: Color(0xFFECEDEE)),
         titleTextStyle: TextStyle(
           color: const Color(0xFFECEDEE),
@@ -113,6 +130,20 @@ class AppTheme {
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         margin: EdgeInsets.zero,
+      ),
+      listTileTheme: const ListTileThemeData(
+        dense: true,
+        visualDensity: VisualDensity.compact,
+        minVerticalPadding: 4,
+        contentPadding: EdgeInsets.symmetric(horizontal: 12),
+      ),
+      dividerTheme: DividerThemeData(
+        color: _darkSurfaceVariant,
+        space: 8,
+        thickness: 1,
+      ),
+      chipTheme: const ChipThemeData(
+        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 0),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -128,14 +159,14 @@ class AppTheme {
           borderSide: const BorderSide(color: _primary, width: 2),
         ),
         hintStyle: TextStyle(color: Colors.grey.shade500),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: _primary,
           foregroundColor: Colors.white,
           elevation: 0,
-          minimumSize: const Size(double.infinity, 50),
+          minimumSize: const Size(double.infinity, 44),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
@@ -143,17 +174,13 @@ class AppTheme {
       iconTheme: const IconThemeData(
         color: _secondary,
       ),
-      dividerTheme: DividerThemeData(
-        color: _darkSurfaceVariant,
-        thickness: 1,
-      ),
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         backgroundColor: _darkSurface,
         selectedItemColor: _primary,
         unselectedItemColor: Colors.grey,
         type: BottomNavigationBarType.fixed,
         elevation: 0,
-      )
+      ),
     );
   }
 }

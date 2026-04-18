@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
@@ -40,7 +41,7 @@ class ExpenseGroupsScreen extends ConsumerWidget {
             }
             return ListView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(16),
+              padding: kScreenPadding,
               itemCount: groups.length,
               itemBuilder: (context, index) {
                 return _ExpenseGroupCard(group: groups[index]);
@@ -258,9 +259,9 @@ class _ExpenseGroupCard extends ConsumerWidget {
         final progress = group.budgetAmount > 0 ? (spent / group.budgetAmount) : 0.0;
 
         return Card(
-          margin: const EdgeInsets.only(bottom: 16),
+          margin: const EdgeInsets.only(bottom: kSpaceLg),
           child: Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: kCardPadding,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -287,19 +288,19 @@ class _ExpenseGroupCard extends ConsumerWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
+                kGapSm,
                 Text(
                   _dateRangeLabel,
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
-                const SizedBox(height: 12),
+                kGapLg,
                 if (group.budgetAmount > 0) ...[
                   LinearProgressIndicator(
                     value: progress.clamp(0.0, 1.0),
                     backgroundColor: Colors.grey[200],
                     color: progress > 1 ? Colors.red : Theme.of(context).primaryColor,
                   ),
-                  const SizedBox(height: 8),
+                  kGapMd,
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [

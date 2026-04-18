@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:async';
 
 import 'package:budgett_frontend/presentation/screens/home_screen.dart';
+import 'package:budgett_frontend/presentation/screens/accounts_screen.dart';
 import 'package:budgett_frontend/presentation/screens/auth/login_screen.dart';
 import 'package:budgett_frontend/presentation/screens/auth/register_screen.dart';
 import 'package:budgett_frontend/presentation/screens/budget_screen.dart';
@@ -17,6 +18,7 @@ import 'package:budgett_frontend/presentation/screens/categories_screen.dart';
 import 'package:budgett_frontend/presentation/screens/more_screen.dart';
 import 'package:budgett_frontend/presentation/screens/credit_card_details_screen.dart';
 import 'package:budgett_frontend/presentation/screens/investment_details_screen.dart';
+import 'package:budgett_frontend/presentation/screens/pocket_details_screen.dart';
 import 'package:budgett_frontend/presentation/screens/profile_screen.dart';
 
 class _AuthNotifier extends ChangeNotifier {
@@ -62,6 +64,10 @@ final appRouter = GoRouter(
           builder: (context, state) => const HomeScreen(),
         ),
         GoRoute(
+          path: '/accounts',
+          builder: (context, state) => const AccountsScreen(),
+        ),
+        GoRoute(
           path: '/budget',
           builder: (context, state) => const BudgetScreen(),
         ),
@@ -102,6 +108,12 @@ final appRouter = GoRouter(
         GoRoute(
           path: '/investment/:id',
           builder: (context, state) => InvestmentDetailsScreen(
+            accountId: state.pathParameters['id']!,
+          ),
+        ),
+        GoRoute(
+          path: '/pockets/:id',
+          builder: (context, state) => PocketDetailsScreen(
             accountId: state.pathParameters['id']!,
           ),
         ),

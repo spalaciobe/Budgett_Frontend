@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/data/models/category_model.dart';
 import 'package:budgett_frontend/data/models/sub_category_model.dart';
@@ -29,6 +30,9 @@ class _EditCategoryDialogState extends ConsumerState<EditCategoryDialog> {
   List<SubCategory> _existingSubCategories = [];
   final List<String> _newSubCategories = [];
   final List<String> _deletedSubCategoryIds = [];
+  final Map<String, String> _renamedSubCategories = {}; // id → new name
+  String? _editingSubCategoryId;
+  final Map<String, TextEditingController> _editControllers = {};
 
   final List<String> _colors = [
     '0xFF4CAF50', // Green
@@ -42,15 +46,6 @@ class _EditCategoryDialogState extends ConsumerState<EditCategoryDialog> {
     '0xFFFFC107', // Amber
   ];
 
-  final List<String> _categoryIcons = [
-    'home', 'restaurant', 'directions_car', 'health_and_safety', 'bolt', 
-    'shopping_cart', 'movie', 'flight', 'school', 'work', 
-    'pets', 'fitness_center', 'checkroom', 'credit_card', 'savings', 
-    'attach_money', 'card_giftcard', 'smartphone', 'computer', 'build', 
-    'palette', 'child_care', 'local_bar', 'music_note', 'subscriptions', 
-    'menu_book', 'videogame_asset', 'local_gas_station', 'receipt_long', 'more_horiz',
-    'local_cafe', 'medical_services'
-  ];
   
   @override
   void initState() {
@@ -62,15 +57,22 @@ class _EditCategoryDialogState extends ConsumerState<EditCategoryDialog> {
     
     if (widget.category.subCategories != null) {
       _existingSubCategories = List.from(widget.category.subCategories!);
+      for (final sub in _existingSubCategories) {
+        _editControllers[sub.id] = TextEditingController(text: sub.name);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Dialog(
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: MediaQuery.of(context).size.width * 0.025,
+        vertical: 24,
+      ),
       child: Container(
         constraints: const BoxConstraints(maxWidth: 500, maxHeight: 620),
-        padding: const EdgeInsets.all(24),
+        padding: kDialogPadding,
         child: Form(
           key: _formKey,
           child: Column(
@@ -79,9 +81,10 @@ class _EditCategoryDialogState extends ConsumerState<EditCategoryDialog> {
             children: [
               // Header
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Edit Category', style: Theme.of(context).textTheme.headlineSmall),
+                  Expanded(
+                    child: Text('Edit Category', style: Theme.of(context).textTheme.headlineSmall),
+                  ),
                   IconButton(
                     icon: const Icon(Icons.close),
                     onPressed: () => Navigator.of(context).pop(),
@@ -109,7 +112,7 @@ class _EditCategoryDialogState extends ConsumerState<EditCategoryDialog> {
                           });
                         },
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 10),
                       
                       // Name Input
                       TextFormField(
@@ -120,7 +123,7 @@ class _EditCategoryDialogState extends ConsumerState<EditCategoryDialog> {
                         ),
                         validator: (value) => value == null || value.isEmpty ? 'Required' : null,
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 10),
                       
                       // Color Picker
                       const Text('Color', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -150,66 +153,78 @@ class _EditCategoryDialogState extends ConsumerState<EditCategoryDialog> {
                           }).toList(),
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 10),
 
                       // Icon Picker
                       Text('Icon', style: Theme.of(context).textTheme.titleSmall),
                       const SizedBox(height: 8),
-                      Container(
-                        width: double.infinity,
-                        child: Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          alignment: WrapAlignment.start,
-                          children: _categoryIcons.map((key) {
-                            final iconData = IconHelper.getIcon(key);
-                            final isSelected = _selectedIcon == key;
-                            
-                            return InkWell(
-                              onTap: () => setState(() => _selectedIcon = key),
-                              child: Container(
-                                width: 48,
-                                height: 48,
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                    color: isSelected 
-                                      ? Theme.of(context).colorScheme.primary 
-                                      : Colors.grey.shade300,
-                                    width: isSelected ? 2 : 1,
-                                  ),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Icon(
-                                  iconData,
-                                  color: isSelected ? Theme.of(context).colorScheme.primary : Colors.white,
-                                  size: 24,
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
+                      _IconGrid(
+                        selectedIcon: _selectedIcon,
+                        onSelected: (key) => setState(() => _selectedIcon = key),
                       ),
                       
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 10),
                       
                       // Sub Categories Management
                       Text('Sub Categories', style: Theme.of(context).textTheme.titleSmall),
                       Column(
                         children: [
-                          ..._existingSubCategories.map((sub) => ListTile(
-                            dense: true,
-                            contentPadding: EdgeInsets.zero,
-                            title: Text(sub.name),
-                            trailing: IconButton(
-                              icon: const Icon(Icons.delete, size: 18, color: Colors.grey),
-                              onPressed: () {
-                                setState(() {
-                                  _existingSubCategories.remove(sub);
-                                  _deletedSubCategoryIds.add(sub.id);
-                                });
-                              },
-                            ),
-                          )),
+                          ..._existingSubCategories.map((sub) {
+                            final isEditing = _editingSubCategoryId == sub.id;
+                            return ListTile(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              title: isEditing
+                                  ? TextFormField(
+                                      controller: _editControllers[sub.id],
+                                      autofocus: true,
+                                      decoration: const InputDecoration(
+                                        border: OutlineInputBorder(),
+                                        contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                        isDense: true,
+                                      ),
+                                      onFieldSubmitted: (_) => _confirmRename(sub),
+                                    )
+                                  : Text(_renamedSubCategories[sub.id] ?? sub.name),
+                              trailing: isEditing
+                                  ? Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        IconButton(
+                                          icon: const Icon(Icons.check, size: 18, color: Colors.green),
+                                          onPressed: () => _confirmRename(sub),
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(Icons.close, size: 18, color: Colors.grey),
+                                          onPressed: () => setState(() {
+                                            _editControllers[sub.id]?.text = _renamedSubCategories[sub.id] ?? sub.name;
+                                            _editingSubCategoryId = null;
+                                          }),
+                                        ),
+                                      ],
+                                    )
+                                  : Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        IconButton(
+                                          icon: const Icon(Icons.edit, size: 18, color: Colors.grey),
+                                          onPressed: () => setState(() => _editingSubCategoryId = sub.id),
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(Icons.delete, size: 18, color: Colors.grey),
+                                          onPressed: () {
+                                            setState(() {
+                                              _existingSubCategories.remove(sub);
+                                              _deletedSubCategoryIds.add(sub.id);
+                                              _renamedSubCategories.remove(sub.id);
+                                              _editControllers.remove(sub.id)?.dispose();
+                                            });
+                                          },
+                                        ),
+                                      ],
+                                    ),
+                            );
+                          }),
                           ..._newSubCategories.asMap().entries.map((entry) => ListTile(
                             dense: true,
                             contentPadding: EdgeInsets.zero,
@@ -258,21 +273,19 @@ class _EditCategoryDialogState extends ConsumerState<EditCategoryDialog> {
                 ),
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
 
               // Action Buttons
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              OverflowBar(
+                alignment: MainAxisAlignment.spaceBetween,
                 children: [
-                   // Delete Button
                   TextButton.icon(
                     onPressed: _isLoading ? null : _deleteCategory,
                     icon: const Icon(Icons.delete, color: Colors.red),
                     label: const Text('Delete', style: TextStyle(color: Colors.red)),
                   ),
-                  
-                  // Save Buttons
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(),
@@ -281,7 +294,7 @@ class _EditCategoryDialogState extends ConsumerState<EditCategoryDialog> {
                       const SizedBox(width: 8),
                       FilledButton(
                         onPressed: _isLoading ? null : _updateCategory,
-                        child: _isLoading 
+                        child: _isLoading
                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                            : const Text('Save Changes'),
                       ),
@@ -294,6 +307,18 @@ class _EditCategoryDialogState extends ConsumerState<EditCategoryDialog> {
         ),
       ),
     );
+  }
+
+  void _confirmRename(SubCategory sub) {
+    final newName = _editControllers[sub.id]?.text.trim() ?? '';
+    if (newName.isNotEmpty && newName != sub.name) {
+      setState(() {
+        _renamedSubCategories[sub.id] = newName;
+        _editingSubCategoryId = null;
+      });
+    } else {
+      setState(() => _editingSubCategoryId = null);
+    }
   }
 
   Future<void> _updateCategory() async {
@@ -313,13 +338,18 @@ class _EditCategoryDialogState extends ConsumerState<EditCategoryDialog> {
       await repo.updateCategory(widget.category.id, categoryData);
       
       // Handle SubCategories
-      
-      // 1. Delete removed ones
+
+      // 1. Rename modified ones
+      for (final entry in _renamedSubCategories.entries) {
+        await repo.updateSubCategory(entry.key, {'name': entry.value});
+      }
+
+      // 2. Delete removed ones
       for (final id in _deletedSubCategoryIds) {
         await repo.deleteSubCategory(id);
       }
-      
-      // 2. Add new ones
+
+      // 3. Add new ones
       for (final name in _newSubCategories) {
         await repo.addSubCategory(SubCategory(
           id: '',
@@ -402,6 +432,65 @@ class _EditCategoryDialogState extends ConsumerState<EditCategoryDialog> {
   void dispose() {
     _nameController.dispose();
     _subCategoryController.dispose();
+    for (final c in _editControllers.values) {
+      c.dispose();
+    }
     super.dispose();
+  }
+}
+
+class _IconGrid extends StatelessWidget {
+  final String selectedIcon;
+  final ValueChanged<String> onSelected;
+
+  const _IconGrid({required this.selectedIcon, required this.onSelected});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cols = MediaQuery.of(context).size.width >= 1024 ? 8 : 6;
+        const spacing = 4.0;
+        final cellSize = (constraints.maxWidth - spacing * (cols - 1)) / cols;
+        final iconSize = (cellSize * 0.48).clamp(14.0, 28.0);
+
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: cols,
+            crossAxisSpacing: spacing,
+            mainAxisSpacing: spacing,
+          ),
+          itemCount: IconHelper.categoryIconKeys.length,
+          itemBuilder: (context, index) {
+            final key = IconHelper.categoryIconKeys[index];
+            final isSelected = selectedIcon == key;
+            return InkWell(
+              onTap: () => onSelected(key),
+              borderRadius: BorderRadius.circular(6),
+              child: Container(
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: isSelected
+                        ? Theme.of(context).colorScheme.primary
+                        : Colors.grey.shade300,
+                    width: isSelected ? 2 : 1,
+                  ),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Icon(
+                  IconHelper.getIcon(key),
+                  color: isSelected
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.white,
+                  size: iconSize,
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 }

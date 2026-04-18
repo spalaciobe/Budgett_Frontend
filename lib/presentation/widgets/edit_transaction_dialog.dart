@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:budgett_frontend/data/models/account_model.dart';
 import 'package:budgett_frontend/data/models/transaction_model.dart';
-import 'package:budgett_frontend/data/models/bank_model.dart';
+import 'package:budgett_frontend/data/models/recurring_transaction_model.dart';
 import 'package:budgett_frontend/data/repositories/bank_repository.dart';
 import 'package:budgett_frontend/core/utils/credit_card_calculator.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
+import 'package:budgett_frontend/presentation/widgets/credit_card_billing_simulator.dart';
 
 class EditTransactionDialog extends ConsumerStatefulWidget {
   final Transaction transaction;
@@ -27,13 +30,22 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
   String? _selectedAccountId;
   String? _selectedTargetAccountId;
   String? _selectedCategoryId;
-  String? _selectedMovementType;
   late String _status;
   late String _currency;
   bool _isUsdPayment = false;
   late TextEditingController _fxRateController;
 
   bool _isLoading = false;
+
+  // Installment state (populated when editing an installment parent)
+  int _numCuotas = 12;
+  bool _interestFree = true;
+  late TextEditingController _interestRateController;
+  static const _cuotasOptions = [2, 3, 6, 9, 12, 18, 24, 36, 48];
+
+  // Recurrence state (user can promote this transaction to a recurring one)
+  bool _isRecurring = false;
+  String _frequency = 'monthly';
 
   @override
   void initState() {
@@ -52,9 +64,19 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
     _selectedAccountId = t.accountId;
     _selectedTargetAccountId = t.targetAccountId;
     _selectedCategoryId = t.subCategoryId ?? t.categoryId;
-    _selectedMovementType = t.movementType;
     _status = t.status;
     _isUsdPayment = t.isCrossCurrencyPayment;
+
+    // Installment parent: restore installment config state
+    if (t.isInstallmentParent) {
+      _numCuotas = t.numCuotas ?? 12;
+      _interestFree = !(t.hasInterest ?? false);
+      final ratePercent = (t.interestRate ?? 0.0) * 100;
+      _interestRateController = TextEditingController(
+          text: ratePercent > 0 ? ratePercent.toStringAsFixed(3) : '');
+    } else {
+      _interestRateController = TextEditingController();
+    }
   }
 
   @override
@@ -63,7 +85,55 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
     _descriptionController.dispose();
     _notesController.dispose();
     _fxRateController.dispose();
+    _interestRateController.dispose();
     super.dispose();
+  }
+
+  /// Flattens the parent/pocket tree so pockets are selectable alongside
+  /// top-level accounts.
+  List<Account> _flattenAccounts(List<Account> accounts) {
+    final out = <Account>[];
+    for (final a in accounts) {
+      out.add(a);
+      out.addAll(a.pockets);
+    }
+    return out;
+  }
+
+  /// Builds dropdown items with pockets indented under their parent.
+  List<DropdownMenuItem<String>> _buildAccountItems(
+    List<Account> accounts, {
+    String? excludeId,
+  }) {
+    final items = <DropdownMenuItem<String>>[];
+    for (final a in accounts) {
+      if (a.id != excludeId) {
+        items.add(DropdownMenuItem(
+          value: a.id,
+          child: Text(a.name, style: const TextStyle(fontSize: 13)),
+        ));
+      }
+      for (final p in a.pockets) {
+        if (p.id == excludeId) continue;
+        items.add(DropdownMenuItem(
+          value: p.id,
+          child: Row(
+            children: [
+              const SizedBox(width: 16),
+              Icon(Icons.subdirectory_arrow_right,
+                  size: 12,
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withOpacity(0.5)),
+              const SizedBox(width: 4),
+              Text(p.name, style: const TextStyle(fontSize: 13)),
+            ],
+          ),
+        ));
+      }
+    }
+    return items;
   }
 
   Future<void> _selectDate(BuildContext context) async {
@@ -107,7 +177,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
       'status': _status,
       'currency': _currency,
       'target_account_id': _selectedType == 'transfer' ? _selectedTargetAccountId : null,
-      'movement_type': _selectedType == 'expense' ? _selectedMovementType : null,
+      'movement_type': null,
       'notes': _notesController.text.isNotEmpty ? _notesController.text : null,
     };
 
@@ -126,7 +196,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
     // Recalculate billing period for CC transactions
     try {
       final accounts = ref.read(accountsProvider).valueOrNull ?? [];
-      final account = accounts.firstWhereOrNull((a) => a.id == _selectedAccountId);
+      final account = _flattenAccounts(accounts).firstWhereOrNull((a) => a.id == _selectedAccountId);
       if (account != null && account.type == 'credit_card' && account.creditCardRules != null) {
         final bank = await ref.read(bankRepositoryProvider).getBanks().then(
             (banks) => banks.firstWhereOrNull((b) => b.id == account.creditCardRules!.bankId));
@@ -179,16 +249,119 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
     }
 
     try {
-      await ref.read(financeRepositoryProvider).updateTransaction(widget.transaction.id, transactionData);
-      
+      final repo = ref.read(financeRepositoryProvider);
+
+      if (widget.transaction.isInstallmentParent) {
+        // Installment parent: regenerate schedule.
+        final accounts = ref.read(accountsProvider).valueOrNull ?? [];
+        final account = _flattenAccounts(accounts)
+            .firstWhereOrNull((a) => a.id == _selectedAccountId);
+        if (account?.creditCardRules == null) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                  content: Text('This card has no billing rules configured.')),
+            );
+          }
+          setState(() => _isLoading = false);
+          return;
+        }
+        final bank = await ref.read(bankRepositoryProvider).getBanks().then(
+              (banks) => banks.firstWhereOrNull(
+                  (b) => b.id == account!.creditCardRules!.bankId),
+            );
+        if (bank == null) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                  content: Text('Could not load bank rules.')),
+            );
+          }
+          setState(() => _isLoading = false);
+          return;
+        }
+        final rate = _interestFree
+            ? 0.0
+            : (double.tryParse(
+                        _interestRateController.text.replaceAll(',', '')) ??
+                    0.0) /
+                100.0;
+        final String? finalCategoryId = transactionData['category_id'] as String?;
+        final String? finalSubCategoryId =
+            transactionData['sub_category_id'] as String?;
+
+        await repo.updateInstallmentPurchase(
+          parentId: widget.transaction.id,
+          accountId: _selectedAccountId!,
+          amount: CurrencyFormatter.parse(_amountController.text,
+              currency: _currency),
+          numCuotas: _numCuotas,
+          hasInterest: !_interestFree,
+          interestRate: rate,
+          purchaseDate: _selectedDate,
+          currency: _currency,
+          description: _descriptionController.text,
+          rules: account!.creditCardRules!,
+          bank: bank,
+          categoryId: finalCategoryId,
+          subCategoryId: finalSubCategoryId,
+          expenseGroupId: null,
+          notes: _notesController.text.isNotEmpty ? _notesController.text : null,
+          movementType: null,
+          status: _status,
+        );
+      } else {
+        await repo.updateTransaction(widget.transaction.id, transactionData);
+      }
+
+      if (_isRecurring) {
+        DateTime nextDate = _selectedDate;
+        switch (_frequency) {
+          case 'daily':
+            nextDate = nextDate.add(const Duration(days: 1));
+            break;
+          case 'weekly':
+            nextDate = nextDate.add(const Duration(days: 7));
+            break;
+          case 'biweekly':
+            nextDate = nextDate.add(const Duration(days: 14));
+            break;
+          case 'monthly':
+            nextDate = DateTime(nextDate.year, nextDate.month + 1, nextDate.day);
+            break;
+          case 'yearly':
+            nextDate = DateTime(nextDate.year + 1, nextDate.month, nextDate.day);
+            break;
+        }
+
+        final recurringData = RecurringTransaction(
+          id: '',
+          description: _descriptionController.text,
+          amount: CurrencyFormatter.parse(_amountController.text, currency: _currency),
+          categoryId: transactionData['category_id'] as String?,
+          accountId: _selectedAccountId,
+          type: _selectedType,
+          frequency: _frequency,
+          nextRunDate: nextDate,
+          isActive: true,
+          currency: _currency,
+        );
+
+        await repo.addRecurringTransaction(recurringData);
+        ref.invalidate(recurringTransactionsProvider);
+      }
+
       ref.invalidate(recentTransactionsProvider);
       ref.invalidate(accountsProvider);
       ref.invalidate(budgetsProvider); // Budgets might change
-      
+
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Transaction updated successfully')),
+          SnackBar(
+              content: Text(_isRecurring
+                  ? 'Transaction updated and recurrence created'
+                  : 'Transaction updated successfully')),
         );
       }
     } catch (e) {
@@ -256,9 +429,13 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
     final categoriesAsync = ref.watch(categoriesProvider);
 
     return Dialog(
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: MediaQuery.of(context).size.width * 0.025,
+        vertical: 24,
+      ),
       child: Container(
         constraints: const BoxConstraints(maxWidth: 500, maxHeight: 700),
-        padding: const EdgeInsets.all(24),
+        padding: kDialogPadding,
         child: Form(
           key: _formKey,
           child: Column(
@@ -266,17 +443,102 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Edit Transaction', style: Theme.of(context).textTheme.headlineSmall),
+                  Expanded(
+                    child: Text(
+                      widget.transaction.isInstallmentParent
+                          ? 'Edit Installment Purchase'
+                          : 'Edit Transaction',
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                  ),
                   IconButton(
                     icon: const Icon(Icons.close),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
-              
+              const SizedBox(height: 8),
+
+              // Installment child banner
+              if (widget.transaction.isInstallmentChild) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .primaryContainer
+                        .withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.credit_card, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Installment ${widget.transaction.installmentNumber} of ${widget.transaction.numCuotas} — generated from purchase',
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.open_in_new, size: 16),
+                  label: const Text('Open parent purchase'),
+                  onPressed: () async {
+                    final parentId = widget.transaction.parentTransactionId;
+                    if (parentId == null) return;
+                    final parent = await ref
+                        .read(financeRepositoryProvider)
+                        .getInstallmentParent(parentId);
+                    if (!mounted || parent == null) return;
+                    Navigator.of(context).pop();
+                    showDialog(
+                      context: context,
+                      builder: (_) =>
+                          EditTransactionDialog(transaction: parent),
+                    );
+                  },
+                ),
+                const SizedBox(height: 8),
+              ],
+
+              // Installment parent warning
+              if (widget.transaction.isInstallmentParent) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .tertiaryContainer
+                        .withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.info_outline, size: 16),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Editing this installment purchase will regenerate all future installments. Paid cuotas will keep their status.',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+
+              const SizedBox(height: 8),
+
               Expanded(
                 child: SingleChildScrollView(
                   child: Column(
@@ -285,8 +547,8 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                       // Currency toggle (CC transactions)
                       Builder(builder: (context) {
                         final accounts = ref.watch(accountsProvider).valueOrNull ?? [];
-                        final account = accounts.firstWhereOrNull(
-                            (a) => a.id == _selectedAccountId);
+                        final account = _flattenAccounts(accounts)
+                            .firstWhereOrNull((a) => a.id == _selectedAccountId);
                         final isCC = account?.type == 'credit_card';
                         if (!isCC ||
                             (_selectedType != 'expense' &&
@@ -309,11 +571,14 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                         );
                       }),
 
-                      // Amount
+                      // Amount (read-only for installment children)
                       TextFormField(
                         controller: _amountController,
+                        enabled: !widget.transaction.isInstallmentChild,
                         decoration: InputDecoration(
-                          labelText: 'Amount',
+                          labelText: widget.transaction.isInstallmentChild
+                              ? 'Amount (managed by parent purchase)'
+                              : 'Amount',
                           prefixText: CurrencyFormatter.prefixFor(_currency),
                           border: const OutlineInputBorder(),
                         ),
@@ -327,7 +592,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                           return null;
                         },
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 10),
 
                       // Description
                       TextFormField(
@@ -338,7 +603,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                         ),
                         validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 10),
 
                       // Date
                       InkWell(
@@ -373,7 +638,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 10),
                       
                       // Status
                       DropdownButtonFormField<String>(
@@ -388,7 +653,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                         ],
                         onChanged: (value) => setState(() => _status = value!),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 10),
 
                       // Type (Disabled for edit to avoid complex logic changes, or re-enabled if needed)
                       // Allowing type change requires logic to handle "changing from transfer to expense" etc.
@@ -406,26 +671,42 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                         ],
                         onChanged: (value) => setState(() => _selectedType = value!),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 10),
 
                       // Account
                       accountsAsync.when(
-                        data: (accounts) => DropdownButtonFormField<String>(
-                          value: _selectedAccountId,
-                          decoration: const InputDecoration(
-                            labelText: 'Account',
-                            border: OutlineInputBorder(),
-                          ),
-                          items: accounts.map((acc) => DropdownMenuItem(
-                            value: acc.id,
-                            child: Text(acc.name),
-                          )).toList(),
-                          onChanged: (value) => setState(() => _selectedAccountId = value),
-                        ),
+                        data: (accounts) {
+                          final selectedAccount = _selectedAccountId == null
+                              ? null
+                              : _flattenAccounts(accounts).firstWhereOrNull(
+                                  (a) => a.id == _selectedAccountId);
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              DropdownButtonFormField<String>(
+                                value: _selectedAccountId,
+                                isExpanded: true,
+                                decoration: const InputDecoration(
+                                  labelText: 'Account',
+                                  border: OutlineInputBorder(),
+                                ),
+                                items: _buildAccountItems(accounts),
+                                onChanged: (value) => setState(() => _selectedAccountId = value),
+                              ),
+                              if (selectedAccount != null &&
+                                  selectedAccount.type == 'credit_card' &&
+                                  selectedAccount.creditCardRules != null)
+                                CreditCardBillingSubtitle(
+                                  account: selectedAccount,
+                                  transactionDate: _selectedDate,
+                                ),
+                            ],
+                          );
+                        },
                         loading: () => const CircularProgressIndicator(),
                         error: (e, s) => Text('Error loading accounts: $e'),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 10),
 
                       // Category
                       if (_selectedType != 'transfer')
@@ -439,13 +720,13 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                                 for (final sub in cat.subCategories!) {
                                   dropdownItems.add(DropdownMenuItem(
                                     value: sub.id,
-                                    child: Text('${cat.name} > ${sub.name}'),
+                                    child: Text('${cat.name} > ${sub.name}', style: const TextStyle(fontSize: 13)),
                                   ));
                                 }
                               } else {
                                 dropdownItems.add(DropdownMenuItem(
                                   value: cat.id,
-                                  child: Text(cat.name),
+                                  child: Text(cat.name, style: const TextStyle(fontSize: 13)),
                                 ));
                               }
                             }
@@ -457,6 +738,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                             
                             return DropdownButtonFormField<String>(
                               value: currentValue,
+                              isExpanded: true,
                               decoration: const InputDecoration(
                                 labelText: 'Category',
                                 border: OutlineInputBorder(),
@@ -468,46 +750,105 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                           loading: () => const CircularProgressIndicator(),
                           error: (e, s) => Text('Error loading categories: $e'),
                         ),
-                      if (_selectedType != 'transfer') const SizedBox(height: 16),
+                      if (_selectedType != 'transfer') const SizedBox(height: 10),
 
                       // Target Account
                       if (_selectedType == 'transfer')
                         accountsAsync.when(
                           data: (accounts) => DropdownButtonFormField<String>(
                             value: _selectedTargetAccountId,
+                            isExpanded: true,
                             decoration: const InputDecoration(
                               labelText: 'Destination Account',
                               border: OutlineInputBorder(),
                             ),
-                            items: accounts
-                                .where((acc) => acc.id != _selectedAccountId)
-                                .map((acc) => DropdownMenuItem(
-                                  value: acc.id,
-                                  child: Text(acc.name),
-                                ))
-                                .toList(),
+                            items: _buildAccountItems(accounts,
+                                excludeId: _selectedAccountId),
                             onChanged: (value) => setState(() => _selectedTargetAccountId = value),
                           ),
                           loading: () => const CircularProgressIndicator(),
                           error: (e, s) => Text('Error loading accounts: $e'),
                         ),
-                      if (_selectedType == 'transfer') const SizedBox(height: 16),
+                      if (_selectedType == 'transfer') const SizedBox(height: 10),
 
-                      // Movement Type
-                      if (_selectedType == 'expense')
-                        DropdownButtonFormField<String>(
-                          value: _selectedMovementType,
+                      // Installment parent: cuota config fields
+                      if (widget.transaction.isInstallmentParent) ...[
+                        const Divider(),
+                        const Text('Installment settings',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w600, fontSize: 14)),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<int>(
+                          value: _cuotasOptions.contains(_numCuotas)
+                              ? _numCuotas
+                              : 12,
                           decoration: const InputDecoration(
-                            labelText: 'Movement Type',
+                            labelText: 'Number of installments',
                             border: OutlineInputBorder(),
                           ),
-                          items: const [
-                            DropdownMenuItem(value: 'fixed', child: Text('Fixed Expense')),
-                            DropdownMenuItem(value: 'variable', child: Text('Variable Expense')),
-                          ],
-                          onChanged: (value) => setState(() => _selectedMovementType = value),
+                          items: _cuotasOptions
+                              .map((n) =>
+                                  DropdownMenuItem(value: n, child: Text('$n')))
+                              .toList(),
+                          onChanged: (v) => setState(() => _numCuotas = v!),
                         ),
-                      if (_selectedType == 'expense') const SizedBox(height: 16),
+                        const SizedBox(height: 12),
+                        CheckboxListTile(
+                          title: const Text('Interest-free'),
+                          value: _interestFree,
+                          onChanged: (v) =>
+                              setState(() => _interestFree = v ?? true),
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        if (!_interestFree) ...[
+                          const SizedBox(height: 8),
+                          TextFormField(
+                            controller: _interestRateController,
+                            decoration: const InputDecoration(
+                              labelText: 'Monthly interest rate (%)',
+                              suffixText: '%',
+                              border: OutlineInputBorder(),
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
+                            onChanged: (_) => setState(() {}),
+                          ),
+                        ],
+                        const SizedBox(height: 10),
+                      ],
+
+                      // Make recurring (not available for installment parent/child)
+                      if (!widget.transaction.isInstallmentParent &&
+                          !widget.transaction.isInstallmentChild) ...[
+                        const Divider(),
+                        SwitchListTile(
+                          title: const Text('Make recurring?'),
+                          subtitle: const Text(
+                              'Automatically create future transactions from this one'),
+                          value: _isRecurring,
+                          onChanged: (v) => setState(() => _isRecurring = v),
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        if (_isRecurring) ...[
+                          const SizedBox(height: 8),
+                          DropdownButtonFormField<String>(
+                            value: _frequency,
+                            decoration: const InputDecoration(
+                              labelText: 'Frequency',
+                              border: OutlineInputBorder(),
+                            ),
+                            items: const [
+                              DropdownMenuItem(value: 'daily', child: Text('Daily')),
+                              DropdownMenuItem(value: 'weekly', child: Text('Weekly')),
+                              DropdownMenuItem(value: 'biweekly', child: Text('Biweekly')),
+                              DropdownMenuItem(value: 'monthly', child: Text('Monthly')),
+                              DropdownMenuItem(value: 'yearly', child: Text('Yearly')),
+                            ],
+                            onChanged: (v) => setState(() => _frequency = v!),
+                          ),
+                          const SizedBox(height: 10),
+                        ],
+                      ],
 
                       // Notes
                       TextFormField(
@@ -517,35 +858,37 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                           border: OutlineInputBorder(),
                         ),
                         maxLines: 2,
+                        // Child transactions: notes are always editable
                       ),
                     ],
                   ),
                 ),
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
 
               // Actions
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  TextButton.icon(
-                    onPressed: _isLoading ? null : _deleteTransaction,
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    label: const Text('Delete', style: TextStyle(color: Colors.red)),
+                  FilledButton(
+                    onPressed: _isLoading ? null : _updateTransaction,
+                    child: _isLoading
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Text('Save Changes'),
                   ),
+                  const SizedBox(height: 8),
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
+                      TextButton.icon(
+                        onPressed: _isLoading ? null : _deleteTransaction,
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        label: const Text('Delete', style: TextStyle(color: Colors.red)),
+                      ),
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(),
                         child: const Text('Cancel'),
-                      ),
-                      const SizedBox(width: 8),
-                      FilledButton(
-                        onPressed: _isLoading ? null : _updateTransaction,
-                        child: _isLoading 
-                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                          : const Text('Save Changes'),
                       ),
                     ],
                   ),

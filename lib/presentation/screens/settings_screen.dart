@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:budgett_frontend/presentation/providers/settings_provider.dart';
 import 'package:budgett_frontend/presentation/providers/logout_action.dart';
+import 'package:budgett_frontend/presentation/providers/fx_rate_provider.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -13,6 +15,7 @@ class SettingsScreen extends ConsumerWidget {
     final isDarkAsync = ref.watch(themeModeProvider);
     final ccEnabledAsync = ref.watch(ccNotificationsEnabledProvider);
     final ccDaysAsync = ref.watch(ccNotificationDaysBeforeProvider);
+    final fxAsync = ref.watch(fxRateProvider);
 
     // Derive values with safe fallbacks — no nested when() to avoid full-screen spinners
     final currency = currencyAsync.valueOrNull ?? 'COP';
@@ -25,8 +28,14 @@ class SettingsScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('Settings')),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              children: [
+          : RefreshIndicator(
+              onRefresh: () async {
+                ref.invalidate(fxRateProvider);
+                await ref.read(fxRateProvider.future);
+              },
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
                 ListTile(
                   leading: const Icon(Icons.attach_money),
                   title: const Text('Currency'),
@@ -102,10 +111,51 @@ class SettingsScreen extends ConsumerWidget {
                         },
                 ),
                 const Divider(),
-                const ListTile(
-                  leading: Icon(Icons.info),
-                  title: Text('About'),
-                  subtitle: Text('Budgett v1.0.0'),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Text(
+                    'Exchange Rate',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                  ),
+                ),
+                fxAsync.when(
+                  loading: () => const ListTile(
+                    leading: Icon(Icons.currency_exchange),
+                    title: Text('TRM (USD → COP)'),
+                    subtitle: Text('Loading…'),
+                  ),
+                  error: (_, __) => const ListTile(
+                    leading: Icon(Icons.currency_exchange),
+                    title: Text('TRM (USD → COP)'),
+                    subtitle: Text('Unavailable'),
+                  ),
+                  data: (fxRate) {
+                    if (fxRate == null) {
+                      return const ListTile(
+                        leading: Icon(Icons.currency_exchange),
+                        title: Text('TRM (USD → COP)'),
+                        subtitle: Text('Unavailable'),
+                      );
+                    }
+                    final dateStr = DateFormat('d MMM yyyy', 'en').format(fxRate.asOfDate);
+                    final rateStr = NumberFormat('#,##0.00', 'en_US').format(fxRate.rate);
+                    return ListTile(
+                      leading: const Icon(Icons.currency_exchange),
+                      title: Text('\$$rateStr COP'),
+                      subtitle: Text(
+                        '${fxRate.isStale ? "Stale — " : ""}As of $dateStr · ${fxRate.source}',
+                      ),
+                      trailing: fxRate.isStale
+                          ? Tooltip(
+                              message: 'Could not fetch today\'s rate — using last cached value',
+                              child: Icon(Icons.warning_amber_rounded,
+                                  color: Theme.of(context).colorScheme.error),
+                            )
+                          : null,
+                    );
+                  },
                 ),
                 const Divider(),
                 Padding(
@@ -129,8 +179,15 @@ class SettingsScreen extends ConsumerWidget {
                   title: const Text('Log out'),
                   onTap: () => performLogout(ref, context),
                 ),
+                const Divider(),
+                const ListTile(
+                  leading: Icon(Icons.info),
+                  title: Text('About'),
+                  subtitle: Text('Budgett v1.0.0'),
+                ),
               ],
             ),
+          ),
     );
   }
 

@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 class CurrencyFormatter {
   /// Formats [amount] according to [currency].
   ///
-  /// COP: es_CO locale, '$' prefix, 0 decimal digits (e.g. $1.200.000)
+  /// COP: es_CO locale, '$' prefix, 2 decimal digits (e.g. $1.200.000,50)
   /// USD: en_US locale, 'US$' prefix, 2 decimal digits (e.g. US$1,200.50)
   static String format(
     double amount, {
@@ -24,7 +24,7 @@ class CurrencyFormatter {
       final formatter = NumberFormat.currency(
         locale: 'es_CO',
         symbol: includeSymbol ? '\$' : '',
-        decimalDigits: decimalDigits ?? 0,
+        decimalDigits: decimalDigits ?? 2,
       );
       return formatter.format(amount).trim();
     }
@@ -108,11 +108,27 @@ class CurrencyInputFormatter extends TextInputFormatter {
     }
   }
 
-  // COP: whole numbers only, es_CO thousands separator (dot)
+  // COP: up to 2 decimal digits, es_CO thousands separator (dot), decimal separator (comma)
   TextEditingValue _formatCop(TextEditingValue value) {
     final isNegative = value.text.startsWith('-');
-    final digitsOnly = value.text.replaceAll(RegExp(r'[^0-9]'), '');
-    if (digitsOnly.isEmpty) {
+
+    // Allow digits and at most one comma (decimal separator in es_CO)
+    final raw = value.text.replaceAll(RegExp(r'[^0-9,]'), '');
+
+    // Split at first comma
+    final commaIndex = raw.indexOf(',');
+    final String intRaw;
+    final String? decRaw;
+    if (commaIndex != -1) {
+      intRaw = raw.substring(0, commaIndex);
+      final afterComma = raw.substring(commaIndex + 1).replaceAll(',', '');
+      decRaw = afterComma.length > 2 ? afterComma.substring(0, 2) : afterComma;
+    } else {
+      intRaw = raw;
+      decRaw = null;
+    }
+
+    if (intRaw.isEmpty && decRaw == null) {
       final text = isNegative ? '-' : '';
       return TextEditingValue(
         text: text,
@@ -120,8 +136,17 @@ class CurrencyInputFormatter extends TextInputFormatter {
       );
     }
 
+    // Format integer part with es_CO thousands separator (dot)
     final formatter = NumberFormat('#,###', 'es_CO');
-    final formatted = (isNegative ? '-' : '') + formatter.format(int.parse(digitsOnly));
+    final intValue = intRaw.isEmpty ? 0 : (int.tryParse(intRaw) ?? 0);
+    final formattedInt = formatter.format(intValue);
+
+    final String formatted;
+    if (decRaw != null) {
+      formatted = (isNegative ? '-' : '') + '$formattedInt,$decRaw';
+    } else {
+      formatted = (isNegative ? '-' : '') + formattedInt;
+    }
 
     return TextEditingValue(
       text: formatted,

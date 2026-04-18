@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
+import '../../core/app_spacing.dart';
+import '../../core/responsive.dart';
 import '../../core/utils/investment_calculator.dart';
 import '../../data/models/account_model.dart';
 import '../../data/models/investment_details_model.dart';
@@ -12,20 +13,13 @@ import '../providers/finance_provider.dart';
 import '../providers/fx_rate_provider.dart';
 import '../utils/currency_formatter.dart';
 import '../widgets/edit_account_dialog.dart';
-import '../widgets/high_yield_interest_dialog.dart';
 import '../widgets/edit_holding_dialog.dart';
 import '../widgets/buy_sell_holding_dialog.dart';
 import '../widgets/update_prices_dialog.dart';
 import '../widgets/cdt_collect_dialog.dart';
 import '../widgets/investment_holding_card.dart';
-
-// Co-located provider for this account's transactions (mirrors credit_card_details_screen)
-final _invTxProvider = FutureProvider.family.autoDispose<List<Transaction>, String>(
-  (ref, accountId) async {
-    final repo = ref.read(financeRepositoryProvider);
-    return repo.getTransactionsForAccount(accountId, limit: 50);
-  },
-);
+import '../widgets/portfolio_donut_chart.dart';
+import '../widgets/transaction_tile.dart';
 
 class InvestmentDetailsScreen extends ConsumerWidget {
   final String accountId;
@@ -48,7 +42,7 @@ class InvestmentDetailsScreen extends ConsumerWidget {
 
     final details = account.investmentDetails;
     final holdingsAsync = ref.watch(accountHoldingsProvider(accountId));
-    final txAsync = ref.watch(_invTxProvider(accountId));
+    final txAsync = ref.watch(accountDetailTransactionsProvider(accountId));
     final fxAsync = ref.watch(fxRateProvider);
 
     return Scaffold(
@@ -67,19 +61,43 @@ class InvestmentDetailsScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: holdingsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
-        data: (holdings) {
-          final fxRate = fxAsync.valueOrNull;
-          return _Body(
-            account: account,
-            details: details,
-            holdings: holdings,
-            txAsync: txAsync,
-            fxRate: fxRate,
-          );
+      body: RefreshIndicator(
+        onRefresh: () async {
+          ref.invalidate(accountsProvider);
+          ref.invalidate(accountHoldingsProvider(accountId));
+          ref.invalidate(accountDetailTransactionsProvider(accountId));
+          ref.invalidate(fxRateProvider);
+          await Future.wait([
+            ref.read(accountsProvider.future),
+            ref.read(accountHoldingsProvider(accountId).future),
+          ]);
         },
+        child: holdingsAsync.when(
+          loading: () => ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            children: const [
+              SizedBox(height: 200),
+              Center(child: CircularProgressIndicator()),
+            ],
+          ),
+          error: (e, _) => ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            children: [
+              const SizedBox(height: 200),
+              Center(child: Text('Error: $e')),
+            ],
+          ),
+          data: (holdings) {
+            final fxRate = fxAsync.valueOrNull;
+            return _Body(
+              account: account,
+              details: details,
+              holdings: holdings,
+              txAsync: txAsync,
+              fxRate: fxRate,
+            );
+          },
+        ),
       ),
     );
   }
@@ -102,7 +120,7 @@ class _Body extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final invType = details?.investmentType ?? InvestmentType.highYield;
+    final invType = details?.investmentType ?? InvestmentType.cdt;
     final totalValue = InvestmentCalculator.computeTotalValue(
       account,
       holdings,
@@ -111,7 +129,8 @@ class _Body extends ConsumerWidget {
     final pnl = InvestmentCalculator.computePnl(holdings);
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: kScreenPadding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -125,12 +144,10 @@ class _Body extends ConsumerWidget {
             fxRate: fxRate,
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
 
           // ── Type-specific content ──────────────────────────────────────
-          if (invType == InvestmentType.highYield) ...[
-            _HighYieldSection(account: account, details: details),
-          ] else if (invType == InvestmentType.cdt) ...[
+          if (invType == InvestmentType.cdt) ...[
             _CdtSection(account: account, details: details),
           ] else ...[
             // Multi-holding: FIC, crypto, stock_etf
@@ -163,7 +180,10 @@ class _Body extends ConsumerWidget {
                   itemCount: txs.length,
                   separatorBuilder: (_, __) =>
                       const Divider(height: 1, indent: 16, endIndent: 16),
-                  itemBuilder: (context, i) => _TxTile(tx: txs[i]),
+                  itemBuilder: (context, i) => TransactionTile(
+                    transaction: txs[i],
+                    perspectiveAccountId: account.id,
+                  ),
                 ),
               );
             },
@@ -222,7 +242,7 @@ class _SummaryHeader extends StatelessWidget {
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -271,7 +291,7 @@ class _SummaryHeader extends StatelessWidget {
 
             // P&L (only when there are multi-holding positions)
             if (hasHoldings && pnl.costBasis != 0) ...[
-              const SizedBox(height: 12),
+              kGapLg,
               Row(
                 children: [
                   Icon(
@@ -317,216 +337,6 @@ class _SummaryHeader extends StatelessWidget {
   }
 }
 
-// ── High-yield section ────────────────────────────────────────────────────────
-
-class _HighYieldSection extends ConsumerWidget {
-  final Account account;
-  final InvestmentDetails? details;
-
-  const _HighYieldSection({required this.account, required this.details});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    if (details == null) return const SizedBox.shrink();
-
-    final apyRate = details!.apyRate ?? 0;
-    final apy = apyRate * 100;
-    final annual =
-        InvestmentCalculator.projectedAnnualIncome(account.balance, apyRate);
-    final daily =
-        InvestmentCalculator.highYieldDailyIncome(account.balance, apyRate);
-    final fromDate = details!.lastInterestDate;
-    final accrued = fromDate != null
-        ? InvestmentCalculator.highYieldAccruedInterest(
-            account.balance, apyRate, fromDate)
-        : null;
-
-    return Column(
-      children: [
-        // ── Stats row ──────────────────────────────────────────────────
-        Card(
-          elevation: 1,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: _StatItem(
-                        label: 'APY',
-                        value: '${apy.toStringAsFixed(2)}% E.A.',
-                        color: Colors.green.shade600,
-                      ),
-                    ),
-                    Expanded(
-                      child: _StatItem(
-                        label: 'Daily Earnings',
-                        value: CurrencyFormatter.format(daily),
-                        color: Colors.green.shade600,
-                      ),
-                    ),
-                    Expanded(
-                      child: _StatItem(
-                        label: 'Annual Est.',
-                        value: CurrencyFormatter.format(annual),
-                      ),
-                    ),
-                  ],
-                ),
-
-                // ── Accrued interest row (only when tracking date is set) ──
-                if (accrued != null) ...[
-                  const SizedBox(height: 12),
-                  const Divider(height: 1),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        flex: 2,
-                        child: _StatItem(
-                          label: 'Accrued Interest',
-                          value: CurrencyFormatter.format(accrued),
-                          color: Colors.green.shade600,
-                        ),
-                      ),
-                      Expanded(
-                        flex: 3,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Since',
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: theme.colorScheme.onSurface
-                                    .withOpacity(0.55),
-                              ),
-                            ),
-                            Text(
-                              DateFormat('MMM d, y').format(fromDate!),
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            Text(
-                              '${DateTime.now().difference(fromDate).inDays} days',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurface
-                                    .withOpacity(0.55),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-
-        // ── Record Interest button / Set start date prompt ─────────────
-        const SizedBox(height: 8),
-        if (fromDate != null)
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.tonal(
-              onPressed: () {
-                showDialog(
-                  context: context,
-                  builder: (_) => HighYieldInterestDialog(
-                    account: account,
-                    details: details!,
-                  ),
-                ).then((recorded) {
-                  if (recorded == true) {
-                    ref.invalidate(accountsProvider);
-                    ref.invalidate(recentTransactionsProvider);
-                  }
-                });
-              },
-              child: const Text('Record Interest'),
-            ),
-          )
-        else
-          _SetStartDateBanner(account: account, details: details!),
-        const SizedBox(height: 8),
-      ],
-    );
-  }
-}
-
-/// Shown when [lastInterestDate] is null — prompts the user to set a start date
-/// so the app can begin tracking accrued interest.
-class _SetStartDateBanner extends ConsumerWidget {
-  final Account account;
-  final InvestmentDetails details;
-
-  const _SetStartDateBanner({required this.account, required this.details});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    return Card(
-      color: theme.colorScheme.secondaryContainer.withOpacity(0.5),
-      elevation: 0,
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: [
-            Icon(Icons.calendar_today,
-                size: 18,
-                color: theme.colorScheme.onSecondaryContainer
-                    .withOpacity(0.7)),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Set a start date to begin tracking daily accrued interest.',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSecondaryContainer
-                      .withOpacity(0.8),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            TextButton(
-              onPressed: () async {
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: DateTime.now(),
-                  firstDate: DateTime(2020),
-                  lastDate: DateTime.now(),
-                );
-                if (picked == null || !context.mounted) return;
-                try {
-                  final dateStr =
-                      '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
-                  await ref
-                      .read(financeRepositoryProvider)
-                      .rawUpdateInvestmentDetails(details.id,
-                          {'last_interest_date': dateStr});
-                  ref.invalidate(accountsProvider);
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Error: $e')));
-                  }
-                }
-              },
-              child: const Text('Set date'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 // ── CDT section ───────────────────────────────────────────────────────────────
 
@@ -633,59 +443,140 @@ class _CdtSection extends ConsumerWidget {
 
 // ── Holdings list ─────────────────────────────────────────────────────────────
 
-class _HoldingsList extends ConsumerWidget {
+class _HoldingsList extends ConsumerStatefulWidget {
   final Account account;
   final List<InvestmentHolding> holdings;
 
   const _HoldingsList({required this.account, required this.holdings});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_HoldingsList> createState() => _HoldingsListState();
+}
+
+class _HoldingsListState extends ConsumerState<_HoldingsList> {
+  int _viewMode = 0; // 0 = positions, 1 = donut
+
+  @override
+  Widget build(BuildContext context) {
+    final account = widget.account;
+    final holdings = widget.holdings;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('Positions',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(fontWeight: FontWeight.bold)),
-            Row(
-              children: [
-                if (holdings.isNotEmpty)
-                  TextButton.icon(
+        if (context.formFactor == FormFactor.mobile) ...[
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              if (holdings.isNotEmpty)
+                _UpdatePricesButton(
+                  accountId: account.id,
+                  holdings: holdings,
+                ),
+              FilledButton.icon(
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (_) =>
+                        EditHoldingDialog(accountId: account.id),
+                  );
+                },
+                icon: const Icon(Icons.add, size: 16),
+                label: const Text('Add'),
+                style: FilledButton.styleFrom(
+                    visualDensity: VisualDensity.compact),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (holdings.isNotEmpty)
+            Center(
+              child: SegmentedButton<int>(
+                style: SegmentedButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  textStyle: const TextStyle(fontSize: 12),
+                  minimumSize: const Size(0, 32),
+                ),
+                segments: const [
+                  ButtonSegment(
+                    value: 0,
+                    label: Text('Positions'),
+                    icon: Icon(Icons.view_module, size: 16),
+                  ),
+                  ButtonSegment(
+                    value: 1,
+                    label: Text('Portfolio'),
+                    icon: Icon(Icons.donut_large, size: 16),
+                  ),
+                ],
+                selected: {_viewMode},
+                onSelectionChanged: (s) => setState(() => _viewMode = s.first),
+              ),
+            )
+          else
+            Center(
+              child: Text('Positions',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.bold)),
+            ),
+        ] else
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              if (holdings.isNotEmpty)
+                SegmentedButton<int>(
+                  style: SegmentedButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    textStyle: const TextStyle(fontSize: 12),
+                    minimumSize: const Size(0, 32),
+                  ),
+                  segments: const [
+                    ButtonSegment(
+                      value: 0,
+                      label: Text('Positions'),
+                      icon: Icon(Icons.view_module, size: 16),
+                    ),
+                    ButtonSegment(
+                      value: 1,
+                      label: Text('Portfolio'),
+                      icon: Icon(Icons.donut_large, size: 16),
+                    ),
+                  ],
+                  selected: {_viewMode},
+                  onSelectionChanged: (s) => setState(() => _viewMode = s.first),
+                )
+              else
+                Text('Positions',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.bold)),
+              Row(
+                children: [
+                  if (holdings.isNotEmpty)
+                    _UpdatePricesButton(
+                      accountId: account.id,
+                      holdings: holdings,
+                    ),
+                  FilledButton.icon(
                     onPressed: () {
                       showDialog(
                         context: context,
-                        builder: (_) => UpdatePricesDialog(
-                          accountId: account.id,
-                          holdings: holdings,
-                        ),
+                        builder: (_) =>
+                            EditHoldingDialog(accountId: account.id),
                       );
                     },
-                    icon: const Icon(Icons.refresh, size: 16),
-                    label: const Text('Update Prices'),
+                    icon: const Icon(Icons.add, size: 16),
+                    label: const Text('Add'),
+                    style: FilledButton.styleFrom(
+                        visualDensity: VisualDensity.compact),
                   ),
-                FilledButton.icon(
-                  onPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (_) =>
-                          EditHoldingDialog(accountId: account.id),
-                    );
-                  },
-                  icon: const Icon(Icons.add, size: 16),
-                  label: const Text('Add'),
-                  style: FilledButton.styleFrom(
-                      visualDensity: VisualDensity.compact),
-                ),
-              ],
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
+                ],
+              ),
+            ],
+          ),
+        const SizedBox(height: 12),
         if (holdings.isEmpty)
           const Card(
             child: Padding(
@@ -693,50 +584,61 @@ class _HoldingsList extends ConsumerWidget {
               child: Text('No positions yet. Tap "Add" to get started.'),
             ),
           )
+        else if (_viewMode == 1)
+          _buildDonut(context, account, holdings)
         else
-          ...holdings.map((h) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: InvestmentHoldingCard(
-                  holding: h,
-                  onBuy: () {
-                    showDialog(
-                      context: context,
-                      builder: (_) => BuySellHoldingDialog(
-                        accountId: account.id,
-                        holding: h,
-                        isBuy: true,
-                      ),
-                    );
-                  },
-                  onSell: () {
-                    showDialog(
-                      context: context,
-                      builder: (_) => BuySellHoldingDialog(
-                        accountId: account.id,
-                        holding: h,
-                        isBuy: false,
-                      ),
-                    );
-                  },
-                  onEdit: () {
-                    showDialog(
-                      context: context,
-                      builder: (_) => EditHoldingDialog(
-                        accountId: account.id,
-                        holding: h,
-                      ),
-                    );
-                  },
-                  onDelete: () async {
-                    final confirmed = await showDialog<bool>(
-                      context: context,
-                      builder: (_) => AlertDialog(
-                        title: const Text('Delete Position?'),
-                        content: Text(
-                            'Delete ${h.symbol}? Transaction history will be preserved.'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.of(context).pop(false),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final columns = context.formFactor == FormFactor.mobile ? 1 : 3;
+              const spacing = 8.0;
+              final itemWidth =
+                  (constraints.maxWidth - spacing * (columns - 1)) / columns;
+              return Wrap(
+                spacing: spacing,
+                runSpacing: spacing,
+                children: holdings.map((h) => SizedBox(
+                  width: itemWidth,
+                  child: InvestmentHoldingCard(
+                    holding: h,
+                    onBuy: () {
+                      showDialog(
+                        context: context,
+                        builder: (_) => BuySellHoldingDialog(
+                          accountId: account.id,
+                          holding: h,
+                          isBuy: true,
+                        ),
+                      );
+                    },
+                    onSell: () {
+                      showDialog(
+                        context: context,
+                        builder: (_) => BuySellHoldingDialog(
+                          accountId: account.id,
+                          holding: h,
+                          isBuy: false,
+                        ),
+                      );
+                    },
+                    onEdit: () {
+                      showDialog(
+                        context: context,
+                        builder: (_) => EditHoldingDialog(
+                          accountId: account.id,
+                          holding: h,
+                        ),
+                      );
+                    },
+                    onDelete: () async {
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (_) => AlertDialog(
+                          title: const Text('Delete Position?'),
+                          content: Text(
+                              'Delete ${h.symbol}? Transaction history will be preserved.'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(false),
                             child: const Text('Cancel'),
                           ),
                           FilledButton(
@@ -750,18 +652,104 @@ class _HoldingsList extends ConsumerWidget {
                         ],
                       ),
                     );
-                    if (confirmed == true) {
-                      await ref
-                          .read(financeRepositoryProvider)
-                          .deleteHolding(h.id);
-                      ref.invalidate(accountHoldingsProvider(account.id));
-                    }
-                  },
-                ),
-              )),
+                      if (confirmed == true) {
+                        await ref
+                            .read(financeRepositoryProvider)
+                            .deleteHolding(h.id);
+                        ref.invalidate(accountHoldingsProvider(account.id));
+                      }
+                    },
+                  ),
+                )).toList(),
+              );
+            },
+          ),
       ],
     );
   }
+
+  Widget _buildDonut(
+    BuildContext context,
+    Account account,
+    List<InvestmentHolding> holdings,
+  ) {
+    final baseCurrency = account.investmentDetails?.baseCurrency ?? 'COP';
+
+    // Group holdings by symbol+currency so buying the same asset twice
+    // shows as a single slice even if the user created two rows.
+    final grouped = <String, _SymbolSlice>{};
+    for (final h in holdings) {
+      if (h.marketValue <= 0) continue;
+      final key = '${h.symbol}|${h.currency}';
+      final existing = grouped[key];
+      if (existing == null) {
+        grouped[key] = _SymbolSlice(
+          label: h.displayName,
+          marketValue: h.marketValue,
+          costBasis: h.costBasis,
+          currency: h.currency,
+        );
+      } else {
+        grouped[key] = _SymbolSlice(
+          label: existing.label,
+          marketValue: existing.marketValue + h.marketValue,
+          costBasis: existing.costBasis + h.costBasis,
+          currency: existing.currency,
+        );
+      }
+    }
+
+    final sorted = grouped.values.toList()
+      ..sort((a, b) => b.marketValue.compareTo(a.marketValue));
+
+    final slices = <PortfolioSlice>[];
+    for (var i = 0; i < sorted.length; i++) {
+      final s = sorted[i];
+      final pnlPct = s.costBasis == 0
+          ? 0.0
+          : ((s.marketValue - s.costBasis) / s.costBasis) * 100;
+      final pnlLabel = s.costBasis == 0
+          ? null
+          : '${pnlPct >= 0 ? '+' : ''}${pnlPct.toStringAsFixed(1)}%';
+      slices.add(PortfolioSlice(
+        label: s.label,
+        value: s.marketValue,
+        color: PortfolioPalette.colorFor(i),
+        trailing: pnlLabel,
+      ));
+    }
+
+    final total = sorted.fold<double>(0, (sum, s) => sum + s.marketValue);
+    final centerValue =
+        CurrencyFormatter.format(total, currency: baseCurrency);
+
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: PortfolioDonutChart(
+          slices: slices,
+          centerLabel: 'Holdings',
+          centerValue: centerValue,
+        ),
+      ),
+    );
+  }
+}
+
+class _SymbolSlice {
+  final String label;
+  final double marketValue;
+  final double costBasis;
+  final String currency;
+
+  const _SymbolSlice({
+    required this.label,
+    required this.marketValue,
+    required this.costBasis,
+    required this.currency,
+  });
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -800,33 +788,199 @@ class _StatItem extends StatelessWidget {
   }
 }
 
-class _TxTile extends StatelessWidget {
-  final Transaction tx;
+// ── Embeddable body for the master/detail split view ─────────────────────────
 
-  const _TxTile({required this.tx});
+/// Renders the full investment-detail content without a Scaffold / AppBar.
+/// Use this inside AccountsScreen's right panel.
+class InvestmentDetailsBody extends ConsumerWidget {
+  final String accountId;
+
+  const InvestmentDetailsBody({super.key, required this.accountId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final accounts = ref.watch(accountsProvider).valueOrNull ?? [];
+    final account = accounts.cast<Account?>().firstWhere(
+          (a) => a?.id == accountId,
+          orElse: () => null,
+        );
+
+    if (account == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final details = account.investmentDetails;
+    final holdingsAsync = ref.watch(accountHoldingsProvider(accountId));
+    final txAsync = ref.watch(accountDetailTransactionsProvider(accountId));
+    final fxAsync = ref.watch(fxRateProvider);
+
+    return holdingsAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('Error: $e')),
+      data: (holdings) => _Body(
+        account: account,
+        details: details,
+        holdings: holdings,
+        txAsync: txAsync,
+        fxRate: fxAsync.valueOrNull,
+      ),
+    );
+  }
+}
+
+// ── Update Prices button ──────────────────────────────────────────────────────
+
+enum _UpdatePricesAction { auto, manual }
+
+/// Split-menu button for updating prices on all holdings in an account.
+///
+/// Tapping opens a popup with two options:
+///   - Fetch from market: calls the `update-prices` Edge Function (CoinGecko
+///     for crypto, Yahoo Finance for stocks/ETFs, datos.gov.co for FICs).
+///   - Enter manually: opens [UpdatePricesDialog] to type prices by hand.
+///
+/// Auto-fetch is also offered as a fallback via a snackbar action when the
+/// edge function skips holdings or errors out.
+class _UpdatePricesButton extends ConsumerStatefulWidget {
+  final String accountId;
+  final List<InvestmentHolding> holdings;
+
+  const _UpdatePricesButton({
+    required this.accountId,
+    required this.holdings,
+  });
+
+  @override
+  ConsumerState<_UpdatePricesButton> createState() =>
+      _UpdatePricesButtonState();
+}
+
+class _UpdatePricesButtonState extends ConsumerState<_UpdatePricesButton> {
+  bool _isLoading = false;
+
+  void _openManualDialog() {
+    showDialog(
+      context: context,
+      builder: (_) => UpdatePricesDialog(
+        accountId: widget.accountId,
+        holdings: widget.holdings,
+      ),
+    );
+  }
+
+  Future<void> _autoFetch() async {
+    setState(() => _isLoading = true);
+    try {
+      final result = await ref
+          .read(financeRepositoryProvider)
+          .fetchMarketPrices(widget.accountId);
+      ref.invalidate(accountHoldingsProvider(widget.accountId));
+      if (!mounted) return;
+
+      final updated = result.updatedCount;
+      final skipped = result.skipped;
+      final messenger = ScaffoldMessenger.of(context);
+      if (updated == 0 && skipped.isEmpty) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('No holdings to update')),
+        );
+      } else if (skipped.isEmpty) {
+        messenger.showSnackBar(
+          SnackBar(content: Text('Updated $updated holding${updated == 1 ? '' : 's'}')),
+        );
+      } else {
+        final symbols = skipped.map((s) => s.symbol).join(', ');
+        messenger.showSnackBar(
+          SnackBar(
+            duration: const Duration(seconds: 6),
+            content: Text('Updated $updated, skipped: $symbols'),
+            action: SnackBarAction(
+              label: 'Edit manually',
+              onPressed: _openManualDialog,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to fetch prices: $e'),
+          action: SnackBarAction(
+            label: 'Edit manually',
+            onPressed: _openManualDialog,
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isIncome = tx.type == 'income';
-    final color = isIncome ? Colors.green.shade600 : theme.colorScheme.error;
-    final sign = isIncome ? '+' : '-';
-
-    return ListTile(
-      dense: true,
-      title: Text(
-        tx.description ?? tx.type,
-        style: theme.textTheme.bodyMedium,
-      ),
-      subtitle: Text(
-        DateFormat('MMM d, y').format(tx.date),
-        style: theme.textTheme.bodySmall
-            ?.copyWith(color: theme.colorScheme.onSurface.withOpacity(0.6)),
-      ),
-      trailing: Text(
-        '$sign${CurrencyFormatter.format(tx.amount, currency: tx.currency)}',
-        style: theme.textTheme.bodyMedium
-            ?.copyWith(color: color, fontWeight: FontWeight.w600),
+    return PopupMenuButton<_UpdatePricesAction>(
+      enabled: !_isLoading,
+      tooltip: 'Update prices',
+      position: PopupMenuPosition.under,
+      onSelected: (action) {
+        switch (action) {
+          case _UpdatePricesAction.auto:
+            _autoFetch();
+            break;
+          case _UpdatePricesAction.manual:
+            _openManualDialog();
+            break;
+        }
+      },
+      itemBuilder: (_) => const [
+        PopupMenuItem(
+          value: _UpdatePricesAction.auto,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.cloud_download_outlined, size: 18),
+              SizedBox(width: 10),
+              Text('Fetch from market'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: _UpdatePricesAction.manual,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.edit_outlined, size: 18),
+              SizedBox(width: 10),
+              Text('Enter manually…'),
+            ],
+          ),
+        ),
+      ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_isLoading)
+              const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else
+              Icon(Icons.refresh, size: 16, color: theme.colorScheme.primary),
+            const SizedBox(width: 6),
+            Text(
+              'Update Prices',
+              style: theme.textTheme.labelLarge
+                  ?.copyWith(color: theme.colorScheme.primary),
+            ),
+            Icon(Icons.arrow_drop_down,
+                size: 18, color: theme.colorScheme.primary),
+          ],
+        ),
       ),
     );
   }

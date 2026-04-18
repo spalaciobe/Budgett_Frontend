@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/investment_holding_model.dart';
 import '../../data/repositories/finance_repository.dart';
@@ -27,6 +28,7 @@ class _EditHoldingDialogState extends ConsumerState<EditHoldingDialog> {
   late TextEditingController _avgCostCtrl;
   late TextEditingController _currentPriceCtrl;
   late TextEditingController _notesCtrl;
+  late TextEditingController _sourceSymbolCtrl;
   late String _assetClass;
   late String _currency;
   bool _isLoading = false;
@@ -53,6 +55,7 @@ class _EditHoldingDialogState extends ConsumerState<EditHoldingDialog> {
           : '',
     );
     _notesCtrl = TextEditingController(text: h?.notes ?? '');
+    _sourceSymbolCtrl = TextEditingController(text: h?.sourceSymbol ?? '');
     _assetClass = h?.assetClass ?? 'stock';
     _currency = h?.currency ?? 'COP';
   }
@@ -65,6 +68,7 @@ class _EditHoldingDialogState extends ConsumerState<EditHoldingDialog> {
     _avgCostCtrl.dispose();
     _currentPriceCtrl.dispose();
     _notesCtrl.dispose();
+    _sourceSymbolCtrl.dispose();
     super.dispose();
   }
 
@@ -73,6 +77,7 @@ class _EditHoldingDialogState extends ConsumerState<EditHoldingDialog> {
     setState(() => _isLoading = true);
 
     final repo = ref.read(financeRepositoryProvider);
+    final sourceSymbol = _sourceSymbolCtrl.text.trim();
     final data = {
       'account_id': widget.accountId,
       'symbol': _symbolCtrl.text.trim().toUpperCase(),
@@ -85,6 +90,7 @@ class _EditHoldingDialogState extends ConsumerState<EditHoldingDialog> {
           CurrencyFormatter.parse(_currentPriceCtrl.text, currency: _currency),
       'price_updated_at': DateTime.now().toIso8601String(),
       'notes': _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
+      'source_symbol': sourceSymbol.isEmpty ? null : sourceSymbol,
     };
 
     try {
@@ -109,9 +115,13 @@ class _EditHoldingDialogState extends ConsumerState<EditHoldingDialog> {
   Widget build(BuildContext context) {
     final isEdit = widget.holding != null;
     return Dialog(
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: MediaQuery.of(context).size.width * 0.025,
+        vertical: 24,
+      ),
       child: Container(
         constraints: const BoxConstraints(maxWidth: 480, maxHeight: 680),
-        padding: const EdgeInsets.all(24),
+        padding: kDialogPadding,
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
@@ -120,10 +130,11 @@ class _EditHoldingDialogState extends ConsumerState<EditHoldingDialog> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(isEdit ? 'Edit Holding' : 'Add Holding',
-                        style: Theme.of(context).textTheme.headlineSmall),
+                    Expanded(
+                      child: Text(isEdit ? 'Edit Holding' : 'Add Holding',
+                          style: Theme.of(context).textTheme.headlineSmall),
+                    ),
                     IconButton(
                       icon: const Icon(Icons.close),
                       onPressed: () => Navigator.of(context).pop(),
@@ -144,7 +155,7 @@ class _EditHoldingDialogState extends ConsumerState<EditHoldingDialog> {
                   validator: (v) =>
                       v == null || v.trim().isEmpty ? 'Required' : null,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
 
                 TextFormField(
                   controller: _nameCtrl,
@@ -154,7 +165,7 @@ class _EditHoldingDialogState extends ConsumerState<EditHoldingDialog> {
                     hintText: 'Bitcoin, Vanguard S&P 500…',
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
 
                 // Asset class
                 DropdownButtonFormField<String>(
@@ -173,7 +184,7 @@ class _EditHoldingDialogState extends ConsumerState<EditHoldingDialog> {
                   ],
                   onChanged: (v) => setState(() => _assetClass = v!),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
 
                 // Currency
                 DropdownButtonFormField<String>(
@@ -188,7 +199,7 @@ class _EditHoldingDialogState extends ConsumerState<EditHoldingDialog> {
                   ],
                   onChanged: (v) => setState(() => _currency = v!),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
 
                 // Quantity
                 TextFormField(
@@ -202,7 +213,7 @@ class _EditHoldingDialogState extends ConsumerState<EditHoldingDialog> {
                   validator: (v) =>
                       v == null || v.isEmpty ? 'Required' : null,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
 
                 // Avg cost
                 TextFormField(
@@ -217,7 +228,7 @@ class _EditHoldingDialogState extends ConsumerState<EditHoldingDialog> {
                   validator: (v) =>
                       v == null || v.isEmpty ? 'Required' : null,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
 
                 // Current price
                 TextFormField(
@@ -232,7 +243,25 @@ class _EditHoldingDialogState extends ConsumerState<EditHoldingDialog> {
                   validator: (v) =>
                       v == null || v.isEmpty ? 'Required' : null,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
+
+                // Fund Lookup Name (only for FICs) — exact nombre_patrimonio
+                // used by the update-prices Edge Function when querying
+                // datos.gov.co. If left blank the holding won't auto-update.
+                if (_assetClass == 'fic') ...[
+                  TextFormField(
+                    controller: _sourceSymbolCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Fund Lookup Name (datos.gov.co)',
+                      border: OutlineInputBorder(),
+                      hintText: 'FIC ABIERTO SIN PACTO DE PERMANENCIA ETF 500 US',
+                      helperText:
+                          'Exact nombre_patrimonio from datos.gov.co (dataset qhpu-8ixx)',
+                      helperMaxLines: 2,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
 
                 TextFormField(
                   controller: _notesCtrl,
@@ -242,7 +271,7 @@ class _EditHoldingDialogState extends ConsumerState<EditHoldingDialog> {
                   ),
                   maxLines: 2,
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
 
                 SizedBox(
                   width: double.infinity,

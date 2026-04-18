@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/investment_holding_model.dart';
 import '../providers/finance_provider.dart';
@@ -76,18 +77,23 @@ class _UpdatePricesDialogState extends ConsumerState<UpdatePricesDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: MediaQuery.of(context).size.width * 0.025,
+        vertical: 24,
+      ),
       child: Container(
         constraints: const BoxConstraints(maxWidth: 480, maxHeight: 600),
-        padding: const EdgeInsets.all(24),
+        padding: kDialogPadding,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Update Prices',
-                    style: Theme.of(context).textTheme.headlineSmall),
+                Expanded(
+                  child: Text('Update Prices',
+                      style: Theme.of(context).textTheme.headlineSmall),
+                ),
                 IconButton(
                   icon: const Icon(Icons.close),
                   onPressed: () => Navigator.of(context).pop(),
@@ -104,7 +110,7 @@ class _UpdatePricesDialogState extends ConsumerState<UpdatePricesDialog> {
                         .withOpacity(0.6),
                   ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
             Flexible(
               child: ListView.separated(
                 shrinkWrap: true,

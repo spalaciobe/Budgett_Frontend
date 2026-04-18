@@ -115,47 +115,62 @@ class _MobileShell extends StatelessWidget {
     '/recurring',
     '/expense-groups',
     '/categories',
+    '/settings',
   };
 
   @override
   Widget build(BuildContext context) {
     final currentPath = GoRouterState.of(context).uri.path;
     final selectedIndex = _selectedIndex(currentPath);
+    final router = GoRouter.of(context);
 
-    return Scaffold(
-      body: child,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: selectedIndex,
-        onDestinationSelected: (i) => _onTap(context, i),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.pie_chart_outline),
-            selectedIcon: Icon(Icons.pie_chart),
-            label: 'Budget',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.more_horiz),
-            label: 'More',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: 'Settings',
-          ),
-        ],
+    return BackButtonListener(
+      onBackButtonPressed: () async {
+        if (currentPath == '/') return false;
+        if (router.canPop()) {
+          router.pop();
+        } else {
+          context.go('/');
+        }
+        return true;
+      },
+      child: Scaffold(
+        body: child,
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: selectedIndex,
+          onDestinationSelected: (i) => _onTap(context, i),
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.receipt_long_outlined),
+              selectedIcon: Icon(Icons.receipt_long),
+              label: 'Transactions',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.account_balance_wallet_outlined),
+              selectedIcon: Icon(Icons.account_balance_wallet),
+              label: 'Accounts',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.pie_chart_outline),
+              selectedIcon: Icon(Icons.pie_chart),
+              label: 'Budget',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.more_horiz),
+              label: 'More',
+            ),
+          ],
+        ),
       ),
     );
   }
 
   int _selectedIndex(String path) {
-    if (path == '/budget') return 1;
-    if (_advancedPaths.contains(path)) return 2;
-    if (path == '/settings') return 3;
+    if (path == '/accounts' ||
+        path.startsWith('/credit-card/') ||
+        path.startsWith('/investment/')) return 1;
+    if (path == '/budget') return 2;
+    if (_advancedPaths.contains(path)) return 3;
     return 0;
   }
 
@@ -164,11 +179,11 @@ class _MobileShell extends StatelessWidget {
       case 0:
         context.go('/');
       case 1:
-        context.go('/budget');
+        context.go('/accounts');
       case 2:
-        context.go('/more');
+        context.go('/budget');
       case 3:
-        context.go('/settings');
+        context.go('/more');
     }
   }
 }
@@ -219,13 +234,24 @@ class _Sidebar extends ConsumerWidget {
                     children: [
                       if (isExpanded)
                         Padding(
-                          padding: const EdgeInsets.only(left: 16),
-                          child: Text(
-                            'Budgett',
-                            style: theme.textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: theme.colorScheme.primary,
-                            ),
+                          padding: const EdgeInsets.only(left: 12),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Image.asset(
+                                'assets/app_icon.png',
+                                width: 32,
+                                height: 32,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Budgett',
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: theme.colorScheme.primary,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       IconButton(

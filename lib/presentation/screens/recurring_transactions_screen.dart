@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
@@ -44,8 +45,8 @@ class RecurringTransactionsScreen extends ConsumerWidget {
             return ListView.separated(
               physics: const AlwaysScrollableScrollPhysics(),
               itemCount: transactions.length,
-              padding: const EdgeInsets.all(16),
-              separatorBuilder: (context, index) => const SizedBox(height: 12),
+              padding: kScreenPadding,
+              separatorBuilder: (context, index) => kGapLg,
             itemBuilder: (context, index) {
               final item = transactions[index];
               return Card(

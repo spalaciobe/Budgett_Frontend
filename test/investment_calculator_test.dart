@@ -4,6 +4,7 @@ import 'package:budgett_frontend/data/models/account_model.dart';
 import 'package:budgett_frontend/data/models/investment_details_model.dart';
 import 'package:budgett_frontend/data/models/investment_holding_model.dart';
 import 'package:budgett_frontend/data/models/fx_rate_model.dart';
+import 'package:budgett_frontend/data/models/savings_interest_details_model.dart';
 
 // ── Test helpers ──────────────────────────────────────────────────────────────
 
@@ -289,53 +290,255 @@ void main() {
       expect(InvestmentCalculator.projectedAnnualIncome(1000000.0, 0.0), 0.0);
     });
 
-    test('highYieldDailyIncome uses E.A. compound daily rate', () {
+    test('savingsDailyIncome uses E.A. compound daily rate', () {
       // dailyRate = (1 + 0.0925)^(1/365) - 1 ≈ 0.000242...
       // dailyIncome = 1_000_000 × dailyRate ≈ 242.xx
       final income =
-          InvestmentCalculator.highYieldDailyIncome(1000000.0, 0.0925);
+          InvestmentCalculator.savingsDailyIncome(1000000.0, 0.0925);
       expect(income, closeTo(242.0, 2.0)); // within ±2 COP tolerance
     });
 
-    test('highYieldDailyIncome returns 0 for zero balance', () {
-      expect(InvestmentCalculator.highYieldDailyIncome(0.0, 0.0925), 0.0);
+    test('savingsDailyIncome returns 0 for zero balance', () {
+      expect(InvestmentCalculator.savingsDailyIncome(0.0, 0.0925), 0.0);
     });
 
-    test('highYieldDailyIncome returns 0 for zero APY', () {
-      expect(InvestmentCalculator.highYieldDailyIncome(1000000.0, 0.0), 0.0);
+    test('savingsDailyIncome returns 0 for zero APY', () {
+      expect(InvestmentCalculator.savingsDailyIncome(1000000.0, 0.0), 0.0);
     });
 
-    test('highYieldAccruedInterest for 30 days at 9.25% E.A.', () {
+    test('savingsAccruedInterest for 30 days at 9.25% E.A.', () {
       // interest = 1_000_000 × ((1.0925)^(30/365) - 1)
       // ≈ 1_000_000 × 0.007268 ≈ 7268
       final fromDate = DateTime.now().subtract(const Duration(days: 30));
-      final interest = InvestmentCalculator.highYieldAccruedInterest(
+      final interest = InvestmentCalculator.savingsAccruedInterest(
           1000000.0, 0.0925, fromDate);
       expect(interest, closeTo(7268.0, 50.0)); // ±50 COP tolerance
     });
 
-    test('highYieldAccruedInterest returns 0 when fromDate is today', () {
+    test('savingsAccruedInterest returns 0 when fromDate is today', () {
       final today = DateTime.now();
       final interest =
-          InvestmentCalculator.highYieldAccruedInterest(1000000.0, 0.0925, today);
+          InvestmentCalculator.savingsAccruedInterest(1000000.0, 0.0925, today);
       expect(interest, 0.0);
     });
 
-    test('highYieldAccruedInterest returns 0 for future fromDate', () {
+    test('savingsAccruedInterest returns 0 for future fromDate', () {
       final future = DateTime.now().add(const Duration(days: 5));
       final interest =
-          InvestmentCalculator.highYieldAccruedInterest(1000000.0, 0.0925, future);
+          InvestmentCalculator.savingsAccruedInterest(1000000.0, 0.0925, future);
       expect(interest, 0.0);
     });
 
-    test('highYieldAccruedInterest is greater for longer periods', () {
+    test('savingsAccruedInterest is greater for longer periods', () {
       final from30 = DateTime.now().subtract(const Duration(days: 30));
       final from60 = DateTime.now().subtract(const Duration(days: 60));
-      final interest30 = InvestmentCalculator.highYieldAccruedInterest(
+      final interest30 = InvestmentCalculator.savingsAccruedInterest(
           1000000.0, 0.0925, from30);
-      final interest60 = InvestmentCalculator.highYieldAccruedInterest(
+      final interest60 = InvestmentCalculator.savingsAccruedInterest(
           1000000.0, 0.0925, from60);
       expect(interest60, greaterThan(interest30));
+    });
+  });
+
+  // ── savingsAccruedInterestWithSegments ─────────────────────────────────────
+
+  group('InvestmentCalculator.savingsAccruedInterestWithSegments', () {
+    test('empty segments falls back to single-segment result', () {
+      final fromDate = DateTime.now().subtract(const Duration(days: 30));
+      final withSegments =
+          InvestmentCalculator.savingsAccruedInterestWithSegments(
+        segments: const [],
+        currentBalance: 1000000.0,
+        currentApyRate: 0.0925,
+        lastInterestDate: fromDate,
+      );
+      final legacy = InvestmentCalculator.savingsAccruedInterest(
+          1000000.0, 0.0925, fromDate);
+      expect(withSegments, closeTo(legacy, 0.001));
+    });
+
+    test('single segment with no balance change equals single-segment result', () {
+      // Segment covers 15 days at 1_000_000; open covers next 15 days at same balance.
+      final start = DateTime.now().subtract(const Duration(days: 30));
+      final midpoint = DateTime.now().subtract(const Duration(days: 15));
+
+      final segment = InterestPeriodSegment(
+        from: DateTime(start.year, start.month, start.day),
+        to: DateTime(midpoint.year, midpoint.month, midpoint.day),
+        balance: 1000000.0,
+        apyRate: 0.0925,
+      );
+
+      final withSegments =
+          InvestmentCalculator.savingsAccruedInterestWithSegments(
+        segments: [segment],
+        currentBalance: 1000000.0,
+        currentApyRate: 0.0925,
+        lastInterestDate: start,
+      );
+      final legacy = InvestmentCalculator.savingsAccruedInterest(
+          1000000.0, 0.0925, start);
+
+      // Results are close but not identical: compound interest splits across
+      // sub-periods rather than compounding the first period's earnings into the
+      // second. The difference is ≈13 COP on 1_000_000 over 30 days at 9.25%.
+      expect(withSegments, closeTo(legacy, 20.0)); // within 20 COP
+    });
+
+    test('deposit mid-period increases total interest vs no-deposit scenario', () {
+      // Account starts at 1_000_000, then receives 500_000 deposit after 15 days.
+      final start = DateTime.now().subtract(const Duration(days: 30));
+      final depositDay = DateTime.now().subtract(const Duration(days: 15));
+
+      final segment = InterestPeriodSegment(
+        from: DateTime(start.year, start.month, start.day),
+        to: DateTime(depositDay.year, depositDay.month, depositDay.day),
+        balance: 1000000.0,
+        apyRate: 0.0925,
+      );
+
+      // After deposit: balance = 1_500_000
+      final withDeposit =
+          InvestmentCalculator.savingsAccruedInterestWithSegments(
+        segments: [segment],
+        currentBalance: 1500000.0,
+        currentApyRate: 0.0925,
+        lastInterestDate: start,
+      );
+      final withoutDeposit =
+          InvestmentCalculator.savingsAccruedInterestWithSegments(
+        segments: const [],
+        currentBalance: 1000000.0,
+        currentApyRate: 0.0925,
+        lastInterestDate: start,
+      );
+
+      expect(withDeposit, greaterThan(withoutDeposit));
+    });
+
+    test('rate change mid-period: each segment uses its own rate', () {
+      // 15 days at 9.25%, then 15 days at 7.00% (rate cut).
+      final start = DateTime.now().subtract(const Duration(days: 30));
+      final rateChangeDay = DateTime.now().subtract(const Duration(days: 15));
+
+      final segment = InterestPeriodSegment(
+        from: DateTime(start.year, start.month, start.day),
+        to: DateTime(
+            rateChangeDay.year, rateChangeDay.month, rateChangeDay.day),
+        balance: 1000000.0,
+        apyRate: 0.0925,
+      );
+
+      final splitResult =
+          InvestmentCalculator.savingsAccruedInterestWithSegments(
+        segments: [segment],
+        currentBalance: 1000000.0,
+        currentApyRate: 0.0700,
+        lastInterestDate: start,
+      );
+
+      // Full 30 days at old rate would be higher (rate was cut).
+      final allAtOldRate = InvestmentCalculator.savingsAccruedInterest(
+          1000000.0, 0.0925, start);
+      // Full 30 days at new rate would be lower.
+      final allAtNewRate = InvestmentCalculator.savingsAccruedInterest(
+          1000000.0, 0.0700, start);
+
+      expect(splitResult, lessThan(allAtOldRate));
+      expect(splitResult, greaterThan(allAtNewRate));
+    });
+
+    test('withdrawal mid-period reduces total interest vs no-withdrawal', () {
+      final start = DateTime.now().subtract(const Duration(days: 30));
+      final withdrawalDay = DateTime.now().subtract(const Duration(days: 15));
+
+      final segment = InterestPeriodSegment(
+        from: DateTime(start.year, start.month, start.day),
+        to: DateTime(
+            withdrawalDay.year, withdrawalDay.month, withdrawalDay.day),
+        balance: 1000000.0,
+        apyRate: 0.0925,
+      );
+
+      // After withdrawal: balance = 500_000
+      final withWithdrawal =
+          InvestmentCalculator.savingsAccruedInterestWithSegments(
+        segments: [segment],
+        currentBalance: 500000.0,
+        currentApyRate: 0.0925,
+        lastInterestDate: start,
+      );
+      final noChange =
+          InvestmentCalculator.savingsAccruedInterestWithSegments(
+        segments: const [],
+        currentBalance: 1000000.0,
+        currentApyRate: 0.0925,
+        lastInterestDate: start,
+      );
+
+      expect(withWithdrawal, lessThan(noChange));
+    });
+
+    test('zero-duration segment is ignored', () {
+      final start = DateTime.now().subtract(const Duration(days: 10));
+      final sameDay = DateTime(start.year, start.month, start.day);
+
+      final zeroDurationSegment = InterestPeriodSegment(
+        from: sameDay,
+        to: sameDay, // same day → 0 days
+        balance: 1000000.0,
+        apyRate: 0.0925,
+      );
+
+      final result =
+          InvestmentCalculator.savingsAccruedInterestWithSegments(
+        segments: [zeroDurationSegment],
+        currentBalance: 1000000.0,
+        currentApyRate: 0.0925,
+        lastInterestDate: start,
+      );
+      final noSegments =
+          InvestmentCalculator.savingsAccruedInterestWithSegments(
+        segments: const [],
+        currentBalance: 1000000.0,
+        currentApyRate: 0.0925,
+        lastInterestDate: start,
+      );
+
+      expect(result, closeTo(noSegments, 0.001));
+    });
+
+    test('multiple segments sum correctly', () {
+      final d0 = DateTime.now().subtract(const Duration(days: 40));
+      final d1 = DateTime.now().subtract(const Duration(days: 25));
+      final d2 = DateTime.now().subtract(const Duration(days: 10));
+
+      final seg1 = InterestPeriodSegment(
+        from: DateTime(d0.year, d0.month, d0.day),
+        to: DateTime(d1.year, d1.month, d1.day),
+        balance: 1000000.0,
+        apyRate: 0.0925,
+      );
+      final seg2 = InterestPeriodSegment(
+        from: DateTime(d1.year, d1.month, d1.day),
+        to: DateTime(d2.year, d2.month, d2.day),
+        balance: 1500000.0, // deposit at d1
+        apyRate: 0.0925,
+      );
+
+      final result =
+          InvestmentCalculator.savingsAccruedInterestWithSegments(
+        segments: [seg1, seg2],
+        currentBalance: 1500000.0,
+        currentApyRate: 0.0925,
+        lastInterestDate: d0,
+      );
+
+      expect(result, greaterThan(0));
+      // Manually verify: result > interest on 1_000_000 for 40 days
+      final baseLine = InvestmentCalculator.savingsAccruedInterest(
+          1000000.0, 0.0925, d0);
+      expect(result, greaterThan(baseLine));
     });
   });
 

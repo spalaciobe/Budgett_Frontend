@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/app_spacing.dart';
 import '../../data/models/category_model.dart';
 import '../providers/finance_provider.dart';
 import '../utils/icon_helper.dart';
@@ -44,7 +45,7 @@ class CategoriesScreen extends ConsumerWidget {
 
           return ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(16),
+            padding: kScreenPadding,
             children: [
               _SectionHeader(
                 label: 'Income',
@@ -55,7 +56,7 @@ class CategoriesScreen extends ConsumerWidget {
               const SizedBox(height: 8),
               ...income.map((c) => _CategoryTile(category: c, ref: ref)),
 
-              const SizedBox(height: 24),
+              kGapXl,
               _SectionHeader(
                 label: 'Expenses',
                 icon: Icons.arrow_upward,
@@ -65,7 +66,7 @@ class CategoriesScreen extends ConsumerWidget {
               const SizedBox(height: 8),
               ...expense.map((c) => _CategoryTile(category: c, ref: ref)),
 
-              const SizedBox(height: 80),
+              const SizedBox(height: 64),
             ],
           );
         },

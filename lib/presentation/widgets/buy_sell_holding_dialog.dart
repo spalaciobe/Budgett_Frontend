@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/investment_holding_model.dart';
 import '../../data/repositories/finance_repository.dart';
@@ -118,9 +119,13 @@ class _BuySellHoldingDialogState extends ConsumerState<BuySellHoldingDialog> {
     final currency = h.currency;
 
     return Dialog(
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: MediaQuery.of(context).size.width * 0.025,
+        vertical: 24,
+      ),
       child: Container(
         constraints: const BoxConstraints(maxWidth: 420, maxHeight: 580),
-        padding: const EdgeInsets.all(24),
+        padding: kDialogPadding,
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
@@ -174,7 +179,7 @@ class _BuySellHoldingDialogState extends ConsumerState<BuySellHoldingDialog> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
 
                 // Price
                 TextFormField(
@@ -190,7 +195,7 @@ class _BuySellHoldingDialogState extends ConsumerState<BuySellHoldingDialog> {
                   validator: (v) =>
                       v == null || v.isEmpty ? 'Required' : null,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
 
                 // Fee (optional)
                 TextFormField(
@@ -204,7 +209,7 @@ class _BuySellHoldingDialogState extends ConsumerState<BuySellHoldingDialog> {
                       const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: [CurrencyInputFormatter(currency: currency)],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
 
                 // Date
                 InkWell(
@@ -228,7 +233,7 @@ class _BuySellHoldingDialogState extends ConsumerState<BuySellHoldingDialog> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
 
                 TextFormField(
                   controller: _descCtrl,
@@ -239,7 +244,7 @@ class _BuySellHoldingDialogState extends ConsumerState<BuySellHoldingDialog> {
                   validator: (v) =>
                       v == null || v.trim().isEmpty ? 'Required' : null,
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
 
                 SizedBox(
                   width: double.infinity,

@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/data/models/recurring_transaction_model.dart';
 import 'package:budgett_frontend/data/models/expense_group_model.dart';
 import '../../core/utils/credit_card_calculator.dart';
+import '../../core/utils/installment_calculator.dart';
 import '../../data/models/account_model.dart';
+import '../../data/repositories/finance_repository.dart';
 import '../../data/models/bank_model.dart';
 import '../../data/repositories/bank_repository.dart';
 import 'package:budgett_frontend/presentation/widgets/credit_card_billing_simulator.dart';
@@ -31,7 +34,6 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
   String? _selectedTargetAccountId;
   String? _selectedCategoryId;
   String? _selectedExpenseGroupId;
-  String? _selectedMovementType;
 
   String _status = 'paid';
   bool _isRecurring = false;
@@ -41,8 +43,60 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
   String _currency = 'COP';
   bool _isUsdPayment = false; // cross-currency CC payment
 
+  // Installment fields
+  bool _payInInstallments = false;
+  int _numCuotas = 12;
+  bool _interestFree = true;
+  final _interestRateController = TextEditingController();
+  static const _cuotasOptions = [2, 3, 6, 9, 12, 18, 24, 36, 48];
+
+  /// Flattens the parent/pocket tree so pockets are selectable alongside
+  /// top-level accounts.
+  List<Account> _flattenAccounts(List<Account> accounts) {
+    final out = <Account>[];
+    for (final a in accounts) {
+      out.add(a);
+      out.addAll(a.pockets);
+    }
+    return out;
+  }
+
+  /// Builds dropdown items with pockets indented under their parent.
+  List<DropdownMenuItem<String>> _buildAccountItems(
+    List<Account> accounts, {
+    String? excludeId,
+  }) {
+    final items = <DropdownMenuItem<String>>[];
+    for (final a in accounts) {
+      if (a.id != excludeId) {
+        items.add(DropdownMenuItem(
+          value: a.id,
+          child: Text(a.name, style: const TextStyle(fontSize: 13)),
+        ));
+      }
+      for (final p in a.pockets) {
+        if (p.id == excludeId) continue;
+        items.add(DropdownMenuItem(
+          value: p.id,
+          child: Row(
+            children: [
+              const SizedBox(width: 16),
+              Icon(Icons.subdirectory_arrow_right,
+                  size: 12,
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+              const SizedBox(width: 4),
+              Text(p.name, style: const TextStyle(fontSize: 13)),
+            ],
+          ),
+        ));
+      }
+    }
+    return items;
+  }
+
   Account? get _selectedAccount {
-    final accounts = ref.read(accountsProvider).valueOrNull ?? [];
+    final accounts = _flattenAccounts(
+        ref.read(accountsProvider).valueOrNull ?? const []);
     if (_selectedAccountId == null) return null;
     try {
       return accounts.firstWhere((a) => a.id == _selectedAccountId);
@@ -52,7 +106,8 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
   }
 
   Account? get _selectedTargetAccount {
-    final accounts = ref.read(accountsProvider).valueOrNull ?? [];
+    final accounts = _flattenAccounts(
+        ref.read(accountsProvider).valueOrNull ?? const []);
     if (_selectedTargetAccountId == null) return null;
     try {
       return accounts.firstWhere((a) => a.id == _selectedTargetAccountId);
@@ -77,6 +132,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
     _descriptionController.dispose();
     _notesController.dispose();
     _fxRateController.dispose();
+    _interestRateController.dispose();
     super.dispose();
   }
 
@@ -92,6 +148,34 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
     final rate = double.tryParse(_fxRateController.text.replaceAll(',', ''));
     if (amount > 0 && rate != null && rate > 0) return amount / rate;
     return null;
+  }
+
+  /// Closes the open interest sub-period for the source and/or target savings
+  /// account (parent or pocket) so that accrued-interest calculations split
+  /// correctly at the transaction date. Runs silently — errors are swallowed
+  /// so they never block the actual transaction save.
+  Future<void> _closeSavingsInterestSegmentsIfNeeded(
+      FinanceRepository repo) async {
+    Future<void> maybeClose(Account? account) async {
+      final sid = account?.interestDetails;
+      if (sid == null) return;
+      if (sid.lastInterestDate == null) return;
+      if (sid.apyRate == null || sid.apyRate! <= 0) return;
+      try {
+        await repo.appendSavingsInterestSegment(
+          detailsId: sid.id,
+          segmentEnd: _selectedDate,
+          balance: account!.balance,
+          apyRate: sid.apyRate!,
+          lastInterestDate: sid.lastInterestDate!,
+        );
+      } catch (_) {}
+    }
+
+    await maybeClose(_selectedAccount);
+    if (_selectedType == 'transfer') {
+      await maybeClose(_selectedTargetAccount);
+    }
   }
 
   Future<void> _saveTransaction() async {
@@ -172,9 +256,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
     if (_selectedTargetAccountId != null) {
       transactionData['target_account_id'] = _selectedTargetAccountId;
     }
-    if (_selectedMovementType != null) {
-      transactionData['movement_type'] = _selectedMovementType;
-    }
+
     if (_notesController.text.isNotEmpty) {
       transactionData['notes'] = _notesController.text;
     }
@@ -216,7 +298,54 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
     try {
       final repo = ref.read(financeRepositoryProvider);
 
-      await repo.addTransaction(transactionData);
+      // Installment purchase path (CC expense only).
+      if (_payInInstallments && _isCreditCardExpense) {
+        final account = _selectedAccount;
+        if (account?.creditCardRules == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text(
+                    'This card has no billing rules configured.')),
+          );
+          return;
+        }
+        final rate = _interestFree
+            ? 0.0
+            : (double.tryParse(
+                        _interestRateController.text.replaceAll(',', '')) ??
+                    0.0) /
+                100.0;
+        final bank = await ref.read(bankRepositoryProvider).getBanks().then(
+              (banks) => banks.firstWhere(
+                (b) => b.id == account!.creditCardRules!.bankId,
+                orElse: () => Bank(id: '0', name: 'Unknown', code: 'UNK'),
+              ),
+            );
+        await repo.createInstallmentPurchase(
+          accountId: _selectedAccountId!,
+          amount: CurrencyFormatter.parse(_amountController.text,
+              currency: _currency),
+          numCuotas: _numCuotas,
+          hasInterest: !_interestFree,
+          interestRate: rate,
+          purchaseDate: _selectedDate,
+          currency: _currency,
+          description: _descriptionController.text,
+          rules: account!.creditCardRules!,
+          bank: bank,
+          categoryId: transactionData['category_id'] as String?,
+          subCategoryId: transactionData['sub_category_id'] as String?,
+          expenseGroupId: transactionData['expense_group_id'] as String?,
+          notes: transactionData['notes'] as String?,
+          movementType: transactionData['movement_type'] as String?,
+          status: _status,
+        );
+      } else {
+        // Before the DB trigger fires and changes the balance, close any open
+        // high-yield sub-period so the accrued-interest estimate stays correct.
+        await _closeSavingsInterestSegmentsIfNeeded(repo);
+        await repo.addTransaction(transactionData);
+      }
 
       if (_isRecurring) {
         DateTime nextDate = _selectedDate;
@@ -275,6 +404,208 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
     }
   }
 
+  Widget _buildInstallmentsSection() {
+    final account = _selectedAccount;
+    final defaultRate =
+        (account?.creditCardRules?.defaultInstallmentRate ?? 0.0) * 100;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Divider(),
+        CheckboxListTile(
+          title: const Text('Pay in installments'),
+          value: _payInInstallments,
+          onChanged: (v) {
+            setState(() {
+              _payInInstallments = v ?? false;
+              if (_payInInstallments &&
+                  _interestRateController.text.isEmpty &&
+                  defaultRate > 0) {
+                _interestRateController.text =
+                    defaultRate.toStringAsFixed(3);
+              }
+            });
+          },
+          contentPadding: EdgeInsets.zero,
+        ),
+        if (_payInInstallments) ...[
+          const SizedBox(height: 8),
+          DropdownButtonFormField<int>(
+            value: _cuotasOptions.contains(_numCuotas) ? _numCuotas : 12,
+            decoration: const InputDecoration(
+              labelText: 'Number of installments',
+              border: OutlineInputBorder(),
+            ),
+            items: _cuotasOptions
+                .map((n) => DropdownMenuItem(value: n, child: Text('$n')))
+                .toList(),
+            onChanged: (v) => setState(() => _numCuotas = v!),
+          ),
+          const SizedBox(height: 12),
+          CheckboxListTile(
+            title: const Text('Interest-free'),
+            value: _interestFree,
+            onChanged: (v) {
+              setState(() {
+                _interestFree = v ?? true;
+                if (!_interestFree &&
+                    _interestRateController.text.isEmpty &&
+                    defaultRate > 0) {
+                  _interestRateController.text =
+                      defaultRate.toStringAsFixed(3);
+                }
+              });
+            },
+            contentPadding: EdgeInsets.zero,
+          ),
+          if (!_interestFree) ...[
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _interestRateController,
+              decoration: const InputDecoration(
+                labelText: 'Monthly interest rate (%)',
+                suffixText: '%',
+                border: OutlineInputBorder(),
+                hintText: 'e.g. 2.500',
+              ),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              onChanged: (_) => setState(() {}),
+              validator: (v) {
+                if (!_payInInstallments || _interestFree) return null;
+                final parsed = double.tryParse(v?.replaceAll(',', '') ?? '');
+                if (parsed == null || parsed < 0) {
+                  return 'Enter a valid rate (0 or greater)';
+                }
+                return null;
+              },
+            ),
+          ],
+          const SizedBox(height: 12),
+          _buildInstallmentSchedulePreview(),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildInstallmentSchedulePreview() {
+    final account = _selectedAccount;
+    if (account?.creditCardRules == null) return const SizedBox();
+
+    final principal =
+        CurrencyFormatter.parse(_amountController.text, currency: _currency);
+    if (principal <= 0) {
+      return const Text(
+        'Enter an amount to see the installment preview.',
+        style: TextStyle(fontSize: 12),
+      );
+    }
+
+    final rate = _interestFree
+        ? 0.0
+        : (double.tryParse(
+                    _interestRateController.text.replaceAll(',', '')) ??
+                0.0) /
+            100.0;
+
+    // Build a simple synchronous preview using available rules (bank is unknown
+    // here, so we use a dummy Bank with no holiday adjustments for the preview).
+    final rules = account!.creditCardRules!;
+    final dummyBank = Bank(id: '0', name: '', code: '');
+    List<InstallmentScheduleEntry> entries;
+    try {
+      entries = InstallmentCalculator.generateSchedule(
+        purchaseDate: _selectedDate,
+        rules: rules,
+        bank: dummyBank,
+        numCuotas: _numCuotas,
+        hasInterest: !_interestFree,
+        monthlyRate: rate,
+        principal: principal,
+      );
+    } catch (_) {
+      return const SizedBox();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Installment schedule preview',
+            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+        const SizedBox(height: 6),
+        Table(
+          columnWidths: const {
+            0: FixedColumnWidth(32),
+            1: FlexColumnWidth(),
+            2: FlexColumnWidth(),
+            3: FlexColumnWidth(),
+          },
+          children: [
+            TableRow(
+              decoration: BoxDecoration(
+                  color: Colors.grey.withOpacity(0.12)),
+              children: const [
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+                  child: Text('#',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 11)),
+                ),
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: 4),
+                  child: Text('Amount',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 11)),
+                ),
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: 4),
+                  child: Text('Period',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 11)),
+                ),
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: 4),
+                  child: Text('Payment date',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 11)),
+                ),
+              ],
+            ),
+            ...entries.map((e) => TableRow(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 3, horizontal: 4),
+                      child: Text('${e.number}',
+                          style: const TextStyle(fontSize: 11)),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 3),
+                      child: Text(
+                          CurrencyFormatter.format(e.amount,
+                              currency: _currency),
+                          style: const TextStyle(fontSize: 11)),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 3),
+                      child: Text(e.billingPeriod,
+                          style: const TextStyle(fontSize: 11)),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 3),
+                      child: Text(
+                          '${e.paymentDate.day}/${e.paymentDate.month}/${e.paymentDate.year}',
+                          style: const TextStyle(fontSize: 11)),
+                    ),
+                  ],
+                )),
+          ],
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final accountsAsync = ref.watch(accountsProvider);
@@ -282,9 +613,13 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
     final expenseGroupsAsync = ref.watch(expenseGroupsProvider);
 
     return Dialog(
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: MediaQuery.of(context).size.width * 0.025,
+        vertical: 24,
+      ),
       child: Container(
         constraints: const BoxConstraints(maxWidth: 500, maxHeight: 700),
-        padding: const EdgeInsets.all(24),
+        padding: kDialogPadding,
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
@@ -304,7 +639,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
 
                 // Currency toggle (only for CC expense/income)
                 if (_isCreditCardExpense) ...[
@@ -343,7 +678,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
 
                 // Description
                 TextFormField(
@@ -354,7 +689,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                   ),
                   validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
 
                 // Date
                 Row(
@@ -381,31 +716,13 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
 
-                // Billing simulator (CC only)
-                if (_selectedAccountId != null && _amountController.text.isNotEmpty)
-                  Consumer(
-                    builder: (context, ref, _) {
-                      final accounts = ref.watch(accountsProvider).valueOrNull ?? [];
-                      if (_selectedAccountId == null) return const SizedBox();
-                      final account = accounts.firstWhereOrNull(
-                          (a) => a.id == _selectedAccountId);
-                      if (account == null) return const SizedBox();
-                      if (account.type == 'credit_card' &&
-                          account.creditCardRules != null) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 16.0),
-                          child: CreditCardBillingSimulator(
-                            account: account,
-                            transactionDate: _selectedDate,
-                            amount: double.tryParse(_amountController.text),
-                          ),
-                        );
-                      }
-                      return const SizedBox();
-                    },
-                  ),
+                // Installments section (CC expense only)
+                if (_isCreditCardExpense && _selectedType == 'expense') ...[
+                  _buildInstallmentsSection(),
+                  const SizedBox(height: 10),
+                ],
 
                 // Type
                 DropdownButtonFormField<String>(
@@ -421,12 +738,13 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                   ],
                   onChanged: (value) => setState(() {
                     _selectedType = value!;
-                    // Reset currency to COP when not a CC expense
+                    // Reset currency and installments when changing type
                     if (!_isCreditCardExpense) _currency = 'COP';
                     _isUsdPayment = false;
+                    _payInInstallments = false;
                   }),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
 
                 // Status Toggle
                 SegmentedButton<String>(
@@ -443,7 +761,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                   selected: {_status},
                   onSelectionChanged: (s) => setState(() => _status = s.first),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
 
                 // Recurrence Switch
                 SwitchListTile(
@@ -471,34 +789,43 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                     ],
                     onChanged: (v) => setState(() => _frequency = v!),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 10),
                 ],
 
                 // Account
                 accountsAsync.when(
-                  data: (accounts) => DropdownButtonFormField<String>(
-                    value: _selectedAccountId,
-                    decoration: const InputDecoration(
-                      labelText: 'Account',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: accounts
-                        .map((acc) => DropdownMenuItem(
-                              value: acc.id,
-                              child: Text(acc.name),
-                            ))
-                        .toList(),
-                    onChanged: (value) => setState(() {
-                      _selectedAccountId = value;
-                      // Reset currency when switching accounts
-                      _currency = 'COP';
-                      _isUsdPayment = false;
-                    }),
+                  data: (accounts) => Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      DropdownButtonFormField<String>(
+                        value: _selectedAccountId,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Account',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: _buildAccountItems(accounts),
+                        onChanged: (value) => setState(() {
+                          _selectedAccountId = value;
+                          // Reset currency and installments when switching accounts
+                          _currency = 'COP';
+                          _isUsdPayment = false;
+                          _payInInstallments = false;
+                        }),
+                      ),
+                      if (_selectedAccount != null &&
+                          _selectedAccount!.type == 'credit_card' &&
+                          _selectedAccount!.creditCardRules != null)
+                        CreditCardBillingSubtitle(
+                          account: _selectedAccount!,
+                          transactionDate: _selectedDate,
+                        ),
+                    ],
                   ),
                   loading: () => const CircularProgressIndicator(),
                   error: (e, s) => Text('Error: $e'),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
 
                 // Category (only for income/expense)
                 if (_selectedType != 'transfer')
@@ -515,19 +842,20 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                           for (final sub in cat.subCategories!) {
                             dropdownItems.add(DropdownMenuItem(
                               value: sub.id,
-                              child: Text('${cat.name} > ${sub.name}'),
+                              child: Text('${cat.name} > ${sub.name}', style: const TextStyle(fontSize: 13)),
                             ));
                           }
                         } else {
                           dropdownItems.add(DropdownMenuItem(
                             value: cat.id,
-                            child: Text(cat.name),
+                            child: Text(cat.name, style: const TextStyle(fontSize: 13)),
                           ));
                         }
                       }
 
                       return DropdownButtonFormField<String>(
                         value: _selectedCategoryId,
+                        isExpanded: true,
                         decoration: const InputDecoration(
                           labelText: 'Category',
                           border: OutlineInputBorder(),
@@ -539,24 +867,20 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                     loading: () => const CircularProgressIndicator(),
                     error: (e, s) => Text('Error: $e'),
                   ),
-                if (_selectedType != 'transfer') const SizedBox(height: 16),
+                if (_selectedType != 'transfer') const SizedBox(height: 10),
 
                 // Target Account (for transfers)
                 if (_selectedType == 'transfer') ...[
                   accountsAsync.when(
                     data: (accounts) => DropdownButtonFormField<String>(
                       value: _selectedTargetAccountId,
+                      isExpanded: true,
                       decoration: const InputDecoration(
                         labelText: 'Destination Account',
                         border: OutlineInputBorder(),
                       ),
-                      items: accounts
-                          .where((acc) => acc.id != _selectedAccountId)
-                          .map((acc) => DropdownMenuItem(
-                                value: acc.id,
-                                child: Text(acc.name),
-                              ))
-                          .toList(),
+                      items: _buildAccountItems(accounts,
+                          excludeId: _selectedAccountId),
                       onChanged: (value) => setState(() {
                         _selectedTargetAccountId = value;
                         _isUsdPayment = false;
@@ -565,7 +889,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                     loading: () => const CircularProgressIndicator(),
                     error: (e, s) => Text('Error: $e'),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 10),
 
                   // USD payment section (transfer to CC with USD balance)
                   if (_showUsdPaymentSection) ...[
@@ -610,27 +934,9 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                           ),
                         ),
                       ],
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 10),
                     ],
                   ],
-                ],
-
-                // Movement Type (for expenses)
-                if (_selectedType == 'expense') ...[
-                  DropdownButtonFormField<String>(
-                    value: _selectedMovementType,
-                    decoration: const InputDecoration(
-                      labelText: 'Movement Type',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: const [
-                      DropdownMenuItem(value: 'fixed', child: Text('Fixed Expense')),
-                      DropdownMenuItem(
-                          value: 'variable', child: Text('Variable Expense')),
-                    ],
-                    onChanged: (v) => setState(() => _selectedMovementType = v),
-                  ),
-                  const SizedBox(height: 16),
                 ],
 
                 // Expense Group (Optional, only for expenses)
@@ -655,7 +961,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                     loading: () => const LinearProgressIndicator(),
                     error: (_, __) => const SizedBox(),
                   ),
-                if (_selectedType == 'expense') const SizedBox(height: 16),
+                if (_selectedType == 'expense') const SizedBox(height: 10),
 
                 // Notes
                 TextFormField(
@@ -666,7 +972,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                   ),
                   maxLines: 2,
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
 
                 // Save Button
                 SizedBox(
@@ -688,11 +994,3 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
   }
 }
 
-extension _ListExt<T> on List<T> {
-  T? firstWhereOrNull(bool Function(T) test) {
-    for (final e in this) {
-      if (test(e)) return e;
-    }
-    return null;
-  }
-}

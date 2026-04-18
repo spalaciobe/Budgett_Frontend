@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/utils/investment_calculator.dart';
 import '../../data/models/account_model.dart';
@@ -74,18 +75,23 @@ class _CdtCollectDialogState extends ConsumerState<CdtCollectDialog> {
   Widget build(BuildContext context) {
     final details = widget.account.investmentDetails;
     return Dialog(
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: MediaQuery.of(context).size.width * 0.025,
+        vertical: 24,
+      ),
       child: Container(
         constraints: const BoxConstraints(maxWidth: 400),
-        padding: const EdgeInsets.all(24),
+        padding: kDialogPadding,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Collect CDT',
-                    style: Theme.of(context).textTheme.headlineSmall),
+                Expanded(
+                  child: Text('Collect CDT',
+                      style: Theme.of(context).textTheme.headlineSmall),
+                ),
                 IconButton(
                   icon: const Icon(Icons.close),
                   onPressed: () => Navigator.of(context).pop(),
@@ -105,7 +111,7 @@ class _CdtCollectDialogState extends ConsumerState<CdtCollectDialog> {
                           .withOpacity(0.65),
                     ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
             ],
             TextFormField(
               controller: _amountCtrl,

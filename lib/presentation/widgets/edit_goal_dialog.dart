@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
@@ -174,9 +175,13 @@ class _EditGoalDialogState extends ConsumerState<EditGoalDialog> {
         : 0.0;
 
     return Dialog(
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: MediaQuery.of(context).size.width * 0.025,
+        vertical: 24,
+      ),
       child: Container(
         constraints: const BoxConstraints(maxWidth: 500, maxHeight: 700),
-        padding: const EdgeInsets.all(24),
+        padding: kDialogPadding,
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
@@ -185,16 +190,17 @@ class _EditGoalDialogState extends ConsumerState<EditGoalDialog> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Edit Goal', style: Theme.of(context).textTheme.headlineSmall),
+                    Expanded(
+                      child: Text('Edit Goal', style: Theme.of(context).textTheme.headlineSmall),
+                    ),
                     IconButton(
                       icon: const Icon(Icons.close),
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
 
                 // Icon Selector
                 Text('Icon', style: Theme.of(context).textTheme.titleSmall),
@@ -229,7 +235,7 @@ class _EditGoalDialogState extends ConsumerState<EditGoalDialog> {
                     );
                   }).toList(),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
 
                 // Name
                 TextFormField(
@@ -240,7 +246,7 @@ class _EditGoalDialogState extends ConsumerState<EditGoalDialog> {
                   ),
                   validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
 
                 // Target Amount
                 TextFormField(
@@ -259,7 +265,7 @@ class _EditGoalDialogState extends ConsumerState<EditGoalDialog> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
 
                 // Current Amount
                 TextFormField(
@@ -275,7 +281,7 @@ class _EditGoalDialogState extends ConsumerState<EditGoalDialog> {
                   inputFormatters: [CurrencyInputFormatter()],
                   onChanged: (_) => setState(() {}), // Recalculate
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
 
                 // Deadline
                 InkWell(
@@ -312,7 +318,7 @@ class _EditGoalDialogState extends ConsumerState<EditGoalDialog> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
 
                 // Monthly Savings Calculator
                 if (_selectedDeadline != null && targetAmount > 0 && remainingAmount > 0)
@@ -346,11 +352,11 @@ class _EditGoalDialogState extends ConsumerState<EditGoalDialog> {
                       ),
                     ),
                   ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
 
                 // Actions
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                OverflowBar(
+                  alignment: MainAxisAlignment.spaceBetween,
                   children: [
                     TextButton.icon(
                       onPressed: _isLoading ? null : _deleteGoal,
@@ -358,6 +364,7 @@ class _EditGoalDialogState extends ConsumerState<EditGoalDialog> {
                       label: const Text('Delete', style: TextStyle(color: Colors.red)),
                     ),
                     Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         TextButton(
                           onPressed: () => Navigator.of(context).pop(),
@@ -366,7 +373,7 @@ class _EditGoalDialogState extends ConsumerState<EditGoalDialog> {
                         const SizedBox(width: 8),
                         FilledButton(
                           onPressed: _isLoading ? null : _updateGoal,
-                          child: _isLoading 
+                          child: _isLoading
                             ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                             : const Text('Save Changes'),
                         ),

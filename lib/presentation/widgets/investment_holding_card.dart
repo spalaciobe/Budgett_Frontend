@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/app_spacing.dart';
 import '../../data/models/investment_holding_model.dart';
 import '../utils/currency_formatter.dart';
 
@@ -33,7 +34,7 @@ class InvestmentHoldingCard extends StatelessWidget {
       elevation: 1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: kSpaceLg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -99,7 +100,7 @@ class InvestmentHoldingCard extends StatelessWidget {
               ),
             ],
 
-            const SizedBox(height: 10),
+            kGapLg,
 
             // Quantity row
             Row(
@@ -129,9 +130,10 @@ class InvestmentHoldingCard extends StatelessWidget {
               ],
             ),
 
-            const SizedBox(height: 8),
-            const Divider(height: 1),
-            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: kSpaceMd),
+              child: const Divider(height: 1),
+            ),
 
             // Value + P&L row
             Row(

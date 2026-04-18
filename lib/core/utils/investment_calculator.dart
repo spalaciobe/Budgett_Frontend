@@ -3,6 +3,7 @@ import '../../data/models/account_model.dart';
 import '../../data/models/investment_details_model.dart';
 import '../../data/models/investment_holding_model.dart';
 import '../../data/models/fx_rate_model.dart';
+import '../../data/models/savings_interest_details_model.dart';
 
 /// Result of a total-value computation for an investment account.
 class InvestmentTotalValue {
@@ -201,11 +202,9 @@ class InvestmentCalculator {
     return DateTime.now().isAfter(maturity);
   }
 
-  // ── High-yield helpers ───────────────────────────────────────────────────
+  // ── Savings-interest helpers (per-pocket or per-parent) ──────────────────
 
-  /// Projected annual income from a high-yield account balance.
-  ///
-  ///   income = balance × apyRate
+  /// Projected annual income: balance × apyRate.
   static double projectedAnnualIncome(double balance, double apyRate) {
     return balance * apyRate;
   }
@@ -219,7 +218,7 @@ class InvestmentCalculator {
   ///
   ///   dailyRate = (1 + apyRate)^(1/365) - 1
   ///   dailyIncome = balance × dailyRate
-  static double highYieldDailyIncome(double balance, double apyRate) {
+  static double savingsDailyIncome(double balance, double apyRate) {
     if (apyRate <= 0 || balance <= 0) return 0;
     final dailyRate = math.pow(1 + apyRate, 1 / 365).toDouble() - 1;
     return balance * dailyRate;
@@ -232,19 +231,58 @@ class InvestmentCalculator {
   /// Uses current [balance] as the base (approximation; does not account for
   /// intra-period deposits or withdrawals). Returns 0 when [fromDate] is today
   /// or in the future.
-  static double highYieldAccruedInterest(
+  static double savingsAccruedInterest(
     double balance,
     double apyRate,
-    DateTime fromDate,
-  ) {
+    DateTime fromDate, {
+    DateTime? toDate,
+  }) {
     if (apyRate <= 0 || balance <= 0) return 0;
-    final days = DateTime.now()
+    final end = toDate ?? DateTime.now();
+    final days = DateTime(end.year, end.month, end.day)
         .difference(DateTime(fromDate.year, fromDate.month, fromDate.day))
         .inDays;
     if (days <= 0) return 0;
     return balance * (math.pow(1 + apyRate, days / 365).toDouble() - 1);
   }
 
+  /// Accrued interest that correctly accounts for intra-period balance and
+  /// rate changes using a list of closed [InterestPeriodSegment]s plus an open
+  /// segment from the last known point to today.
+  static double savingsAccruedInterestWithSegments({
+    required List<InterestPeriodSegment> segments,
+    required double currentBalance,
+    required double currentApyRate,
+    required DateTime lastInterestDate,
+  }) {
+    double total = 0.0;
+
+    for (final seg in segments) {
+      if (seg.balance <= 0 || seg.apyRate <= 0) continue;
+      final from = DateTime(seg.from.year, seg.from.month, seg.from.day);
+      final to = DateTime(seg.to.year, seg.to.month, seg.to.day);
+      final days = to.difference(from).inDays;
+      if (days <= 0) continue;
+      total +=
+          seg.balance * (math.pow(1 + seg.apyRate, days / 365).toDouble() - 1);
+    }
+
+    if (currentBalance <= 0 || currentApyRate <= 0) return total;
+
+    final openFrom =
+        segments.isNotEmpty ? segments.last.to : lastInterestDate;
+    final openFromNorm =
+        DateTime(openFrom.year, openFrom.month, openFrom.day);
+    final today = DateTime.now();
+    final todayNorm = DateTime(today.year, today.month, today.day);
+    final openDays = todayNorm.difference(openFromNorm).inDays;
+    if (openDays <= 0) return total;
+
+    total += currentBalance *
+        (math.pow(1 + currentApyRate, openDays / 365).toDouble() - 1);
+
+    return total;
+  }
 
   // ── avg_cost recalculation on buy ────────────────────────────────────────
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
@@ -99,9 +100,13 @@ class _AddGoalDialogState extends ConsumerState<AddGoalDialog> {
     final monthlySavings = targetAmount / effectiveMonths;
 
     return Dialog(
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: MediaQuery.of(context).size.width * 0.025,
+        vertical: 24,
+      ),
       child: Container(
         constraints: const BoxConstraints(maxWidth: 500, maxHeight: 700),
-        padding: const EdgeInsets.all(24),
+        padding: kDialogPadding,
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
@@ -121,7 +126,7 @@ class _AddGoalDialogState extends ConsumerState<AddGoalDialog> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
 
                 // Icon Selector
                 Text('Icon', style: Theme.of(context).textTheme.titleSmall),
@@ -154,7 +159,7 @@ class _AddGoalDialogState extends ConsumerState<AddGoalDialog> {
                     );
                   }).toList(),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
 
                 // Name
                 TextFormField(
@@ -166,7 +171,7 @@ class _AddGoalDialogState extends ConsumerState<AddGoalDialog> {
                   ),
                   validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
 
                 // Target Amount
                 TextFormField(
@@ -185,7 +190,7 @@ class _AddGoalDialogState extends ConsumerState<AddGoalDialog> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
 
                 // Current Amount
                 TextFormField(
@@ -199,7 +204,7 @@ class _AddGoalDialogState extends ConsumerState<AddGoalDialog> {
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: [CurrencyInputFormatter()],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
 
                 // Deadline
                 InkWell(
@@ -236,7 +241,7 @@ class _AddGoalDialogState extends ConsumerState<AddGoalDialog> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
 
                 // Monthly Savings Calculator
                 if (_selectedDeadline != null && targetAmount > 0)
@@ -270,7 +275,7 @@ class _AddGoalDialogState extends ConsumerState<AddGoalDialog> {
                       ),
                     ),
                   ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
 
                 // Save Button
                 SizedBox(

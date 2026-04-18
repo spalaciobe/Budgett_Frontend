@@ -77,7 +77,32 @@ class IconHelper {
     'local_fire_department': Icons.local_fire_department,
     'elderly': Icons.elderly,
     'delivery_dining': Icons.delivery_dining,
+
+    // New additions
+    'family_restroom': Icons.family_restroom,
+    'payments': Icons.payments,
+    'trending_up': Icons.trending_up,
+    'crisis_alert': Icons.crisis_alert,
   };
+
+  /// Unified icon list used by both Create and Edit category dialogs.
+  /// Exactly 48 entries → 6 rows × 8 cols on desktop, 8 rows × 6 cols on mobile.
+  static const List<String> categoryIconKeys = [
+    // General — row 1-4
+    'home', 'restaurant', 'directions_car', 'health_and_safety', 'bolt',
+    'shopping_cart', 'movie', 'flight', 'school', 'work',
+    'pets', 'fitness_center', 'checkroom', 'credit_card', 'savings',
+    'attach_money', 'card_giftcard', 'smartphone', 'computer', 'build',
+    'palette', 'child_care', 'local_bar', 'music_note', 'subscriptions',
+    'menu_book', 'videogame_asset', 'local_gas_station', 'receipt_long', 'more_horiz',
+    'local_cafe', 'medical_services',
+    // Colombian context
+    'apartment', 'water_drop', 'wifi', 'local_hospital', 'elderly',
+    'directions_bus', 'local_taxi', 'local_parking', 'local_fire_department',
+    'kitchen', 'delivery_dining', 'account_balance',
+    // New icons
+    'family_restroom', 'payments', 'trending_up', 'crisis_alert',
+  ];
 
   static IconData getIcon(String? name) {
     if (name == null) return Icons.category;

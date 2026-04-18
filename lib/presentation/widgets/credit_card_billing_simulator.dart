@@ -6,6 +6,58 @@ import '../../data/models/bank_model.dart';
 import '../../data/repositories/bank_repository.dart';
 import '../../core/utils/credit_card_calculator.dart';
 
+class CreditCardBillingSubtitle extends ConsumerWidget {
+  final Account account;
+  final DateTime transactionDate;
+
+  const CreditCardBillingSubtitle({
+    super.key,
+    required this.account,
+    required this.transactionDate,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (account.type != 'credit_card' || account.creditCardRules == null) {
+      return const SizedBox();
+    }
+
+    final banksAsync = ref.watch(banksFutureProvider);
+
+    return banksAsync.when(
+      data: (banks) {
+        final bank = banks.firstWhere(
+          (b) => b.id == account.creditCardRules!.bankId,
+          orElse: () => Bank(id: '0', name: 'Unknown', code: 'UNK'),
+        );
+
+        final billingPeriod = CreditCardCalculator.determineBillingPeriod(
+          transactionDate,
+          account.creditCardRules!,
+          bank,
+        );
+        final parts = billingPeriod.split('-');
+        final year = int.parse(parts[0]);
+        final month = int.parse(parts[1]);
+        final label = DateFormat('MMMM yyyy', 'es_CO')
+            .format(DateTime(year, month));
+
+        return Padding(
+          padding: const EdgeInsets.only(left: 4, top: 4),
+          child: Text(
+            'Billing Cycle: $label',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
+        );
+      },
+      loading: () => const SizedBox(),
+      error: (_, __) => const SizedBox(),
+    );
+  }
+}
+
 class CreditCardBillingSimulator extends ConsumerWidget {
   final Account account;
   final DateTime transactionDate;

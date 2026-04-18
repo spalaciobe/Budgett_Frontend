@@ -4,7 +4,15 @@
       "Bash(flutter test:*)",
       "Bash(flutter pub:*)",
       "Bash(dart run:*)",
-      "Bash(flutter analyze:*)"
+      "Bash(flutter analyze:*)",
+      "Bash(rm:*)",
+      "Bash(cmd /c \"rmdir /s /q \\\\\"D:\\\\Proyectos\\\\Budgett\\\\Budgett_Frontend\\\\windows\\\\flutter\\\\ephemeral\\\\\"\")",
+      "Bash(cmd:*)",
+      "Bash(powershell:*)",
+      "Bash(flutter --version)",
+      "Bash(cd /d D:\\\\Proyectos\\\\Budgett\\\\Budgett_Frontend)",
+      "Bash(find . -name \"*.dart\" -type f -exec grep -l \"Row\\(\" {} \\\\;)",
+      "Bash(xargs grep:*)"
     ]
   }
 }

@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/app_spacing.dart';
+import 'package:budgett_frontend/core/responsive.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
+import 'package:budgett_frontend/presentation/providers/portfolio_provider.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
+import 'package:budgett_frontend/presentation/widgets/portfolio_donut_chart.dart';
 
 class AnalysisScreen extends ConsumerStatefulWidget {
   const AnalysisScreen({super.key});
@@ -16,18 +20,38 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final historyAsync = ref.watch(yearlySummaryProvider(_selectedYear));
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Analysis'),
+          bottom: const TabBar(
+            tabs: [
+              Tab(icon: Icon(Icons.bar_chart), text: 'Cash flow'),
+              Tab(icon: Icon(Icons.pie_chart_outline), text: 'Portfolio'),
+            ],
+          ),
+        ),
+        body: TabBarView(
+          children: [
+            _buildCashFlowTab(),
+            _buildPortfolioTab(),
+          ],
+        ),
+      ),
+    );
+  }
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Analysis')),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          ref.invalidate(yearlySummaryProvider(_selectedYear));
-          await ref.read(yearlySummaryProvider(_selectedYear).future);
-        },
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16),
+  Widget _buildCashFlowTab() {
+    final historyAsync = ref.watch(yearlySummaryProvider(_selectedYear));
+    return RefreshIndicator(
+      onRefresh: () async {
+        ref.invalidate(yearlySummaryProvider(_selectedYear));
+        await ref.read(yearlySummaryProvider(_selectedYear).future);
+      },
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: kScreenPadding,
         child: Column(
           children: [
             // Year Selector
@@ -45,7 +69,7 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 24),
+            kGapXl,
 
             // Chart
             SizedBox(
@@ -110,7 +134,7 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
                 error: (e,s) => Center(child: Text('Error: $e')),
               ),
             ),
-            const SizedBox(height: 16),
+            kGapXl,
             const Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -119,7 +143,7 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
                 Icon(Icons.circle, size: 12, color: Colors.red), SizedBox(width: 4), Text('Expense'),
               ],
             ),
-            const SizedBox(height: 32),
+            kGapXxl,
             
             // Savings Rate Table
             historyAsync.when(
@@ -230,6 +254,319 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildPortfolioTab() {
+    return RefreshIndicator(
+      onRefresh: () async {
+        ref.invalidate(consolidatedPortfolioProvider);
+        ref.invalidate(accountsProvider);
+        await ref.read(consolidatedPortfolioProvider.future);
+      },
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: kScreenPadding,
+        child: const _ConsolidatedPortfolioSection(),
+      ),
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Consolidated portfolio section
+// ──────────────────────────────────────────────────────────────────────────────
+
+class _ConsolidatedPortfolioSection extends ConsumerWidget {
+  const _ConsolidatedPortfolioSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final hasAny = ref.watch(hasAnyPortfolioAccountProvider);
+    if (!hasAny) return const _PortfolioEmptyState();
+
+    final portfolioAsync = ref.watch(consolidatedPortfolioProvider);
+
+    return portfolioAsync.when(
+      loading: () => const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: CircularProgressIndicator(),
+        ),
+      ),
+      error: (e, _) => Padding(
+        padding: const EdgeInsets.all(16),
+        child: Text('Error loading portfolio: $e'),
+      ),
+      data: (p) {
+        if (p.isEmpty) return const _PortfolioEmptyState();
+        return _PortfolioContent(portfolio: p);
+      },
+    );
+  }
+}
+
+class _PortfolioEmptyState extends StatelessWidget {
+  const _PortfolioEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 48),
+      child: Column(
+        children: [
+          Icon(
+            Icons.pie_chart_outline,
+            size: 48,
+            color: theme.colorScheme.onSurface.withOpacity(0.3),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'No positions to show',
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: theme.colorScheme.onSurface.withOpacity(0.6),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Add FIC, crypto or stock investment accounts\nto see your consolidated portfolio here.',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurface.withOpacity(0.5),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PortfolioContent extends StatelessWidget {
+  final ConsolidatedPortfolio portfolio;
+
+  const _PortfolioContent({required this.portfolio});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDesktop = context.formFactor != FormFactor.mobile;
+
+    final totalPnl = portfolio.totalPnl;
+    final pnlPositive = totalPnl >= 0;
+    final pnlColor =
+        pnlPositive ? Colors.green.shade600 : theme.colorScheme.error;
+
+    final positionsCard = _buildPositionsCard(context);
+    final accountsCard = _buildAccountsCard(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.pie_chart_outline, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              'Consolidated portfolio',
+              style: theme.textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            if (portfolio.hasFxConversion) ...[
+              const SizedBox(width: 8),
+              Tooltip(
+                message: 'USD holdings converted to COP using the current TRM',
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text('≈', style: TextStyle(fontSize: 11)),
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // Summary card: total + P&L
+        Card(
+          elevation: 1,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Total value',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color:
+                              theme.colorScheme.onSurface.withOpacity(0.55),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        CurrencyFormatter.format(
+                          portfolio.totalMarketValueCop,
+                        ),
+                        style: theme.textTheme.titleLarge
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+                if (portfolio.totalCostBasisCop > 0)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        'P&L',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color:
+                              theme.colorScheme.onSurface.withOpacity(0.55),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Icon(
+                            pnlPositive
+                                ? Icons.trending_up
+                                : Icons.trending_down,
+                            size: 16,
+                            color: pnlColor,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${pnlPositive ? '+' : ''}${CurrencyFormatter.format(totalPnl)}',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: pnlColor,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        '${pnlPositive ? '+' : ''}${portfolio.totalPnlPct.toStringAsFixed(2)}%',
+                        style: theme.textTheme.bodySmall
+                            ?.copyWith(color: pnlColor),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // Two pie charts
+        if (isDesktop)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: positionsCard),
+              const SizedBox(width: 12),
+              Expanded(child: accountsCard),
+            ],
+          )
+        else
+          Column(
+            children: [
+              positionsCard,
+              const SizedBox(height: 12),
+              accountsCard,
+            ],
+          ),
+      ],
+    );
+  }
+
+  Widget _buildPositionsCard(BuildContext context) {
+    final theme = Theme.of(context);
+
+    final slices = <PortfolioSlice>[];
+    for (var i = 0; i < portfolio.positions.length; i++) {
+      final p = portfolio.positions[i];
+      final pnlLabel = p.costBasisCop == 0
+          ? null
+          : '${p.pnlPct >= 0 ? '+' : ''}${p.pnlPct.toStringAsFixed(1)}%';
+      slices.add(PortfolioSlice(
+        label: p.displayName,
+        value: p.marketValueCop,
+        color: PortfolioPalette.colorFor(i),
+        trailing: pnlLabel,
+      ));
+    }
+
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'By position',
+              style: theme.textTheme.titleSmall
+                  ?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            PortfolioDonutChart(
+              slices: slices,
+              centerLabel: 'Positions',
+              centerValue: CurrencyFormatter.format(
+                portfolio.totalMarketValueCop,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAccountsCard(BuildContext context) {
+    final theme = Theme.of(context);
+
+    final slices = <PortfolioSlice>[];
+    for (var i = 0; i < portfolio.byAccount.length; i++) {
+      final a = portfolio.byAccount[i];
+      slices.add(PortfolioSlice(
+        label: a.accountName,
+        value: a.marketValueCop,
+        color: PortfolioPalette.colorFor(i),
+      ));
+    }
+
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'By account',
+              style: theme.textTheme.titleSmall
+                  ?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            PortfolioDonutChart(
+              slices: slices,
+              centerLabel: 'Accounts',
+              centerValue: CurrencyFormatter.format(
+                portfolio.totalMarketValueCop,
+              ),
+            ),
+          ],
         ),
       ),
     );

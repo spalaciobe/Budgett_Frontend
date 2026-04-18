@@ -1,23 +1,34 @@
 import 'package:flutter/material.dart';
+import '../../core/app_spacing.dart';
 import '../../data/models/account_model.dart';
 import '../utils/currency_formatter.dart';
 
-/// Horizontal account card used in the HomeScreen account strip.
+/// Account card shown in the HomeScreen accounts section.
 ///
 /// [subtitle] is an optional pre-computed widget shown below the balance
-/// (e.g. APY for high-yield, days-to-maturity for CDTs, type label for
-/// multi-holding accounts). When null and the account is a credit card with a
-/// USD balance, the USD balance is shown instead.
+/// (e.g. gains for investment accounts, USD balance for credit cards).
+///
+/// [balanceText] overrides the default balance display computed from
+/// [account.balance] / [account.balanceUsd]. Use this to show a pre-computed
+/// value such as total investment portfolio value (cash + holdings).
+///
+/// [tileLayout] switches to a full-width horizontal tile (icon left, text
+/// right) used on mobile. When false (default) the card renders as a compact
+/// vertical card for the horizontal scroll strip on desktop/tablet.
 class AccountCard extends StatelessWidget {
   final Account account;
   final VoidCallback onTap;
   final Widget? subtitle;
+  final String? balanceText;
+  final bool tileLayout;
 
   const AccountCard({
     super.key,
     required this.account,
     required this.onTap,
     this.subtitle,
+    this.balanceText,
+    this.tileLayout = false,
   });
 
   @override
@@ -25,14 +36,90 @@ class AccountCard extends StatelessWidget {
     final theme = Theme.of(context);
     final acc = account;
 
-    // For USD-based investment accounts use the USD balance as the primary value.
     final isUsdInvestment =
         acc.type == 'investment' &&
         (acc.investmentDetails?.baseCurrency ?? 'COP') == 'USD';
+    final isSavingsWithPockets =
+        acc.isSavingsParent && acc.pockets.isNotEmpty;
 
-    final balanceText = isUsdInvestment
-        ? CurrencyFormatter.format(acc.balanceUsd, currency: 'USD')
-        : CurrencyFormatter.format(acc.balance, decimalDigits: 2);
+    final balanceDisplay = balanceText ??
+        (isUsdInvestment
+            ? CurrencyFormatter.format(acc.balanceUsd, currency: 'USD')
+            : isSavingsWithPockets
+                ? CurrencyFormatter.format(
+                    acc.totalBalanceWithPockets,
+                    decimalDigits: 2,
+                  )
+                : CurrencyFormatter.format(acc.balance, decimalDigits: 2));
+
+    final gradient = BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          theme.colorScheme.surface,
+          theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+        ],
+      ),
+    );
+
+    final iconWidget = Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: _buildIcon(acc, theme),
+    );
+
+    final hasSubtitleContent = subtitle != null ||
+        (acc.type == 'credit_card' && acc.balanceUsd != 0) ||
+        isSavingsWithPockets;
+    final pocketLabel = acc.pockets.length == 1 ? 'pocket' : 'pockets';
+    final subtitleArea = hasSubtitleContent
+        ? (subtitle ??
+            (isSavingsWithPockets
+                ? Text(
+                    '${acc.pockets.length} $pocketLabel · '
+                    '${CurrencyFormatter.format(acc.pocketsBalance, decimalDigits: 2)} stored',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withOpacity(0.5),
+                    ),
+                  )
+                : Text(
+                    CurrencyFormatter.format(acc.balanceUsd, currency: 'USD'),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withOpacity(0.5),
+                    ),
+                  )))
+        : const SizedBox.shrink();
+
+    final textContent = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          acc.name,
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+            fontSize: 13,
+          ),
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          balanceDisplay,
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
+        const SizedBox(height: 2),
+        subtitleArea,
+      ],
+    );
 
     return Card(
       elevation: 4,
@@ -41,74 +128,31 @@ class AccountCard extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: InkWell(
         onTap: onTap,
-        child: Container(
-          width: 170,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                theme.colorScheme.surface,
-                theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
-              ],
-            ),
-          ),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // Icon
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
+        child: tileLayout
+            ? Container(
+                decoration: gradient,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: kSpaceLg,
                 ),
-                child: _buildIcon(acc, theme),
-              ),
-
-              // Name + balance + subtitle
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    acc.name,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color:
-                          theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
-                      fontSize: 13,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    balanceText,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                    ),
-                  ),
-                  if (subtitle != null) ...[
-                    const SizedBox(height: 2),
-                    subtitle!,
-                  ] else if (acc.type == 'credit_card' &&
-                      acc.balanceUsd != 0) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      CurrencyFormatter.format(acc.balanceUsd, currency: 'USD'),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurface.withOpacity(0.5),
-                      ),
-                    ),
+                child: Row(
+                  children: [
+                    iconWidget,
+                    const SizedBox(width: 14),
+                    Expanded(child: textContent),
                   ],
-                ],
+                ),
+              )
+            : Container(
+                width: 170,
+                decoration: gradient,
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [iconWidget, textContent],
+                ),
               ),
-            ],
-          ),
-        ),
       ),
     );
   }

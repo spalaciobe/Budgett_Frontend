@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
@@ -65,9 +66,6 @@ Map<String, dynamic> buildInvestmentDetailsMap({
   required InvestmentType investmentType,
   String? brokerId,
   String baseCurrency = 'COP',
-  double? apyRate,
-  String? interestPeriod,
-  DateTime? lastInterestDate,
   double? principal,
   double? interestRate,
   int? termDays,
@@ -78,24 +76,19 @@ Map<String, dynamic> buildInvestmentDetailsMap({
 }) {
   String? startDateStr;
   String? maturityDateStr;
-  String? lastInterestDateStr;
   if (startDate != null) {
-    startDateStr = '${startDate.year}-${startDate.month.toString().padLeft(2, '0')}-${startDate.day.toString().padLeft(2, '0')}';
+    startDateStr =
+        '${startDate.year}-${startDate.month.toString().padLeft(2, '0')}-${startDate.day.toString().padLeft(2, '0')}';
   }
   if (maturityDate != null) {
-    maturityDateStr = '${maturityDate.year}-${maturityDate.month.toString().padLeft(2, '0')}-${maturityDate.day.toString().padLeft(2, '0')}';
-  }
-  if (lastInterestDate != null) {
-    lastInterestDateStr = '${lastInterestDate.year}-${lastInterestDate.month.toString().padLeft(2, '0')}-${lastInterestDate.day.toString().padLeft(2, '0')}';
+    maturityDateStr =
+        '${maturityDate.year}-${maturityDate.month.toString().padLeft(2, '0')}-${maturityDate.day.toString().padLeft(2, '0')}';
   }
 
   return {
     'investment_type': investmentType.toDbString(),
     'broker_id': brokerId,
     'base_currency': baseCurrency,
-    'apy_rate': investmentType == InvestmentType.highYield ? apyRate : null,
-    'interest_period': investmentType == InvestmentType.highYield ? interestPeriod : null,
-    'last_interest_date': investmentType == InvestmentType.highYield ? lastInterestDateStr : null,
     'principal': investmentType == InvestmentType.cdt ? principal : null,
     'interest_rate': investmentType == InvestmentType.cdt ? interestRate : null,
     'term_days': investmentType == InvestmentType.cdt ? termDays : null,
@@ -125,14 +118,12 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
   final _paymentDayController = TextEditingController();
 
   // Investment controllers
-  final _apyRateController = TextEditingController();
   final _principalController = TextEditingController();
   final _interestRateController = TextEditingController();
   final _termDaysController = TextEditingController();
   final _fundCodeController = TextEditingController();
   DateTime? _cdtStartDate;
   DateTime? _cdtMaturityDate;
-  DateTime? _highYieldEarningSince;
 
   String _selectedType = 'checking';
   String? _selectedIcon;
@@ -143,10 +134,9 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
   int? _selectedCycle; // 15 or 30 — null until user picks
 
   // Investment fields
-  InvestmentType _selectedInvestmentType = InvestmentType.highYield;
+  InvestmentType _selectedInvestmentType = InvestmentType.cdt;
   String _investmentBaseCurrency = 'COP';
   Broker? _selectedBroker;
-  String _investmentInterestPeriod = 'monthly';
 
   @override
   void dispose() {
@@ -157,7 +147,6 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
     _creditLimitUsdController.dispose();
     _cutoffDayController.dispose();
     _paymentDayController.dispose();
-    _apyRateController.dispose();
     _principalController.dispose();
     _interestRateController.dispose();
     _termDaysController.dispose();
@@ -277,12 +266,6 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
         investmentType: _selectedInvestmentType,
         brokerId: _selectedBroker?.id,
         baseCurrency: _investmentBaseCurrency,
-        // User enters percentage (9.25), DB stores decimal (0.0925)
-        apyRate: double.tryParse(_apyRateController.text) != null
-            ? double.parse(_apyRateController.text) / 100
-            : null,
-        interestPeriod: _investmentInterestPeriod,
-        lastInterestDate: _highYieldEarningSince,
         principal: _principalController.text.isEmpty
             ? null
             : CurrencyFormatter.parse(_principalController.text),
@@ -409,9 +392,13 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
     final brokersAsync = ref.watch(brokersFutureProvider);
 
     return Dialog(
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: MediaQuery.of(context).size.width * 0.025,
+        vertical: 24,
+      ),
       child: Container(
         constraints: const BoxConstraints(maxWidth: 500, maxHeight: 800),
-        padding: const EdgeInsets.all(24),
+        padding: kDialogPadding,
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
@@ -432,7 +419,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
 
                 // Name
                 TextFormField(
@@ -445,7 +432,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                   validator: (v) =>
                       v == null || v.trim().isEmpty ? 'Required' : null,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
 
                 // Type
                 DropdownButtonFormField<String>(
@@ -471,7 +458,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                   ],
                   onChanged: (v) => setState(() => _selectedType = v!),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
 
                 // Balance
                 TextFormField(
@@ -502,18 +489,18 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                   validator: (v) =>
                       v == null || v.isEmpty ? 'Required' : null,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
 
                 // Icon picker
                 _buildIconPicker(),
 
                 // ── Credit card section ───────────────────────────────────
                 if (isCreditCard) ...[
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 10),
                   const Divider(),
                   Text('Card Details',
                       style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 10),
 
                   // Bank selector
                   banksAsync.when(
@@ -537,7 +524,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                         const Center(child: CircularProgressIndicator()),
                     error: (e, _) => Text('Error loading banks: $e'),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 10),
 
                   // Credit limit
                   TextFormField(
@@ -551,7 +538,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                         decimal: true),
                     inputFormatters: [const CurrencyInputFormatter()],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 10),
 
                   // USD slice (optional)
                   const Divider(),
@@ -593,7 +580,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
 
                   // RappiCard: auto-rules notice
                   if (_bankHasAutoRules) ...[
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 10),
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -621,7 +608,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
 
                   // Cycle selector for banks with well-known cycles (Bancolombia, Davivienda, BBVA)
                   if (_needsManualDays && _bankHasCycles) ...[
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 10),
                     Text('Billing Cycle',
                         style: Theme.of(context).textTheme.labelLarge),
                     const SizedBox(height: 8),
@@ -651,7 +638,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
 
                   // Manual cutoff/payment days (non-Rappi)
                   if (_needsManualDays) ...[
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 10),
                     Row(
                       children: [
                         Expanded(
@@ -701,11 +688,11 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
 
                 // ── Investment section ────────────────────────────────────
                 if (isInvestment) ...[
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 10),
                   const Divider(),
                   Text('Investment Details',
                       style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 10),
 
                   // Investment type
                   DropdownButtonFormField<InvestmentType>(
@@ -728,7 +715,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                           (v == InvestmentType.stockEtf) ? 'USD' : 'COP';
                     }),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 10),
 
                   // Base currency (only for stock_etf / crypto)
                   if (_selectedInvestmentType == InvestmentType.stockEtf ||
@@ -746,7 +733,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                       onChanged: (v) =>
                           setState(() => _investmentBaseCurrency = v!),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 10),
                   ],
 
                   // Broker
@@ -777,95 +764,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                     error: (e, _) =>
                         Text('Error loading brokers: $e'),
                   ),
-                  const SizedBox(height: 16),
-
-                  // ── High-yield fields ──────────────────────────────────
-                  if (_selectedInvestmentType == InvestmentType.highYield) ...[
-                    Row(
-                      children: [
-                        Expanded(
-                          flex: 2,
-                          child: TextFormField(
-                            controller: _apyRateController,
-                            decoration: const InputDecoration(
-                              labelText: 'APY (E.A. %)',
-                              suffixText: '%',
-                              border: OutlineInputBorder(),
-                              hintText: 'e.g. 9.25',
-                            ),
-                            keyboardType:
-                                const TextInputType.numberWithOptions(
-                                    decimal: true),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          flex: 3,
-                          child: DropdownButtonFormField<String>(
-                            value: _investmentInterestPeriod,
-                            decoration: const InputDecoration(
-                              labelText: 'Interest Period',
-                              border: OutlineInputBorder(),
-                            ),
-                            items: const [
-                              DropdownMenuItem(
-                                  value: 'monthly',
-                                  child: Text('Monthly')),
-                              DropdownMenuItem(
-                                  value: 'daily', child: Text('Daily')),
-                              DropdownMenuItem(
-                                  value: 'on_withdrawal',
-                                  child: Text('On withdrawal')),
-                            ],
-                            onChanged: (v) => setState(
-                                () => _investmentInterestPeriod = v!),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    InkWell(
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: _highYieldEarningSince ?? DateTime.now(),
-                          firstDate: DateTime(2000),
-                          lastDate: DateTime.now(),
-                        );
-                        if (picked != null) {
-                          setState(() => _highYieldEarningSince = picked);
-                        }
-                      },
-                      child: InputDecorator(
-                        decoration: InputDecoration(
-                          labelText: 'Earning since (optional)',
-                          border: const OutlineInputBorder(),
-                          suffixIcon: _highYieldEarningSince != null
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear, size: 18),
-                                  onPressed: () => setState(
-                                      () => _highYieldEarningSince = null),
-                                )
-                              : const Icon(Icons.calendar_today, size: 18),
-                          helperText:
-                              'Sets the start date for interest tracking. Leave blank to set it later.',
-                        ),
-                        child: Text(
-                          _highYieldEarningSince != null
-                              ? '${_highYieldEarningSince!.year}-${_highYieldEarningSince!.month.toString().padLeft(2, '0')}-${_highYieldEarningSince!.day.toString().padLeft(2, '0')}'
-                              : 'Not set — will prompt on detail screen',
-                          style: _highYieldEarningSince == null
-                              ? Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurface
-                                        .withOpacity(0.45),
-                                  )
-                              : null,
-                        ),
-                      ),
-                    ),
-                  ],
+                  const SizedBox(height: 10),
 
                   // ── CDT fields ─────────────────────────────────────────
                   if (_selectedInvestmentType == InvestmentType.cdt) ...[
@@ -1027,7 +926,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                   ],
                 ],
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
 
                 // Save
                 SizedBox(

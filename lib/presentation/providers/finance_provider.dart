@@ -25,9 +25,44 @@ final accountsProvider = FutureProvider<List<Account>>((ref) async {
   return repository.getAccounts();
 });
 
+class AccountCustomOrderNotifier extends AsyncNotifier<List<String>> {
+  @override
+  Future<List<String>> build() async {
+    final repo = ref.watch(financeRepositoryProvider);
+    return repo.getAccountSortOrder();
+  }
+
+  Future<void> setOrder(List<String> ids) async {
+    state = AsyncData(ids); // optimistic — UI responds instantly
+    final repo = ref.read(financeRepositoryProvider);
+    await repo.setAccountSortOrder(ids);
+  }
+}
+
+final accountCustomOrderProvider =
+    AsyncNotifierProvider<AccountCustomOrderNotifier, List<String>>(
+        AccountCustomOrderNotifier.new);
+
 final recentTransactionsProvider = FutureProvider<List<Transaction>>((ref) async {
   final repository = ref.watch(financeRepositoryProvider);
   return repository.getRecentTransactions();
+});
+
+/// Transactions to show in an account's detail view.
+///
+/// - Includes transfers where the account is either source or target.
+/// - For savings parents, also includes transactions from the account's pockets.
+/// - Excludes installment parent rows (children carry the real amounts).
+final accountDetailTransactionsProvider = FutureProvider.autoDispose
+    .family<List<Transaction>, String>((ref, accountId) async {
+  final repo = ref.read(financeRepositoryProvider);
+  final accounts = await ref.watch(accountsProvider.future);
+  final account = accounts.firstWhere(
+    (a) => a.id == accountId,
+    orElse: () => throw StateError('Account not found: $accountId'),
+  );
+  final ids = <String>[account.id, ...account.pockets.map((p) => p.id)];
+  return repo.getTransactionsForAccounts(ids, limit: 100);
 });
 
 final categoriesProvider = FutureProvider<List<Category>>((ref) async {

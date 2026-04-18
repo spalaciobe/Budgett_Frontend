@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/data/models/category_model.dart';
 import 'package:budgett_frontend/data/models/sub_category_model.dart';
@@ -37,27 +38,17 @@ class _CreateCategoryDialogState extends ConsumerState<CreateCategoryDialog> {
     '0xFFFFC107', // Amber
   ];
 
-  final List<String> _categoryIcons = [
-    // Generales
-    'home', 'restaurant', 'directions_car', 'health_and_safety', 'bolt',
-    'shopping_cart', 'movie', 'flight', 'school', 'work',
-    'pets', 'fitness_center', 'checkroom', 'credit_card', 'savings',
-    'attach_money', 'card_giftcard', 'smartphone', 'computer', 'build',
-    'palette', 'child_care', 'local_bar', 'music_note', 'subscriptions',
-    'menu_book', 'videogame_asset', 'local_gas_station', 'receipt_long', 'more_horiz',
-    'local_cafe', 'medical_services',
-    // Colombia
-    'apartment', 'water_drop', 'wifi', 'local_hospital', 'elderly',
-    'directions_bus', 'local_taxi', 'local_parking', 'local_fire_department',
-    'kitchen', 'delivery_dining', 'account_balance',
-  ];
   
   @override
   Widget build(BuildContext context) {
     return Dialog(
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: MediaQuery.of(context).size.width * 0.025,
+        vertical: 24,
+      ),
       child: Container(
         constraints: const BoxConstraints(maxWidth: 500, maxHeight: 600),
-        padding: const EdgeInsets.all(24),
+        padding: kDialogPadding,
         child: Form(
           key: _formKey,
           child: Column(
@@ -66,9 +57,10 @@ class _CreateCategoryDialogState extends ConsumerState<CreateCategoryDialog> {
             children: [
               // Header
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Create Category', style: Theme.of(context).textTheme.headlineSmall),
+                  Expanded(
+                    child: Text('Create Category', style: Theme.of(context).textTheme.headlineSmall),
+                  ),
                   IconButton(
                     icon: const Icon(Icons.close),
                     onPressed: () => Navigator.of(context).pop(),
@@ -96,7 +88,7 @@ class _CreateCategoryDialogState extends ConsumerState<CreateCategoryDialog> {
                           });
                         },
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 10),
                       
                       // Name Input
                       TextFormField(
@@ -107,7 +99,7 @@ class _CreateCategoryDialogState extends ConsumerState<CreateCategoryDialog> {
                         ),
                         validator: (value) => value == null || value.isEmpty ? 'Required' : null,
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 10),
                       
                       // Color Picker
                       const Text('Color', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -137,52 +129,21 @@ class _CreateCategoryDialogState extends ConsumerState<CreateCategoryDialog> {
                           }).toList(),
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 10),
 
                       // Icon Picker
                       Text('Icon', style: Theme.of(context).textTheme.titleSmall),
                       const SizedBox(height: 8),
-                      Container(
-                        width: double.infinity,
-                        // No border decoration here as requested
-                        child: Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          alignment: WrapAlignment.start,
-                          children: _categoryIcons.map((key) {
-                            final iconData = IconHelper.getIcon(key);
-                            final isSelected = _selectedIcon == key;
-                            
-                            return InkWell(
-                              onTap: () => setState(() => _selectedIcon = key),
-                              child: Container(
-                                width: 48,
-                                height: 48,
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                    color: isSelected 
-                                      ? Theme.of(context).colorScheme.primary 
-                                      : Colors.grey.shade300,
-                                    width: isSelected ? 2 : 1,
-                                  ),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Icon(
-                                  iconData,
-                                  color: isSelected ? Theme.of(context).colorScheme.primary : Colors.white,
-                                  size: 24,
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
+                      _IconGrid(
+                        selectedIcon: _selectedIcon,
+                        onSelected: (key) => setState(() => _selectedIcon = key),
                       ),
                     ],
                   ),
                 ),
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
                       
               // Sub Categories
               Text('Sub Categories (Optional)', style: Theme.of(context).textTheme.titleSmall),
@@ -337,5 +298,61 @@ class _CreateCategoryDialogState extends ConsumerState<CreateCategoryDialog> {
     _nameController.dispose();
     _subCategoryController.dispose();
     super.dispose();
+  }
+}
+
+class _IconGrid extends StatelessWidget {
+  final String selectedIcon;
+  final ValueChanged<String> onSelected;
+
+  const _IconGrid({required this.selectedIcon, required this.onSelected});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cols = MediaQuery.of(context).size.width >= 1024 ? 8 : 6;
+        const spacing = 4.0;
+        final cellSize = (constraints.maxWidth - spacing * (cols - 1)) / cols;
+        final iconSize = (cellSize * 0.48).clamp(14.0, 28.0);
+
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: cols,
+            crossAxisSpacing: spacing,
+            mainAxisSpacing: spacing,
+          ),
+          itemCount: IconHelper.categoryIconKeys.length,
+          itemBuilder: (context, index) {
+            final key = IconHelper.categoryIconKeys[index];
+            final isSelected = selectedIcon == key;
+            return InkWell(
+              onTap: () => onSelected(key),
+              borderRadius: BorderRadius.circular(6),
+              child: Container(
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: isSelected
+                        ? Theme.of(context).colorScheme.primary
+                        : Colors.grey.shade300,
+                    width: isSelected ? 2 : 1,
+                  ),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Icon(
+                  IconHelper.getIcon(key),
+                  color: isSelected
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.white,
+                  size: iconSize,
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 }

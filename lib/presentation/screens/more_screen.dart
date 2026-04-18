@@ -13,23 +13,27 @@ class MoreScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text('More')),
-      body: ListView(
-        children: [
-          ...advanced.map(
-            (d) => ListTile(
-              leading: Icon(d.selectedIcon),
-              title: Text(d.label),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => context.go(d.path),
+      body: RefreshIndicator(
+        onRefresh: () async {},
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            ...advanced.map(
+              (d) => ListTile(
+                leading: Icon(d.selectedIcon),
+                title: Text(d.label),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push(d.path),
+              ),
             ),
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.logout),
-            title: const Text('Log out'),
-            onTap: () => performLogout(ref, context),
-          ),
-        ],
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.logout),
+              title: const Text('Log out'),
+              onTap: () => performLogout(ref, context),
+            ),
+          ],
+        ),
       ),
     );
   }

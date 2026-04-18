@@ -145,10 +145,20 @@ void main() {
       expect(result.text, '1.200.000');
     });
 
-    test('strips non-digit chars before formatting', () {
-      final result = applyFormat('1,200,000');
-      // commas are stripped, 1200000 → 1.200.000
+    test('strips dot thousand-separators from pasted input', () {
+      final result = applyFormat('1.200.000');
+      // dots are stripped, 1200000 → 1.200.000
       expect(result.text, '1.200.000');
+    });
+
+    test('allows comma as decimal separator (es_CO)', () {
+      final result = applyFormat('1000,50');
+      expect(result.text, '1.000,50');
+    });
+
+    test('truncates decimals to 2 places', () {
+      final result = applyFormat('1000,999');
+      expect(result.text, '1.000,99');
     });
 
     test('strips dollar sign input', () {

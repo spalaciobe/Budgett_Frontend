@@ -24,6 +24,19 @@ class Transaction {
   final DateTime? calculatedCutoffDate;
   final DateTime? calculatedPaymentDate;
 
+  // Installment ("cuotas") fields
+  final String? parentTransactionId;
+  final bool isInstallmentParent;
+  final int? numCuotas;
+  final int? installmentNumber; // 1..N on children; null on parent
+  final bool? hasInterest;
+  final double? interestRate; // monthly decimal, e.g. 0.025
+  final double? originalPurchaseAmount; // populated only on parent
+
+  // Credit card payment flow
+  final bool isCreditCardPayment;
+  final List<String> closedInstallmentIds;
+
   Transaction({
     required this.id,
     required this.accountId,
@@ -45,10 +58,22 @@ class Transaction {
     this.billingPeriod,
     this.calculatedCutoffDate,
     this.calculatedPaymentDate,
+    this.parentTransactionId,
+    this.isInstallmentParent = false,
+    this.numCuotas,
+    this.installmentNumber,
+    this.hasInterest,
+    this.interestRate,
+    this.originalPurchaseAmount,
+    this.isCreditCardPayment = false,
+    this.closedInstallmentIds = const [],
   });
 
   bool get isCrossCurrencyPayment =>
       targetCurrency != null && targetCurrency != currency;
+
+  bool get isInstallmentChild => parentTransactionId != null;
+  bool get isInstallment => isInstallmentParent || isInstallmentChild;
 
   factory Transaction.fromJson(Map<String, dynamic> json) {
     return Transaction(
@@ -76,6 +101,20 @@ class Transaction {
       calculatedPaymentDate: json['fecha_pago_calculada'] != null
           ? DateTime.parse(json['fecha_pago_calculada'])
           : null,
+      parentTransactionId: json['parent_transaction_id'] as String?,
+      isInstallmentParent: (json['is_installment_parent'] as bool?) ?? false,
+      numCuotas: json['num_cuotas'] as int?,
+      installmentNumber: json['installment_number'] as int?,
+      hasInterest: json['has_interest'] as bool?,
+      interestRate: (json['interest_rate'] as num?)?.toDouble(),
+      originalPurchaseAmount:
+          (json['original_purchase_amount'] as num?)?.toDouble(),
+      isCreditCardPayment:
+          (json['is_credit_card_payment'] as bool?) ?? false,
+      closedInstallmentIds: (json['closed_installment_ids'] as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
     );
   }
 }

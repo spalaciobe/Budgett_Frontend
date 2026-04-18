@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../core/utils/credit_card_calculator.dart';
@@ -8,10 +9,13 @@ import '../../data/models/credit_card_rules_model.dart';
 import '../../data/models/transaction_model.dart';
 import '../../data/repositories/bank_repository.dart';
 import '../../presentation/providers/finance_provider.dart';
+import '../../presentation/providers/fx_rate_provider.dart';
 import '../../presentation/utils/currency_formatter.dart';
 import '../../presentation/widgets/add_account_dialog.dart';
 import '../../presentation/widgets/credit_card_billing_simulator.dart';
 import '../../presentation/widgets/edit_account_dialog.dart';
+import '../../presentation/widgets/transaction_tile.dart';
+import '../../presentation/widgets/pay_credit_card_dialog.dart';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 final _monthNames = [
@@ -19,16 +23,14 @@ final _monthNames = [
   'July','August','September','October','November','December',
 ];
 
-// Provider to fetch transactions for a specific account
-final accountTransactionsProvider = FutureProvider.family.autoDispose<List<Transaction>, String>((ref, accountId) async {
-  final repo = ref.read(financeRepositoryProvider);
-  return repo.getTransactionsForAccount(accountId, limit: 100);
-});
+// ── Embeddable body for the master/detail split view ─────────────────────────
 
-class CreditCardDetailsScreen extends ConsumerWidget {
+/// Renders the full credit-card detail content without a Scaffold / AppBar.
+/// Use this inside AccountsScreen's right panel.
+class CreditCardDetailsBody extends ConsumerWidget {
   final String accountId;
 
-  const CreditCardDetailsScreen({super.key, required this.accountId});
+  const CreditCardDetailsBody({super.key, required this.accountId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -39,236 +41,190 @@ class CreditCardDetailsScreen extends ConsumerWidget {
         .toList();
 
     if (matches == null || matches.isEmpty) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Center(child: CircularProgressIndicator());
     }
 
     final Account freshAccount = matches.first;
 
-    // Watch transactions for this account
-    final transactionsAsync = ref.watch(accountTransactionsProvider(freshAccount.id));
+    final transactionsAsync = ref.watch(accountDetailTransactionsProvider(freshAccount.id));
+    final fxRate = ref.watch(fxRateProvider).valueOrNull;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(freshAccount.name),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: () {
-               showDialog(
-                context: context,
-                builder: (context) => EditAccountDialog(account: freshAccount),
-              ).then((_) {
-                 ref.invalidate(accountsProvider);
-              });
-            },
+    final hasNoUsdSubLimit = freshAccount.creditLimitUsd == 0 && freshAccount.balanceUsd < 0;
+    final usdDebtInCop = (hasNoUsdSubLimit && fxRate != null)
+        ? freshAccount.balanceUsd.abs() * fxRate.rate
+        : 0.0;
+    final rawAvailableCop = freshAccount.creditLimit > 0
+        ? freshAccount.creditLimit + freshAccount.balance
+        : 0.0;
+    final availableCop = (rawAvailableCop - usdDebtInCop).clamp(0.0, double.infinity);
+    final copIsApprox = hasNoUsdSubLimit && fxRate != null;
+
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: kScreenPadding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text('Current Billing Status',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.bold)),
+              ),
+              if (freshAccount.balance.abs() > 0 || freshAccount.balanceUsd.abs() > 0)
+                FilledButton.icon(
+                  icon: const Icon(Icons.payments_outlined, size: 18),
+                  label: const Text('Pay card'),
+                  onPressed: () => showDialog<void>(
+                    context: context,
+                    builder: (_) => PayCreditCardDialog(card: freshAccount),
+                  ),
+                ),
+            ],
           ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 1. Current Status Simulator (Projected for TODAY)
-            Text('Current Billing Status',
-                 style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            CreditCardBillingSimulator(
-              account: freshAccount,
-              transactionDate: DateTime.now(),
-            ),
-
-            const SizedBox(height: 24),
-
-            // 2. Reglas de corte y pago
-            _buildRulesSection(context, ref, freshAccount),
-
-            const SizedBox(height: 24),
-
-            // 3. Account Stats — COP slice
+          const SizedBox(height: 8),
+          CreditCardBillingSimulator(
+            account: freshAccount,
+            transactionDate: DateTime.now(),
+          ),
+          const SizedBox(height: 16),
+          _buildRulesSection(context, ref, freshAccount),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _buildStatCard(
+                  context, 'Available COP', availableCop, Colors.green,
+                  isApprox: copIsApprox,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildStatCard(
+                  context, 'Used COP', freshAccount.balance.abs(), Colors.red,
+                ),
+              ),
+            ],
+          ),
+          if (freshAccount.creditLimitUsd > 0 || freshAccount.balanceUsd != 0) ...[
+            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
                   child: _buildStatCard(
                     context,
-                    'Available COP',
-                    freshAccount.creditLimit > 0 ? freshAccount.creditLimit + freshAccount.balance : 0,
+                    'Available USD',
+                    freshAccount.creditLimitUsd > 0
+                        ? freshAccount.creditLimitUsd + freshAccount.balanceUsd
+                        : 0,
                     Colors.green,
+                    currency: 'USD',
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: _buildStatCard(
                     context,
-                    'Used COP',
-                    freshAccount.balance.abs(),
+                    'Used USD',
+                    freshAccount.balanceUsd.abs(),
                     Colors.red,
+                    currency: 'USD',
                   ),
                 ),
               ],
             ),
-
-            // USD slice (only shown when the account has USD activity)
-            if (freshAccount.creditLimitUsd > 0 || freshAccount.balanceUsd != 0) ...[
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildStatCard(
-                      context,
-                      'Available USD',
-                      freshAccount.creditLimitUsd > 0
-                          ? freshAccount.creditLimitUsd + freshAccount.balanceUsd
-                          : 0,
-                      Colors.green,
-                      currency: 'USD',
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildStatCard(
-                      context,
-                      'Used USD',
-                      freshAccount.balanceUsd.abs(),
-                      Colors.red,
-                      currency: 'USD',
-                    ),
-                  ),
-                ],
-              ),
-            ],
-            const SizedBox(height: 24),
-
-            // 4. Transactions / Extracts List
-            Text('Recent Transactions',
-                 style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-
-            transactionsAsync.when(
-              data: (transactions) {
-                if (transactions.isEmpty) return const Text('No transactions.');
-
-                // Group by (billingPeriod, currency) — key = "YYYY-MM::COP"
-                final Map<String, List<Transaction>> grouped = {};
-                for (var t in transactions) {
-                  final period = t.billingPeriod ?? 'Unassigned';
-                  final key = '$period::${t.currency}';
-                  grouped.putIfAbsent(key, () => []).add(t);
-                }
-
-                // Sort: newest period first, then COP before USD within same period
-                final sortedKeys = grouped.keys.toList()
-                  ..sort((a, b) {
-                    final aParts = a.split('::');
-                    final bParts = b.split('::');
-                    final periodCmp = bParts[0].compareTo(aParts[0]);
-                    if (periodCmp != 0) return periodCmp;
-                    return aParts[1].compareTo(bParts[1]); // COP before USD
-                  });
-
-                return Column(
-                  children: sortedKeys.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final key = entry.value;
-                    final parts = key.split('::');
-                    final period = parts[0];
-                    final currency = parts.length > 1 ? parts[1] : 'COP';
-                    final periodTransactions = grouped[key]!;
-                    final total = periodTransactions.fold(0.0, (sum, t) => sum + t.amount);
-
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      elevation: 1,
-                      child: ExpansionTile(
-                        initiallyExpanded: index == 0,
-                        shape: const Border(),
-                        title: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                _formatPeriod(period),
-                                style: const TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: currency == 'USD'
-                                    ? Colors.blue.withOpacity(0.12)
-                                    : Theme.of(context).colorScheme.primaryContainer,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                currency,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: currency == 'USD'
-                                      ? Colors.blue.shade700
-                                      : Theme.of(context).colorScheme.primary,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        subtitle: Text(
-                          'Total: ${CurrencyFormatter.format(total, currency: currency)}',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.primary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        children: periodTransactions.map((t) {
-                          final isCrossPayment = t.isCrossCurrencyPayment;
-                          return ListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 0),
-                            leading: CircleAvatar(
-                              radius: 4,
-                              backgroundColor: isCrossPayment
-                                  ? Colors.green.withOpacity(0.6)
-                                  : Theme.of(context)
-                                      .colorScheme
-                                      .primary
-                                      .withOpacity(0.5),
-                            ),
-                            title: Text(t.description,
-                                style: const TextStyle(
-                                    fontSize: 14, fontWeight: FontWeight.w500)),
-                            trailing: Text(
-                              CurrencyFormatter.format(t.amount, currency: t.currency),
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 13),
-                            ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                    DateFormat('d MMM', 'en').format(t.date),
-                                    style: const TextStyle(fontSize: 11)),
-                                if (isCrossPayment && t.fxRate != null)
-                                  Text(
-                                    'Payment in COP @ \$${NumberFormat('#,###', 'en_US').format(t.fxRate!.toInt())}',
-                                    style: TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.green.shade700),
-                                  ),
-                              ],
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    );
-                  }).toList(),
-                );
-              },
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, s) => Text('Error: $e'),
-            )
           ],
-        ),
+          const SizedBox(height: 16),
+          Text('Recent Transactions',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          transactionsAsync.when(
+            data: (transactions) {
+              if (transactions.isEmpty) return const Text('No transactions.');
+              final Map<String, List<Transaction>> grouped = {};
+              for (var t in transactions) {
+                final period = t.billingPeriod ?? 'Unassigned';
+                final key = '$period::${t.currency}';
+                grouped.putIfAbsent(key, () => []).add(t);
+              }
+              final sortedKeys = grouped.keys.toList()
+                ..sort((a, b) {
+                  final aParts = a.split('::');
+                  final bParts = b.split('::');
+                  final periodCmp = bParts[0].compareTo(aParts[0]);
+                  if (periodCmp != 0) return periodCmp;
+                  return aParts[1].compareTo(bParts[1]);
+                });
+              return Column(
+                children: sortedKeys.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final key = entry.value;
+                  final parts = key.split('::');
+                  final period = parts[0];
+                  final currency = parts.length > 1 ? parts[1] : 'COP';
+                  final periodTransactions = grouped[key]!;
+                  final total = periodTransactions.fold(0.0, (sum, t) => sum + t.amount);
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: kSpaceLg),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 1,
+                    child: ExpansionTile(
+                      initiallyExpanded: index == 0,
+                      shape: const Border(),
+                      title: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              _formatPeriod(period),
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: currency == 'USD'
+                                  ? Colors.blue.withOpacity(0.12)
+                                  : Theme.of(context).colorScheme.primaryContainer,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              currency,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: currency == 'USD'
+                                    ? Colors.blue.shade700
+                                    : Theme.of(context).colorScheme.primary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      subtitle: Text(
+                        'Total: ${CurrencyFormatter.format(total, currency: currency)}',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      children: periodTransactions
+                          .map((t) => TransactionTile(
+                                transaction: t,
+                                showSign: false,
+                              ))
+                          .toList(),
+                    ),
+                  );
+                }).toList(),
+              );
+            },
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, s) => Text('Error: $e'),
+          ),
+        ],
       ),
     );
   }
@@ -277,7 +233,6 @@ class CreditCardDetailsScreen extends ConsumerWidget {
     final rules = acc.creditCardRules;
     final banksAsync = ref.watch(banksFutureProvider);
 
-    // Watch calendar overrides so "Upcoming Dates" reflects manual edits
     final now = DateTime.now();
     final calendarThisYear = ref
         .watch(billingCalendarProvider((accountId: acc.id, year: now.year)))
@@ -293,7 +248,8 @@ class CreditCardDetailsScreen extends ConsumerWidget {
           padding: const EdgeInsets.all(24),
           child: Column(
             children: [
-              Icon(Icons.rule, size: 48, color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.4)),
+              Icon(Icons.rule, size: 48,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.4)),
               const SizedBox(height: 12),
               Text(
                 'No statement and payment rules configured',
@@ -319,18 +275,14 @@ class CreditCardDetailsScreen extends ConsumerWidget {
         final bank = banks.where((b) => b.id == rules.bankId).firstOrNull;
         final bankName = bank?.name ?? 'Unknown bank';
 
-        // Calculate next 3 months, merging with any calendar overrides
         final upcomingDates = <_CutoffPaymentPair>[];
         if (bank != null) {
           for (int i = 0; i < 3; i++) {
             final targetDate = DateTime(now.year, now.month + i);
-            final overrides = targetDate.year == now.year
-                ? calendarThisYear
-                : calendarNextYear;
+            final overrides = targetDate.year == now.year ? calendarThisYear : calendarNextYear;
             final override = overrides[targetDate.month];
             final cutoff = override?.cutoff ??
-                CreditCardCalculator.calculateCutoffDate(
-                    rules, bank, targetDate.year, targetDate.month);
+                CreditCardCalculator.calculateCutoffDate(rules, bank, targetDate.year, targetDate.month);
             final payment = override?.payment ??
                 CreditCardCalculator.calculatePaymentDate(rules, bank, cutoff);
             upcomingDates.add(_CutoffPaymentPair(cutoff, payment));
@@ -340,17 +292,15 @@ class CreditCardDetailsScreen extends ConsumerWidget {
         return Card(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: kCardPadding,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Statement & Payment Rules',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                    ),
+                    Text('Statement & Payment Rules',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                     IconButton(
                       icon: const Icon(Icons.edit_outlined, size: 20),
                       onPressed: () => _showRulesBottomSheet(context, ref, acc),
@@ -361,29 +311,17 @@ class CreditCardDetailsScreen extends ConsumerWidget {
                 const SizedBox(height: 8),
                 _buildRuleRow(context, Icons.account_balance, 'Bank', bankName),
                 const SizedBox(height: 6),
-                _buildRuleRow(
-                  context,
-                  Icons.content_cut,
-                  'Statement',
-                  _describeCutoffRule(rules),
-                  color: Theme.of(context).colorScheme.primary,
-                ),
+                _buildRuleRow(context, Icons.content_cut, 'Statement', _describeCutoffRule(rules),
+                    color: Theme.of(context).colorScheme.primary),
                 const SizedBox(height: 6),
-                _buildRuleRow(
-                  context,
-                  Icons.payment,
-                  'Payment',
-                  _describePaymentRule(rules),
-                  color: Colors.green,
-                ),
+                _buildRuleRow(context, Icons.payment, 'Payment', _describePaymentRule(rules),
+                    color: Colors.green),
                 if (upcomingDates.isNotEmpty) ...[
-                  const SizedBox(height: 16),
+                  kGapXl,
                   const Divider(),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Upcoming Dates',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-                  ),
+                  kGapLg,
+                  Text('Upcoming Dates',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
                   ...upcomingDates.map((pair) => _buildDateRow(context, pair)),
                 ],
@@ -393,16 +331,10 @@ class CreditCardDetailsScreen extends ConsumerWidget {
         );
       },
       loading: () => const Card(
-        child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Center(child: CircularProgressIndicator()),
-        ),
+        child: Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator())),
       ),
       error: (e, _) => Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Text('Error loading banks: $e'),
-        ),
+        child: Padding(padding: const EdgeInsets.all(16), child: Text('Error loading banks: $e')),
       ),
     );
   }
@@ -429,30 +361,23 @@ class CreditCardDetailsScreen extends ConsumerWidget {
             width: 80,
             child: Text(
               monthFormat.format(pair.cutoff).toUpperCase(),
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
           ),
           Expanded(
-            child: Row(
-              children: [
-                Icon(Icons.content_cut, size: 14, color: Theme.of(context).colorScheme.primary),
-                const SizedBox(width: 4),
-                Text(dateFormat.format(pair.cutoff), style: const TextStyle(fontSize: 12)),
-              ],
-            ),
+            child: Row(children: [
+              Icon(Icons.content_cut, size: 14, color: Theme.of(context).colorScheme.primary),
+              const SizedBox(width: 4),
+              Text(dateFormat.format(pair.cutoff), style: const TextStyle(fontSize: 12)),
+            ]),
           ),
           Expanded(
-            child: Row(
-              children: [
-                const Icon(Icons.payment, size: 14, color: Colors.green),
-                const SizedBox(width: 4),
-                Text(dateFormat.format(pair.payment), style: const TextStyle(fontSize: 12)),
-              ],
-            ),
+            child: Row(children: [
+              const Icon(Icons.payment, size: 14, color: Colors.green),
+              const SizedBox(width: 4),
+              Text(dateFormat.format(pair.payment), style: const TextStyle(fontSize: 12)),
+            ]),
           ),
         ],
       ),
@@ -460,18 +385,12 @@ class CreditCardDetailsScreen extends ConsumerWidget {
   }
 
   String _describeCutoffRule(CreditCardRules rules) {
-    if (rules.cutoffType == CutoffType.fixed) {
-      return 'Day ${rules.nominalCutoffDay}';
-    }
+    if (rules.cutoffType == CutoffType.fixed) return 'Day ${rules.nominalCutoffDay}';
     switch (rules.relativeCutoffType) {
-      case RelativeCutoffType.secondToLastBusinessDay:
-        return 'Second-to-last business day';
-      case RelativeCutoffType.lastBusinessDay:
-        return 'Last business day';
-      case RelativeCutoffType.firstBusinessDay:
-        return 'First business day';
-      default:
-        return 'Relative';
+      case RelativeCutoffType.secondToLastBusinessDay: return 'Second-to-last business day';
+      case RelativeCutoffType.lastBusinessDay: return 'Last business day';
+      case RelativeCutoffType.firstBusinessDay: return 'First business day';
+      default: return 'Relative';
     }
   }
 
@@ -488,20 +407,14 @@ class CreditCardDetailsScreen extends ConsumerWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (sheetContext) => _CreditCardRulesBottomSheet(
-        account: acc,
-        parentRef: ref,
-      ),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (sheetContext) => _CreditCardRulesBottomSheet(account: acc, parentRef: ref),
     );
   }
 
   String _formatPeriod(String period) {
     if (period == 'Unassigned') return period;
     try {
-      // Expect YYYY-MM
       final parts = period.split('-');
       if (parts.length == 2) {
         final date = DateTime(int.parse(parts[0]), int.parse(parts[1]));
@@ -511,10 +424,10 @@ class CreditCardDetailsScreen extends ConsumerWidget {
     return period;
   }
 
-
-  Widget _buildStatCard(BuildContext context, String label, double amount, Color color, {String currency = 'COP'}) {
+  Widget _buildStatCard(BuildContext context, String label, double amount, Color color,
+      {String currency = 'COP', bool isApprox = false}) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: kCardPadding,
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(16),
@@ -523,15 +436,68 @@ class CreditCardDetailsScreen extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(label.toUpperCase(),
-               style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant)),
           const SizedBox(height: 4),
-          Text(CurrencyFormatter.format(amount, currency: currency),
-               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
+          Text(
+            '${isApprox ? "≈ " : ""}${CurrencyFormatter.format(amount, currency: currency)}',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color),
+          ),
+          if (isApprox) ...[
+            const SizedBox(height: 2),
+            Text('USD debt converted at TRM',
+                style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+          ],
         ],
       ),
     );
   }
 }
+
+// ── Full screen (thin wrapper around CreditCardDetailsBody) ───────────────────
+
+class CreditCardDetailsScreen extends ConsumerWidget {
+  final String accountId;
+
+  const CreditCardDetailsScreen({super.key, required this.accountId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final account = ref
+        .watch(accountsProvider)
+        .valueOrNull
+        ?.where((a) => a.id == accountId)
+        .firstOrNull;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(account?.name ?? ''),
+        actions: [
+          if (account != null)
+            IconButton(
+              icon: const Icon(Icons.edit),
+              onPressed: () => showDialog(
+                context: context,
+                builder: (context) => EditAccountDialog(account: account),
+              ).then((_) => ref.invalidate(accountsProvider)),
+            ),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          ref.invalidate(accountsProvider);
+          ref.invalidate(accountDetailTransactionsProvider(accountId));
+          ref.invalidate(fxRateProvider);
+          await ref.read(accountsProvider.future);
+        },
+        child: CreditCardDetailsBody(accountId: accountId),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Private helpers
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _CutoffPaymentPair {
   final DateTime cutoff;
@@ -556,6 +522,7 @@ class _CreditCardRulesBottomSheetState extends ConsumerState<_CreditCardRulesBot
   final _formKey = GlobalKey<FormState>();
   final _cutoffDayController = TextEditingController();
   final _paymentDayController = TextEditingController();
+  final _installmentRateController = TextEditingController();
   Bank? _selectedBank;
   bool _saving = false;
 
@@ -564,7 +531,6 @@ class _CreditCardRulesBottomSheetState extends ConsumerState<_CreditCardRulesBot
   @override
   void initState() {
     super.initState();
-    // Pre-fill from existing rules
     final rules = widget.account.creditCardRules;
     if (rules != null) {
       if (rules.nominalCutoffDay != null) {
@@ -573,6 +539,10 @@ class _CreditCardRulesBottomSheetState extends ConsumerState<_CreditCardRulesBot
       if (rules.nominalPaymentDay != null) {
         _paymentDayController.text = rules.nominalPaymentDay.toString();
       }
+      if (rules.defaultInstallmentRate > 0) {
+        _installmentRateController.text =
+            (rules.defaultInstallmentRate * 100).toStringAsFixed(3);
+      }
     }
   }
 
@@ -580,6 +550,7 @@ class _CreditCardRulesBottomSheetState extends ConsumerState<_CreditCardRulesBot
   void dispose() {
     _cutoffDayController.dispose();
     _paymentDayController.dispose();
+    _installmentRateController.dispose();
     super.dispose();
   }
 
@@ -620,13 +591,17 @@ class _CreditCardRulesBottomSheetState extends ConsumerState<_CreditCardRulesBot
         paymentDay: paymentDay,
       );
 
+      final rateText = _installmentRateController.text.trim();
+      rulesMap['default_installment_rate'] =
+          ((double.tryParse(rateText) ?? 0.0) / 100.0);
+
       await ref.read(financeRepositoryProvider).updateAccount(
         widget.account.id,
         {'credit_card_details': rulesMap},
       );
 
       widget.parentRef.invalidate(accountsProvider);
-      widget.parentRef.invalidate(accountTransactionsProvider(widget.account.id));
+      widget.parentRef.invalidate(accountDetailTransactionsProvider(widget.account.id));
 
       if (mounted) {
         Navigator.of(context).pop();
@@ -649,7 +624,6 @@ class _CreditCardRulesBottomSheetState extends ConsumerState<_CreditCardRulesBot
   Widget build(BuildContext context) {
     final banksAsync = ref.watch(banksFutureProvider);
 
-    // Pre-select bank from existing rules
     if (_selectedBank == null && widget.account.creditCardRules != null) {
       banksAsync.whenData((banks) {
         final match = banks.where((b) => b.id == widget.account.creditCardRules!.bankId).firstOrNull;
@@ -684,14 +658,12 @@ class _CreditCardRulesBottomSheetState extends ConsumerState<_CreditCardRulesBot
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            kGapXl,
             Text(
               'Statement & Payment Rules',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 20),
-
-            // Bank selector
+            kGapXl,
             banksAsync.when(
               data: (banks) => DropdownButtonFormField<Bank>(
                 value: _selectedBank,
@@ -708,9 +680,7 @@ class _CreditCardRulesBottomSheetState extends ConsumerState<_CreditCardRulesBot
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Text('Error loading banks: $e'),
             ),
-            const SizedBox(height: 16),
-
-            // RappiCard auto-rules info
+            kGapXl,
             if (_isRappiCard)
               Container(
                 padding: const EdgeInsets.all(12),
@@ -732,8 +702,6 @@ class _CreditCardRulesBottomSheetState extends ConsumerState<_CreditCardRulesBot
                   ],
                 ),
               ),
-
-            // Manual day fields (non-Rappi)
             if (_selectedBank != null && !_isRappiCard) ...[
               Row(
                 children: [
@@ -775,16 +743,27 @@ class _CreditCardRulesBottomSheetState extends ConsumerState<_CreditCardRulesBot
                 ],
               ),
             ],
-
-            const SizedBox(height: 24),
-
-            // Calendar override button — only when rules are already saved
+            kGapXl,
+            TextFormField(
+              controller: _installmentRateController,
+              decoration: const InputDecoration(
+                labelText: 'Default installment interest rate (monthly %)',
+                suffixText: '%',
+                border: OutlineInputBorder(),
+                hintText: 'e.g. 2.500',
+                helperText:
+                    'Used as the default when recording a new installment purchase on this card. Can be overridden per purchase.',
+                helperMaxLines: 2,
+              ),
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            ),
+            kGapXl,
             if (widget.account.creditCardRules != null && _selectedBank != null)
               OutlinedButton.icon(
                 icon: const Icon(Icons.calendar_month_outlined, size: 18),
                 label: const Text('View and edit yearly dates'),
                 onPressed: () {
-                  Navigator.of(context).pop(); // close rules sheet
+                  Navigator.of(context).pop();
                   showModalBottomSheet(
                     context: context,
                     isScrollControlled: true,
@@ -801,9 +780,7 @@ class _CreditCardRulesBottomSheetState extends ConsumerState<_CreditCardRulesBot
                   );
                 },
               ),
-
             const SizedBox(height: 12),
-
             SizedBox(
               width: double.infinity,
               child: FilledButton(
@@ -843,8 +820,7 @@ class _BillingCalendarSheet extends ConsumerStatefulWidget {
       _BillingCalendarSheetState();
 }
 
-class _BillingCalendarSheetState
-    extends ConsumerState<_BillingCalendarSheet> {
+class _BillingCalendarSheetState extends ConsumerState<_BillingCalendarSheet> {
   int _year = DateTime.now().year;
   final _fmt = DateFormat('d MMM', 'en');
 
@@ -862,7 +838,6 @@ class _BillingCalendarSheetState
       minChildSize: 0.5,
       builder: (ctx, scrollCtrl) => Column(
         children: [
-          // Handle
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 12),
             child: Center(
@@ -875,8 +850,6 @@ class _BillingCalendarSheetState
               ),
             ),
           ),
-
-          // Header + year selector
           Padding(
             padding: const EdgeInsets.fromLTRB(32, 0, 8, 8),
             child: Row(
@@ -899,8 +872,6 @@ class _BillingCalendarSheetState
               ],
             ),
           ),
-
-          // Column headers
           Padding(
             padding: const EdgeInsets.fromLTRB(32, 0, 32, 4),
             child: Row(
@@ -927,8 +898,6 @@ class _BillingCalendarSheetState
             ),
           ),
           const Divider(height: 1),
-
-          // Months list
           Expanded(
             child: calendarAsync.when(
               data: (overrides) => ListView.separated(
@@ -962,8 +931,7 @@ class _BillingCalendarSheetState
                   );
                 },
               ),
-              loading: () =>
-                  const Center(child: CircularProgressIndicator()),
+              loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(child: Text('Error: $e')),
             ),
           ),
@@ -1082,7 +1050,6 @@ class _MonthRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 10),
       child: Row(
         children: [
-          // Month name
           SizedBox(
             width: 120,
             child: Row(
@@ -1105,11 +1072,8 @@ class _MonthRow extends StatelessWidget {
               ],
             ),
           ),
-          // Cutoff date
           Expanded(child: Text(fmt.format(cutoff), style: textStyle)),
-          // Payment date
           Expanded(child: Text(fmt.format(payment), style: textStyle)),
-          // Actions
           SizedBox(
             width: 96,
             child: Row(
@@ -1203,7 +1167,6 @@ class _EditMonthDialogState extends State<_EditMonthDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Cutoff row
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.content_cut, color: Colors.orange),
@@ -1216,7 +1179,6 @@ class _EditMonthDialogState extends State<_EditMonthDialog> {
               ),
             ),
             const SizedBox(height: 8),
-            // Payment row
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.payment, color: Colors.green),

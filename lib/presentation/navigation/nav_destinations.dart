@@ -21,9 +21,16 @@ class NavDestination {
 const kNavDestinations = <NavDestination>[
   NavDestination(
     path: '/',
-    icon: Icons.home_outlined,
-    selectedIcon: Icons.home,
-    label: 'Home',
+    icon: Icons.receipt_long_outlined,
+    selectedIcon: Icons.receipt_long,
+    label: 'Transactions',
+    showOnMobile: true,
+  ),
+  NavDestination(
+    path: '/accounts',
+    icon: Icons.account_balance_wallet_outlined,
+    selectedIcon: Icons.account_balance_wallet,
+    label: 'Accounts',
     showOnMobile: true,
   ),
   NavDestination(
@@ -70,6 +77,5 @@ const kNavDestinations = <NavDestination>[
     icon: Icons.settings_outlined,
     selectedIcon: Icons.settings,
     label: 'Settings',
-    showOnMobile: true,
   ),
 ];

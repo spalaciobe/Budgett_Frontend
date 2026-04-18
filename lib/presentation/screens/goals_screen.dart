@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/presentation/widgets/add_goal_dialog.dart';
@@ -35,9 +36,9 @@ class GoalsScreen extends ConsumerWidget {
           }
           return ListView.separated(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(16),
+            padding: kScreenPadding,
             itemCount: goals.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 12),
+            separatorBuilder: (context, index) => kGapLg,
             itemBuilder: (context, index) {
               final goal = goals[index];
               
@@ -101,7 +102,7 @@ class GoalsScreen extends ConsumerWidget {
                     );
                   },
                   child: Padding(
-                    padding: const EdgeInsets.all(16.0),
+                    padding: kCardPadding,
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [

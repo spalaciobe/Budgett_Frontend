@@ -5,6 +5,25 @@ const _keyCurrency = "settings_currency";
 const _keyDarkMode = "settings_dark_mode";
 const _keyCcNotificationsEnabled = "settings_cc_notifications_enabled";
 const _keyCcNotificationsDaysBefore = "settings_cc_notifications_days_before";
+const _keyAccountSort = "settings_account_sort";
+
+enum AccountSortOption {
+  custom,
+  nameAsc,
+  nameDesc,
+  balanceDesc,
+  balanceAsc,
+  typeAsc;
+
+  String get label => switch (this) {
+        AccountSortOption.custom => "Custom order",
+        AccountSortOption.nameAsc => "Name (A–Z)",
+        AccountSortOption.nameDesc => "Name (Z–A)",
+        AccountSortOption.balanceDesc => "Balance (high to low)",
+        AccountSortOption.balanceAsc => "Balance (low to high)",
+        AccountSortOption.typeAsc => "Type",
+      };
+}
 
 class CurrencyNotifier extends AsyncNotifier<String> {
   @override
@@ -74,3 +93,26 @@ class CcNotificationDaysBeforeNotifier extends AsyncNotifier<int> {
 final ccNotificationDaysBeforeProvider =
     AsyncNotifierProvider<CcNotificationDaysBeforeNotifier, int>(
         CcNotificationDaysBeforeNotifier.new);
+
+class AccountSortNotifier extends AsyncNotifier<AccountSortOption> {
+  @override
+  Future<AccountSortOption> build() async {
+    final prefs = await SharedPreferences.getInstance();
+    final stored = prefs.getString(_keyAccountSort);
+    return AccountSortOption.values.firstWhere(
+      (o) => o.name == stored,
+      orElse: () => AccountSortOption.custom,
+    );
+  }
+
+  Future<void> setSort(AccountSortOption option) async {
+    state = AsyncData(option); // optimistic update
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyAccountSort, option.name);
+  }
+}
+
+final accountSortProvider =
+    AsyncNotifierProvider<AccountSortNotifier, AccountSortOption>(
+        AccountSortNotifier.new);
+

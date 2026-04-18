@@ -16,6 +16,7 @@ class CreditCardRules {
   final String? paymentMonth; // 'same' | 'next'
   final int? daysAfterCutoff;
   final OffsetType paymentOffsetType;
+  final double defaultInstallmentRate; // monthly decimal, e.g. 0.025 = 2.5%
 
   CreditCardRules({
     required this.id,
@@ -30,6 +31,7 @@ class CreditCardRules {
     this.paymentMonth,
     this.daysAfterCutoff,
     this.paymentOffsetType = OffsetType.calendar,
+    this.defaultInstallmentRate = 0.0,
   });
 
   factory CreditCardRules.fromJson(Map<String, dynamic> json) {
@@ -46,6 +48,8 @@ class CreditCardRules {
       paymentMonth: json['mes_pago'],
       daysAfterCutoff: json['dias_despues_corte'],
       paymentOffsetType: _parseOffsetType(json['tipo_offset_pago']),
+      defaultInstallmentRate:
+          (json['default_installment_rate'] as num?)?.toDouble() ?? 0.0,
     );
   }
 

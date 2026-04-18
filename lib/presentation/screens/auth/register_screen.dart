@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -203,7 +204,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         child: Container(
           constraints: const BoxConstraints(maxWidth: 440),
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+            padding: kDialogPadding,
             child: Form(
               key: _formKey,
               child: Column(
@@ -266,7 +267,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
 
                   // ── Profile ────────────────────────────────────────────────
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
                   _SectionLabel('Profile'),
                   const SizedBox(height: 12),
                   TextFormField(
@@ -349,7 +350,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ],
                   ),
 
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 20),
                   if (_isLoading)
                     const Center(child: CircularProgressIndicator())
                   else

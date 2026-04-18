@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 
@@ -93,9 +94,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Widget _buildForm() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Form(
+    return RefreshIndicator(
+      onRefresh: () async {
+        ref.invalidate(profileProvider);
+        await ref.read(profileProvider.future);
+      },
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: kDialogPadding,
+        child: Form(
         key: _formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -107,7 +114,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 prefixIcon: Icon(Icons.alternate_email),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
             TextFormField(
               controller: _firstNameController,
               decoration: const InputDecoration(
@@ -116,7 +123,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ),
               textCapitalization: TextCapitalization.words,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
             TextFormField(
               controller: _lastNameController,
               decoration: const InputDecoration(
@@ -125,7 +132,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ),
               textCapitalization: TextCapitalization.words,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
             TextFormField(
               controller: _phoneController,
               decoration: const InputDecoration(
@@ -134,7 +141,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ),
               keyboardType: TextInputType.phone,
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 20),
             FilledButton(
               onPressed: _saving ? null : _save,
               child: _saving
@@ -146,6 +153,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   : const Text('Save'),
             ),
           ],
+        ),
         ),
       ),
     );

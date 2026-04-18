@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -30,26 +31,31 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
   late TextEditingController _creditLimitUsdController;
   late TextEditingController _closingDayController;
   late TextEditingController _paymentDueDayController;
+  late TextEditingController _minPaymentCopController;
+  late TextEditingController _minPaymentUsdController;
 
   // Investment controllers
-  late TextEditingController _apyRateController;
   late TextEditingController _principalController;
   late TextEditingController _interestRateController;
   late TextEditingController _termDaysController;
   late TextEditingController _fundCodeController;
+
+  // Savings APY controller (applies to type='savings', parent or pocket)
+  late TextEditingController _apyRateController;
 
   late String _selectedType;
   String? _selectedIcon;
   Uint8List? _pendingIconBytes;
 
   // Investment state
-  InvestmentType _selectedInvestmentType = InvestmentType.highYield;
+  InvestmentType _selectedInvestmentType = InvestmentType.cdt;
   String _investmentBaseCurrency = 'COP';
   Broker? _selectedBroker;
-  String _investmentInterestPeriod = 'monthly';
+  String _savingsInterestPeriod = 'monthly';
   DateTime? _cdtStartDate;
   DateTime? _cdtMaturityDate;
-  DateTime? _highYieldLastInterestDate;
+  DateTime? _savingsLastInterestDate;
+  double? _initialApyRate; // decimal form captured on open
 
   bool _isLoading = false;
 
@@ -75,34 +81,54 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
     );
     _closingDayController = TextEditingController(text: acc.closingDay?.toString() ?? '');
     _paymentDueDayController = TextEditingController(text: acc.paymentDueDay?.toString() ?? '');
+    _minPaymentCopController = TextEditingController(
+      text: acc.minimumPaymentCop > 0
+          ? CurrencyFormatter.format(acc.minimumPaymentCop, includeSymbol: false)
+          : '',
+    );
+    _minPaymentUsdController = TextEditingController(
+      text: acc.minimumPaymentUsd > 0
+          ? CurrencyFormatter.format(acc.minimumPaymentUsd,
+              includeSymbol: false, currency: 'USD')
+          : '',
+    );
 
     _selectedType = acc.type;
     _selectedIcon = acc.icon;
 
     // Investment fields — initialise from existing details if present
     final inv = acc.investmentDetails;
-    _apyRateController = TextEditingController(
-      text: inv?.apyRate != null ? (inv!.apyRate! * 100).toStringAsFixed(2) : '',
-    );
     _principalController = TextEditingController(
       text: inv?.principal != null
           ? CurrencyFormatter.format(inv!.principal!, includeSymbol: false)
           : '',
     );
     _interestRateController = TextEditingController(
-      text: inv?.interestRate != null ? (inv!.interestRate! * 100).toStringAsFixed(2) : '',
+      text: inv?.interestRate != null
+          ? (inv!.interestRate! * 100).toStringAsFixed(2)
+          : '',
     );
-    _termDaysController = TextEditingController(text: inv?.termDays?.toString() ?? '');
+    _termDaysController =
+        TextEditingController(text: inv?.termDays?.toString() ?? '');
     _fundCodeController = TextEditingController(text: inv?.fundCode ?? '');
 
     if (inv != null) {
       _selectedInvestmentType = inv.investmentType;
       _investmentBaseCurrency = inv.baseCurrency;
-      _investmentInterestPeriod = inv.interestPeriod ?? 'monthly';
       _cdtStartDate = inv.startDate;
       _cdtMaturityDate = inv.maturityDate;
-      _highYieldLastInterestDate = inv.lastInterestDate;
     }
+
+    // Savings interest — initialise from existing savings_interest_details
+    final sid = acc.interestDetails;
+    _initialApyRate = sid?.apyRate;
+    _apyRateController = TextEditingController(
+      text: sid?.apyRate != null
+          ? (sid!.apyRate! * 100).toStringAsFixed(2)
+          : '',
+    );
+    _savingsInterestPeriod = sid?.interestPeriod ?? 'monthly';
+    _savingsLastInterestDate = sid?.lastInterestDate;
   }
 
   @override
@@ -114,6 +140,8 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
     _creditLimitUsdController.dispose();
     _closingDayController.dispose();
     _paymentDueDayController.dispose();
+    _minPaymentCopController.dispose();
+    _minPaymentUsdController.dispose();
     _apyRateController.dispose();
     _principalController.dispose();
     _interestRateController.dispose();
@@ -164,40 +192,50 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
       );
     }
 
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        preview,
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                hasImage ? 'Image selected' : (hasUrl ? 'Custom icon' : 'No icon selected'),
-                style: theme.textTheme.bodyMedium,
+        Row(
+          children: [
+            preview,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    hasImage ? 'Image selected' : (hasUrl ? 'Custom icon' : 'No icon selected'),
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                  Text(
+                    'Optional — 256×256 image (JPG/PNG)',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
               ),
-              Text(
-                'Optional — 256×256 image (JPG/PNG)',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
-        if (hasImage || hasUrl)
-          IconButton(
-            icon: const Icon(Icons.close),
-            tooltip: 'Remove icon',
-            onPressed: () => setState(() {
-              _pendingIconBytes = null;
-              _selectedIcon = null;
-            }),
-          ),
-        TextButton.icon(
-          onPressed: _pickIcon,
-          icon: const Icon(Icons.upload, size: 18),
-          label: Text(hasImage || hasUrl ? 'Change' : 'Choose'),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            if (hasImage || hasUrl)
+              TextButton.icon(
+                icon: const Icon(Icons.close, size: 16),
+                label: const Text('Remove'),
+                onPressed: () => setState(() {
+                  _pendingIconBytes = null;
+                  _selectedIcon = null;
+                }),
+              ),
+            TextButton.icon(
+              onPressed: _pickIcon,
+              icon: const Icon(Icons.upload, size: 18),
+              label: Text(hasImage || hasUrl ? 'Change' : 'Choose'),
+            ),
+          ],
         ),
       ],
     );
@@ -252,6 +290,13 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
       accountData['payment_due_day'] = _paymentDueDayController.text.isEmpty
           ? null
           : int.parse(_paymentDueDayController.text);
+      accountData['minimum_payment_cop'] = _minPaymentCopController.text.isEmpty
+          ? 0.0
+          : CurrencyFormatter.parse(_minPaymentCopController.text);
+      accountData['minimum_payment_usd'] = _minPaymentUsdController.text.isEmpty
+          ? 0.0
+          : CurrencyFormatter.parse(_minPaymentUsdController.text,
+              currency: 'USD');
     } else if (_selectedType == 'investment') {
       // Clear CC-specific fields
       accountData['credit_limit'] = 0.0;
@@ -270,13 +315,9 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
 
       accountData['investment_details'] = buildInvestmentDetailsMap(
         investmentType: _selectedInvestmentType,
-        brokerId: _selectedBroker?.id ?? widget.account.investmentDetails?.brokerId,
+        brokerId:
+            _selectedBroker?.id ?? widget.account.investmentDetails?.brokerId,
         baseCurrency: _investmentBaseCurrency,
-        apyRate: double.tryParse(_apyRateController.text) != null
-            ? double.parse(_apyRateController.text) / 100
-            : widget.account.investmentDetails?.apyRate,
-        interestPeriod: _investmentInterestPeriod,
-        lastInterestDate: _highYieldLastInterestDate,
         principal: _principalController.text.isEmpty
             ? widget.account.investmentDetails?.principal
             : CurrencyFormatter.parse(_principalController.text),
@@ -298,13 +339,54 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
       accountData['credit_limit_usd'] = 0.0;
       accountData['closing_day'] = null;
       accountData['payment_due_day'] = null;
+      accountData['minimum_payment_cop'] = 0.0;
+      accountData['minimum_payment_usd'] = 0.0;
     }
 
     try {
-      await ref.read(financeRepositoryProvider).updateAccount(widget.account.id, accountData);
-      
+      final repo = ref.read(financeRepositoryProvider);
+      await repo.updateAccount(widget.account.id, accountData);
+
+      // Savings APY — apply to type='savings' (parent or pocket).
+      if (_selectedType == 'savings') {
+        final newApyText = _apyRateController.text.trim();
+        final newApy = newApyText.isEmpty
+            ? null
+            : (double.tryParse(newApyText) ?? 0) / 100;
+        final existing = widget.account.interestDetails;
+
+        if (existing == null && newApy != null && newApy > 0) {
+          await repo.createSavingsInterestDetails(
+            accountId: widget.account.id,
+            apyRate: newApy,
+            interestPeriod: _savingsInterestPeriod,
+            lastInterestDate: _savingsLastInterestDate,
+          );
+        } else if (existing != null && newApy != null) {
+          final changed = (_initialApyRate ?? -1) != newApy;
+          if (changed) {
+            await repo.updateSavingsApy(
+              detailsId: existing.id,
+              oldApyRate: _initialApyRate,
+              oldBalance: widget.account.balance,
+              lastInterestDate: existing.lastInterestDate,
+              newApyRate: newApy,
+              newInterestPeriod: _savingsInterestPeriod,
+            );
+          } else {
+            // Period / last_interest_date patch without touching APY.
+            await repo.rawUpdateSavingsInterestDetails(existing.id, {
+              'interest_period': _savingsInterestPeriod,
+              if (_savingsLastInterestDate != null)
+                'last_interest_date':
+                    '${_savingsLastInterestDate!.year}-${_savingsLastInterestDate!.month.toString().padLeft(2, '0')}-${_savingsLastInterestDate!.day.toString().padLeft(2, '0')}',
+            });
+          }
+        }
+      }
+
       ref.invalidate(accountsProvider);
-      
+
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -384,9 +466,13 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
     final brokersAsync = ref.watch(brokersFutureProvider);
 
     return Dialog(
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: MediaQuery.of(context).size.width * 0.025,
+        vertical: 24,
+      ),
       child: Container(
         constraints: const BoxConstraints(maxWidth: 500, maxHeight: 700),
-        padding: const EdgeInsets.all(24),
+        padding: kDialogPadding,
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
@@ -405,7 +491,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
 
                 // Name
                 TextFormField(
@@ -416,7 +502,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                   ),
                   validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
 
                 // Type
                 DropdownButtonFormField<String>(
@@ -434,7 +520,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                   ],
                   onChanged: (value) => setState(() => _selectedType = value!),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
 
                 // Balance
                 TextFormField(
@@ -456,18 +542,111 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
 
                 // Icon picker
                 _buildIconPicker(),
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
+
+                // Savings APY block (applies to type=savings: parent or pocket)
+                if (_selectedType == 'savings') ...[
+                  const Divider(),
+                  Text('Interest (optional)',
+                      style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _apyRateController,
+                          decoration: const InputDecoration(
+                            labelText: 'APY (E.A. %)',
+                            suffixText: '%',
+                            border: OutlineInputBorder(),
+                            hintText: 'e.g. 9.25',
+                          ),
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: _savingsInterestPeriod,
+                          decoration: const InputDecoration(
+                            labelText: 'Period',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                                value: 'monthly', child: Text('Monthly')),
+                            DropdownMenuItem(
+                                value: 'daily', child: Text('Daily')),
+                            DropdownMenuItem(
+                                value: 'on_withdrawal',
+                                child: Text('On withdrawal')),
+                          ],
+                          onChanged: (v) =>
+                              setState(() => _savingsInterestPeriod = v!),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  InkWell(
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate:
+                            _savingsLastInterestDate ?? DateTime.now(),
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime.now(),
+                      );
+                      if (picked != null) {
+                        setState(() => _savingsLastInterestDate = picked);
+                      }
+                    },
+                    child: InputDecorator(
+                      decoration: InputDecoration(
+                        labelText: 'Last interest recorded',
+                        border: const OutlineInputBorder(),
+                        suffixIcon: _savingsLastInterestDate != null
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, size: 18),
+                                onPressed: () => setState(
+                                    () => _savingsLastInterestDate = null),
+                              )
+                            : const Icon(Icons.calendar_today, size: 18),
+                        helperText:
+                            'APY changes automatically close the current interest segment with the old rate before applying the new one.',
+                      ),
+                      child: Text(
+                        _savingsLastInterestDate != null
+                            ? DateFormat('MMM d, y')
+                                .format(_savingsLastInterestDate!)
+                            : 'Not set',
+                        style: _savingsLastInterestDate == null
+                            ? Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withOpacity(0.45))
+                            : null,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                ],
 
                 // Credit Card specific fields
                 if (isCreditCard) ...[
                   const Divider(),
                   Text('Credit Card Details', 
                     style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 10),
 
                   TextFormField(
                     controller: _creditLimitController,
@@ -479,7 +658,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     inputFormatters: [const CurrencyInputFormatter()],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 10),
 
                   // USD slice
                   const Divider(),
@@ -510,7 +689,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     inputFormatters: [const CurrencyInputFormatter(currency: 'USD')],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 10),
 
                   Row(
                     children: [
@@ -539,7 +718,43 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 10),
+
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _minPaymentCopController,
+                          decoration: const InputDecoration(
+                            labelText: 'Minimum Payment (COP)',
+                            prefixText: '\$',
+                            border: OutlineInputBorder(),
+                            helperText: 'From your statement.',
+                          ),
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          inputFormatters: [const CurrencyInputFormatter()],
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: TextFormField(
+                          controller: _minPaymentUsdController,
+                          decoration: const InputDecoration(
+                            labelText: 'Minimum Payment (USD)',
+                            prefixText: 'US\$',
+                            border: OutlineInputBorder(),
+                          ),
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          inputFormatters: [
+                            const CurrencyInputFormatter(currency: 'USD')
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
                 ],
 
                 // ── Investment section ────────────────────────────────────
@@ -547,7 +762,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                   const Divider(),
                   Text('Investment Details',
                       style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 10),
 
                   DropdownButtonFormField<InvestmentType>(
                     value: _selectedInvestmentType,
@@ -596,63 +811,6 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                     error: (e, _) => Text('Error: $e'),
                   ),
                   const SizedBox(height: 12),
-
-                  if (_selectedInvestmentType == InvestmentType.highYield) ...[
-                    TextFormField(
-                      controller: _apyRateController,
-                      decoration: const InputDecoration(
-                        labelText: 'APY (E.A. %)',
-                        suffixText: '%',
-                        border: OutlineInputBorder(),
-                      ),
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
-                    ),
-                    const SizedBox(height: 12),
-                    InkWell(
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate:
-                              _highYieldLastInterestDate ?? DateTime.now(),
-                          firstDate: DateTime(2000),
-                          lastDate: DateTime.now(),
-                        );
-                        if (picked != null) {
-                          setState(() => _highYieldLastInterestDate = picked);
-                        }
-                      },
-                      child: InputDecorator(
-                        decoration: InputDecoration(
-                          labelText: 'Last interest recorded',
-                          border: const OutlineInputBorder(),
-                          suffixIcon: _highYieldLastInterestDate != null
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear, size: 18),
-                                  onPressed: () => setState(
-                                      () => _highYieldLastInterestDate = null),
-                                )
-                              : const Icon(Icons.calendar_today, size: 18),
-                          helperText:
-                              'If changing the APY, record interest first then update here.',
-                        ),
-                        child: Text(
-                          _highYieldLastInterestDate != null
-                              ? DateFormat('MMM d, y')
-                                  .format(_highYieldLastInterestDate!)
-                              : 'Not set',
-                          style: _highYieldLastInterestDate == null
-                              ? Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurface
-                                        .withOpacity(0.45),
-                                  )
-                              : null,
-                        ),
-                      ),
-                    ),
-                  ],
 
                   if (_selectedInvestmentType == InvestmentType.cdt) ...[
                     TextFormField(
@@ -736,7 +894,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                   ],
                 ],
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
 
                 // Actions
                 OverflowBar(
