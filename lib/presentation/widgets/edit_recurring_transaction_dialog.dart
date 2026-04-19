@@ -67,7 +67,11 @@ class _EditRecurringTransactionDialogState
     for (final a in accounts) {
       items.add(DropdownMenuItem(
         value: a.id,
-        child: Text(a.name, style: const TextStyle(fontSize: 13)),
+        child: Text(
+          a.name,
+          style: const TextStyle(fontSize: 13),
+          overflow: TextOverflow.ellipsis,
+        ),
       ));
       for (final p in a.pockets) {
         items.add(DropdownMenuItem(
@@ -79,7 +83,13 @@ class _EditRecurringTransactionDialogState
                   size: 12,
                   color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
               const SizedBox(width: 4),
-              Text(p.name, style: const TextStyle(fontSize: 13)),
+              Expanded(
+                child: Text(
+                  p.name,
+                  style: const TextStyle(fontSize: 13),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
           ),
         ));
@@ -183,6 +193,7 @@ class _EditRecurringTransactionDialogState
                     Expanded(
                       child: DropdownButtonFormField<String>(
                         value: _currency,
+                        isExpanded: true,
                         decoration: const InputDecoration(
                           labelText: 'Currency',
                           border: OutlineInputBorder(),
@@ -199,6 +210,7 @@ class _EditRecurringTransactionDialogState
                 kGapMd,
                 DropdownButtonFormField<String>(
                   value: _frequency,
+                  isExpanded: true,
                   decoration: const InputDecoration(
                     labelText: 'Frequency',
                     border: OutlineInputBorder(),
@@ -231,6 +243,7 @@ class _EditRecurringTransactionDialogState
                     final valid = flat.any((a) => a.id == _accountId);
                     return DropdownButtonFormField<String>(
                       value: valid ? _accountId : null,
+                      isExpanded: true,
                       decoration: const InputDecoration(
                         labelText: 'Account',
                         border: OutlineInputBorder(),
@@ -251,6 +264,7 @@ class _EditRecurringTransactionDialogState
                     final valid = filtered.any((c) => c.id == _categoryId);
                     return DropdownButtonFormField<String?>(
                       value: valid ? _categoryId : null,
+                      isExpanded: true,
                       decoration: const InputDecoration(
                         labelText: 'Category (optional)',
                         border: OutlineInputBorder(),
@@ -262,7 +276,11 @@ class _EditRecurringTransactionDialogState
                         ),
                         ...filtered.map((c) => DropdownMenuItem<String?>(
                               value: c.id,
-                              child: Text(c.name, style: const TextStyle(fontSize: 13)),
+                              child: Text(
+                                c.name,
+                                style: const TextStyle(fontSize: 13),
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             )),
                       ],
                       onChanged: (v) => setState(() => _categoryId = v),

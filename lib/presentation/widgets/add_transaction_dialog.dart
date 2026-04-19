@@ -78,7 +78,11 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
       if (a.id != excludeId) {
         items.add(DropdownMenuItem(
           value: a.id,
-          child: Text(a.name, style: const TextStyle(fontSize: 13)),
+          child: Text(
+            a.name,
+            style: const TextStyle(fontSize: 13),
+            overflow: TextOverflow.ellipsis,
+          ),
         ));
       }
       for (final p in a.pockets) {
@@ -92,7 +96,13 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                   size: 12,
                   color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
               const SizedBox(width: 4),
-              Text(p.name, style: const TextStyle(fontSize: 13)),
+              Expanded(
+                child: Text(
+                  p.name,
+                  style: const TextStyle(fontSize: 13),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
           ),
         ));
@@ -450,6 +460,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
           const SizedBox(height: 8),
           DropdownButtonFormField<int>(
             value: _cuotasOptions.contains(_numCuotas) ? _numCuotas : 12,
+            isExpanded: true,
             decoration: const InputDecoration(
               labelText: 'Number of installments',
               border: OutlineInputBorder(),
@@ -744,6 +755,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                 // Type
                 DropdownButtonFormField<String>(
                   value: _selectedType,
+                  isExpanded: true,
                   decoration: const InputDecoration(
                     labelText: 'Type',
                     border: OutlineInputBorder(),
@@ -795,6 +807,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
                     value: _frequency,
+                    isExpanded: true,
                     decoration: const InputDecoration(
                       labelText: 'Frequency',
                       border: OutlineInputBorder(),
@@ -1034,6 +1047,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                   expenseGroupsAsync.when(
                     data: (groups) => DropdownButtonFormField<String?>(
                       value: _selectedExpenseGroupId,
+                      isExpanded: true,
                       decoration: const InputDecoration(
                         labelText: 'Expense Group (optional)',
                         border: OutlineInputBorder(),
@@ -1043,7 +1057,11 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                             value: null, child: Text('None')),
                         ...groups.map((ExpenseGroup g) =>
                             DropdownMenuItem<String?>(
-                                value: g.id, child: Text(g.name))),
+                                value: g.id,
+                                child: Text(
+                                  g.name,
+                                  overflow: TextOverflow.ellipsis,
+                                ))),
                       ],
                       onChanged: (v) =>
                           setState(() => _selectedExpenseGroupId = v),

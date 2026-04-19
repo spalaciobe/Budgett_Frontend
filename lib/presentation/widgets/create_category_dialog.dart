@@ -355,6 +355,7 @@ class _SavingsTargetAccountField extends ConsumerWidget {
         }
         return DropdownButtonFormField<String?>(
           value: selectedId,
+          isExpanded: true,
           decoration: const InputDecoration(
             labelText: 'Destination account (optional)',
             helperText: 'Where the money physically lives. Purely informational.',

@@ -211,6 +211,7 @@ class _EditHoldingDialogState extends ConsumerState<EditHoldingDialog> {
                 // Asset class
                 DropdownButtonFormField<String>(
                   value: _assetClass,
+                  isExpanded: true,
                   decoration: const InputDecoration(
                     labelText: 'Asset Class',
                     border: OutlineInputBorder(),
@@ -230,6 +231,7 @@ class _EditHoldingDialogState extends ConsumerState<EditHoldingDialog> {
                 // Currency
                 DropdownButtonFormField<String>(
                   value: _currency,
+                  isExpanded: true,
                   decoration: const InputDecoration(
                     labelText: 'Price Currency',
                     border: OutlineInputBorder(),

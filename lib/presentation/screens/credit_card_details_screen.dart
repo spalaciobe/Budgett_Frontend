@@ -209,6 +209,8 @@ class CreditCardDetailsBody extends ConsumerWidget {
                           color: Theme.of(context).colorScheme.primary,
                           fontWeight: FontWeight.w600,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       children: periodTransactions
                           .map((t) => TransactionTile(
@@ -345,7 +347,13 @@ class CreditCardDetailsBody extends ConsumerWidget {
         Icon(icon, size: 18, color: color ?? Theme.of(context).colorScheme.onSurfaceVariant),
         const SizedBox(width: 8),
         Text('$label: ', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-        Expanded(child: Text(value, style: const TextStyle(fontSize: 13))),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(fontSize: 13),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
       ],
     );
   }
@@ -439,9 +447,15 @@ class CreditCardDetailsBody extends ConsumerWidget {
               style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold,
                   color: Theme.of(context).colorScheme.onSurfaceVariant)),
           const SizedBox(height: 4),
-          Text(
-            '${isApprox ? "≈ " : ""}${CurrencyFormatter.format(amount, currency: currency)}',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              '${isApprox ? "≈ " : ""}${CurrencyFormatter.format(amount, currency: currency)}',
+              maxLines: 1,
+              softWrap: false,
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color),
+            ),
           ),
           if (isApprox) ...[
             const SizedBox(height: 2),
@@ -667,12 +681,19 @@ class _CreditCardRulesBottomSheetState extends ConsumerState<_CreditCardRulesBot
             banksAsync.when(
               data: (banks) => DropdownButtonFormField<Bank>(
                 value: _selectedBank,
+                isExpanded: true,
                 decoration: const InputDecoration(
                   labelText: 'Issuing Bank',
                   border: OutlineInputBorder(),
                 ),
                 items: banks
-                    .map((b) => DropdownMenuItem(value: b, child: Text(b.name)))
+                    .map((b) => DropdownMenuItem(
+                          value: b,
+                          child: Text(
+                            b.name,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ))
                     .toList(),
                 onChanged: _onBankSelected,
                 validator: (v) => v == null ? 'Select a bank' : null,

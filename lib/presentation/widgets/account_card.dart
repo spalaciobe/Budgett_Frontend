@@ -86,12 +86,16 @@ class AccountCard extends StatelessWidget {
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurface.withOpacity(0.5),
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   )
                 : Text(
                     CurrencyFormatter.format(acc.balanceUsd, currency: 'USD'),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurface.withOpacity(0.5),
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   )))
         : const SizedBox.shrink();
 

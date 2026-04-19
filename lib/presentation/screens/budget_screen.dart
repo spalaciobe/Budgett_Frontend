@@ -783,9 +783,13 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
                     decoration: BoxDecoration(color: color, shape: BoxShape.circle),
                   ),
                   const SizedBox(width: 4),
-                  Text(
-                    '${c.name}  ${pct.toStringAsFixed(0)}%',
-                    style: const TextStyle(fontSize: 11),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 180),
+                    child: Text(
+                      '${c.name}  ${pct.toStringAsFixed(0)}%',
+                      style: const TextStyle(fontSize: 11),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
               );

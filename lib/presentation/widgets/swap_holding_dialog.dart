@@ -171,6 +171,7 @@ class _SwapHoldingDialogState extends ConsumerState<SwapHoldingDialog> {
                 // Source
                 DropdownButtonFormField<String>(
                   value: _sourceId,
+                  isExpanded: true,
                   decoration: const InputDecoration(
                     labelText: 'From',
                     border: OutlineInputBorder(),
@@ -231,6 +232,7 @@ class _SwapHoldingDialogState extends ConsumerState<SwapHoldingDialog> {
                 // Destination
                 DropdownButtonFormField<String>(
                   value: _destId,
+                  isExpanded: true,
                   decoration: const InputDecoration(
                     labelText: 'To',
                     border: OutlineInputBorder(),
@@ -297,6 +299,7 @@ class _SwapHoldingDialogState extends ConsumerState<SwapHoldingDialog> {
                       flex: 2,
                       child: DropdownButtonFormField<String>(
                         value: _feeCurrency,
+                        isExpanded: true,
                         decoration: const InputDecoration(
                           labelText: 'In',
                           border: OutlineInputBorder(),
@@ -309,8 +312,13 @@ class _SwapHoldingDialogState extends ConsumerState<SwapHoldingDialog> {
                         }
                             .whereType<String>()
                             .toSet()
-                            .map((c) =>
-                                DropdownMenuItem(value: c, child: Text(c)))
+                            .map((c) => DropdownMenuItem(
+                                  value: c,
+                                  child: Text(
+                                    c,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ))
                             .toList(),
                         onChanged: (v) => setState(() => _feeCurrency = v),
                       ),

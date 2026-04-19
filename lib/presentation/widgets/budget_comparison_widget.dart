@@ -68,8 +68,12 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(widget.categoryName,
-                          style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Text(
+                        widget.categoryName,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                       const SizedBox(height: 4),
                       Text(
                         widget.isIncome

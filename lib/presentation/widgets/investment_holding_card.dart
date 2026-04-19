@@ -139,39 +139,48 @@ class InvestmentHoldingCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Market Value',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color:
-                              theme.colorScheme.onSurface.withOpacity(0.6),
-                        )),
-                    Text(
-                      CurrencyFormatter.format(holding.marketValue,
-                          currency: holding.currency),
-                      style: theme.textTheme.bodyMedium
-                          ?.copyWith(fontWeight: FontWeight.w600),
-                    ),
-                  ],
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text('Unrealized P&L',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color:
-                              theme.colorScheme.onSurface.withOpacity(0.6),
-                        )),
-                    Text(
-                      '${isPositive ? '+' : ''}${CurrencyFormatter.format(pnl, currency: holding.currency)} '
-                      '(${isPositive ? '+' : ''}${pnlPct.toStringAsFixed(2)}%)',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: pnlColor,
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Market Value',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color:
+                                theme.colorScheme.onSurface.withOpacity(0.6),
+                          )),
+                      Text(
+                        CurrencyFormatter.format(holding.marketValue,
+                            currency: holding.currency),
+                        style: theme.textTheme.bodyMedium
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text('Unrealized P&L',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color:
+                                theme.colorScheme.onSurface.withOpacity(0.6),
+                          )),
+                      Text(
+                        '${isPositive ? '+' : ''}${CurrencyFormatter.format(pnl, currency: holding.currency)} '
+                        '(${isPositive ? '+' : ''}${pnlPct.toStringAsFixed(2)}%)',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: pnlColor,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),

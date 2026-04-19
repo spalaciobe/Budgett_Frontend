@@ -118,6 +118,12 @@ final appRouter = GoRouter(
           ),
         ),
         GoRoute(
+          path: '/account/:id',
+          builder: (context, state) => AccountDetailsScreen(
+            accountId: state.pathParameters['id']!,
+          ),
+        ),
+        GoRoute(
           path: '/profile',
           builder: (context, state) => const ProfileScreen(),
         ),

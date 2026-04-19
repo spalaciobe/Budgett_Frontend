@@ -117,7 +117,11 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
       if (a.id != excludeId) {
         items.add(DropdownMenuItem(
           value: a.id,
-          child: Text(a.name, style: const TextStyle(fontSize: 13)),
+          child: Text(
+            a.name,
+            style: const TextStyle(fontSize: 13),
+            overflow: TextOverflow.ellipsis,
+          ),
         ));
       }
       for (final p in a.pockets) {
@@ -134,7 +138,13 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                       .onSurface
                       .withOpacity(0.5)),
               const SizedBox(width: 4),
-              Text(p.name, style: const TextStyle(fontSize: 13)),
+              Expanded(
+                child: Text(
+                  p.name,
+                  style: const TextStyle(fontSize: 13),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
           ),
         ));
@@ -696,6 +706,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                       // Status
                       DropdownButtonFormField<String>(
                         value: ['paid', 'pending'].contains(_status) ? _status : 'paid',
+                        isExpanded: true,
                         decoration: const InputDecoration(
                           labelText: 'Status',
                           border: OutlineInputBorder(),
@@ -713,6 +724,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                       // For now, let's allow it but fields will update.
                       DropdownButtonFormField<String>(
                         value: _selectedType,
+                        isExpanded: true,
                         decoration: const InputDecoration(
                           labelText: 'Type',
                           border: OutlineInputBorder(),
@@ -887,6 +899,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                           value: _cuotasOptions.contains(_numCuotas)
                               ? _numCuotas
                               : 12,
+                          isExpanded: true,
                           decoration: const InputDecoration(
                             labelText: 'Number of installments',
                             border: OutlineInputBorder(),
@@ -938,6 +951,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                           const SizedBox(height: 8),
                           DropdownButtonFormField<String>(
                             value: _frequency,
+                            isExpanded: true,
                             decoration: const InputDecoration(
                               labelText: 'Frequency',
                               border: OutlineInputBorder(),

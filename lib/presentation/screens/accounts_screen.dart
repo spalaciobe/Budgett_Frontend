@@ -292,10 +292,7 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
       } else if (acc.type == 'investment') {
         context.push('/investment/${acc.id}');
       } else {
-        showDialog(
-          context: context,
-          builder: (ctx) => EditAccountDialog(account: acc),
-        );
+        context.push('/account/${acc.id}');
       }
     }
 
@@ -458,6 +455,8 @@ class _AccountListItem extends ConsumerWidget {
         style: theme.textTheme.labelSmall?.copyWith(
           color: theme.colorScheme.onSurface.withOpacity(0.45),
         ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       );
     } else {
       balance = CurrencyFormatter.format(account.balance, decimalDigits: 2);
@@ -705,6 +704,8 @@ class _AccountDetailPanel extends ConsumerWidget {
         '${CurrencyFormatter.format(account.pocketsBalance, decimalDigits: 2)} in pockets',
         style: theme.textTheme.bodySmall
             ?.copyWith(color: theme.colorScheme.onSurface.withOpacity(0.55)),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       );
     } else {
       balanceText = CurrencyFormatter.format(account.balance, decimalDigits: 2);
@@ -1176,6 +1177,142 @@ class _PocketTile extends ConsumerWidget {
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
         onTap: () => context.push('/pockets/${pocket.id}'),
+      ),
+    );
+  }
+}
+
+// ── Mobile account details screen ─────────────────────────────────────────────
+
+/// Full-screen details view for savings, checking, and cash accounts on mobile.
+/// Mirrors the desktop master-detail right panel for the same account types.
+class AccountDetailsScreen extends ConsumerWidget {
+  final String accountId;
+
+  const AccountDetailsScreen({super.key, required this.accountId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final account = ref
+        .watch(accountsProvider)
+        .valueOrNull
+        ?.where((a) => a.id == accountId)
+        .firstOrNull;
+
+    if (account == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final theme = Theme.of(context);
+    final txns =
+        ref.watch(accountDetailTransactionsProvider(account.id)).valueOrNull ??
+            [];
+
+    final balanceText = account.isSavingsParent && account.pockets.isNotEmpty
+        ? CurrencyFormatter.format(
+            account.totalBalanceWithPockets,
+            decimalDigits: 2,
+          )
+        : CurrencyFormatter.format(account.balance, decimalDigits: 2);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(account.name),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit),
+            tooltip: 'Edit account',
+            onPressed: () => showDialog(
+              context: context,
+              builder: (_) => EditAccountDialog(account: account),
+            ).then((_) => ref.invalidate(accountsProvider)),
+          ),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          ref.invalidate(accountsProvider);
+          ref.invalidate(accountDetailTransactionsProvider(accountId));
+          await ref.read(accountsProvider.future);
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: kScreenPadding,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Card(
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Balance',
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color:
+                              theme.colorScheme.onSurface.withOpacity(0.6),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        balanceText,
+                        style: theme.textTheme.headlineMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      if (account.isSavingsParent &&
+                          account.pockets.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          '${CurrencyFormatter.format(account.balance, decimalDigits: 2)} own · '
+                          '${CurrencyFormatter.format(account.pocketsBalance, decimalDigits: 2)} in pockets',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurface
+                                .withOpacity(0.55),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              if (account.interestDetails != null) ...[
+                const SizedBox(height: 16),
+                _SavingsInterestCard(account: account),
+              ],
+              if (account.isSavingsParent) ...[
+                const SizedBox(height: 16),
+                _PocketList(account: account),
+              ],
+              const SizedBox(height: 24),
+              Text(
+                'Recent transactions',
+                style: theme.textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 12),
+              if (txns.isEmpty)
+                Text(
+                  'No recent transactions',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurface.withOpacity(0.5),
+                  ),
+                )
+              else
+                ...txns.map((t) => TransactionTile(
+                      transaction: t,
+                      perspectiveAccountId: account.id,
+                    )),
+            ],
+          ),
+        ),
       ),
     );
   }

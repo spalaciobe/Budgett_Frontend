@@ -520,6 +520,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                 // Type
                 DropdownButtonFormField<String>(
                   value: _selectedType,
+                  isExpanded: true,
                   decoration: const InputDecoration(
                     labelText: 'Account Type',
                     border: OutlineInputBorder(),
@@ -586,6 +587,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                       Expanded(
                         child: DropdownButtonFormField<String>(
                           value: _savingsInterestPeriod,
+                          isExpanded: true,
                           decoration: const InputDecoration(
                             labelText: 'Period',
                             border: OutlineInputBorder(),
@@ -779,6 +781,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
 
                   DropdownButtonFormField<InvestmentType>(
                     value: _selectedInvestmentType,
+                    isExpanded: true,
                     decoration: const InputDecoration(
                       labelText: 'Investment Type',
                       border: OutlineInputBorder(),
@@ -786,7 +789,10 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                     items: InvestmentType.values
                         .map((t) => DropdownMenuItem(
                               value: t,
-                              child: Text(t.displayName),
+                              child: Text(
+                                t.displayName,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ))
                         .toList(),
                     onChanged: (v) => setState(() {
@@ -801,6 +807,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                       _selectedInvestmentType == InvestmentType.crypto) ...[
                     DropdownButtonFormField<String>(
                       value: _investmentBaseCurrency,
+                      isExpanded: true,
                       decoration: const InputDecoration(
                         labelText: 'Cash Currency',
                         border: OutlineInputBorder(),
@@ -823,6 +830,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                           .toList();
                       return DropdownButtonFormField<Broker>(
                         value: _selectedBroker,
+                        isExpanded: true,
                         decoration: const InputDecoration(
                           labelText: 'Platform / Broker',
                           border: OutlineInputBorder(),
@@ -830,7 +838,10 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                         items: filtered
                             .map((b) => DropdownMenuItem(
                                   value: b,
-                                  child: Text(b.name),
+                                  child: Text(
+                                    b.name,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ))
                             .toList(),
                         onChanged: (v) =>

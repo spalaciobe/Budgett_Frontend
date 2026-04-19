@@ -114,7 +114,22 @@ class CreditCardBillingSimulator extends ConsumerWidget {
       year,
       month,
     );
-    
+
+    // Start of this cycle = day after previous month's cutoff
+    int prevMonth = month - 1;
+    int prevYear = year;
+    if (prevMonth < 1) {
+      prevMonth = 12;
+      prevYear = year - 1;
+    }
+    final prevCutoff = CreditCardCalculator.calculateCutoffDate(
+      account.creditCardRules!,
+      bank,
+      prevYear,
+      prevMonth,
+    );
+    final cycleStart = prevCutoff.add(const Duration(days: 1));
+
     final paymentDate = CreditCardCalculator.calculatePaymentDate(
       account.creditCardRules!,
       bank,
@@ -149,9 +164,12 @@ class CreditCardBillingSimulator extends ConsumerWidget {
               ],
             ),
             const Divider(height: 24),
-            
+
             // Timeline Visualization
-            _buildTimeline(context, transactionDate, cutoffDate, paymentDate),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: _buildTimeline(context, cycleStart, transactionDate, cutoffDate, paymentDate),
+            ),
             
             const SizedBox(height: 16),
             
@@ -178,8 +196,13 @@ class CreditCardBillingSimulator extends ConsumerWidget {
                    children: [
                      const Icon(Icons.warning_amber, size: 16, color: Colors.orange),
                      const SizedBox(width: 8),
-                     Text('Payment due in $daysToPayment days', 
-                      style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 12))
+                     Expanded(
+                       child: Text(
+                         'Payment due in $daysToPayment days',
+                         style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 12),
+                         overflow: TextOverflow.ellipsis,
+                       ),
+                     ),
                    ],
                  ),
                )
@@ -190,40 +213,130 @@ class CreditCardBillingSimulator extends ConsumerWidget {
     );
   }
   
-  Widget _buildTimeline(BuildContext context, DateTime purchase, DateTime cutoff, DateTime payment) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-         _buildTimelineNode(context, 'Buy', purchase, true),
-         Expanded(child: Container(height: 2, color: Colors.grey.withOpacity(0.3))),
-         _buildTimelineNode(context, 'Cutoff', cutoff, false, color: Colors.orange),
-         Expanded(child: Container(height: 2, color: Colors.grey.withOpacity(0.3))),
-         _buildTimelineNode(context, 'Pay', payment, false, color: Colors.green),
-      ],
+  Widget _buildTimeline(BuildContext context, DateTime cycleStart, DateTime today, DateTime cutoff, DateTime payment) {
+    return LayoutBuilder(
+      builder: (ctx, constraints) {
+        final width = constraints.maxWidth;
+        final totalMs = payment.difference(cycleStart).inMilliseconds;
+
+        double cutoffRatio = 0.5;
+        if (totalMs > 0) {
+          cutoffRatio =
+              (cutoff.difference(cycleStart).inMilliseconds / totalMs).clamp(0.0, 1.0);
+        }
+
+        // Force "today" to be shown between cycle start and cutoff.
+        double todayRatio;
+        if (today.isBefore(cycleStart)) {
+          todayRatio = 0.0;
+        } else if (today.isAfter(cutoff)) {
+          todayRatio = cutoffRatio;
+        } else if (totalMs > 0) {
+          todayRatio =
+              (today.difference(cycleStart).inMilliseconds / totalMs).clamp(0.0, cutoffRatio);
+        } else {
+          todayRatio = 0.0;
+        }
+
+        final primary = Theme.of(context).colorScheme.primary;
+
+        // Detect label collision with Start or Cutoff and stagger "Today" above the line.
+        const collisionPx = 50.0;
+        final todayPx = todayRatio * width;
+        final cutoffPx = cutoffRatio * width;
+        final todayAbove = todayPx < collisionPx || (cutoffPx - todayPx).abs() < collisionPx;
+
+        const lineTop = 46.0;
+
+        return SizedBox(
+          height: 92,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                left: 0,
+                right: 0,
+                top: lineTop,
+                child: Container(height: 2, color: Colors.grey.withOpacity(0.3)),
+              ),
+              _buildTimelineNode(context, width, 0.0, 'Start', cycleStart, color: primary, lineTop: lineTop),
+              _buildTimelineNode(context, width, todayRatio, 'Today', today, color: primary, isPrimary: true, above: todayAbove, lineTop: lineTop),
+              _buildTimelineNode(context, width, cutoffRatio, 'Cutoff', cutoff, color: Colors.orange, lineTop: lineTop),
+              _buildTimelineNode(context, width, 1.0, 'Pay', payment, color: Colors.green, lineTop: lineTop),
+            ],
+          ),
+        );
+      },
     );
   }
-  
-  Widget _buildTimelineNode(BuildContext context, String label, DateTime date, bool isPrimary, {Color? color}) {
-    final c = color ?? Theme.of(context).colorScheme.primary;
-    return Column(
-      children: [
-        Container(
-          width: 12, height: 12,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: c,
-            border: isPrimary ? Border.all(color: Colors.white, width: 2) : null,
-            boxShadow: [
-              if(isPrimary) BoxShadow(color: c.withOpacity(0.4), blurRadius: 4, spreadRadius: 2)
-            ]
-          ),
+
+  Widget _buildTimelineNode(
+    BuildContext context,
+    double width,
+    double ratio,
+    String label,
+    DateTime date, {
+    required Color color,
+    required double lineTop,
+    bool isPrimary = false,
+    bool above = false,
+  }) {
+    const nodeWidth = 80.0;
+    const dotSize = 12.0;
+    final left = (ratio * width) - (nodeWidth / 2);
+
+    final dot = Container(
+      width: dotSize,
+      height: dotSize,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color,
+        border: isPrimary ? Border.all(color: Colors.white, width: 2) : null,
+        boxShadow: [
+          if (isPrimary)
+            BoxShadow(color: color.withOpacity(0.4), blurRadius: 4, spreadRadius: 2),
+        ],
+      ),
+    );
+    final dateText = Text(
+      DateFormat('d MMM', 'es_CO').format(date),
+      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: color),
+    );
+    final labelText = Text(
+      label,
+      style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSurfaceVariant),
+    );
+
+    if (above) {
+      return Positioned(
+        left: left,
+        top: 0,
+        width: nodeWidth,
+        height: lineTop + dotSize / 2 + 1,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            labelText,
+            dateText,
+            const SizedBox(height: 4),
+            dot,
+          ],
         ),
-        const SizedBox(height: 4),
-        Text(DateFormat('d MMM', 'es_CO').format(date), 
-          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: c)),
-        Text(label, 
-          style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSurfaceVariant)),
-      ],
+      );
+    }
+
+    return Positioned(
+      left: left,
+      top: lineTop - dotSize / 2 + 1,
+      width: nodeWidth,
+      child: Column(
+        children: [
+          dot,
+          const SizedBox(height: 4),
+          dateText,
+          labelText,
+        ],
+      ),
     );
   }
 

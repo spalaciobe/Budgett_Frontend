@@ -6,6 +6,7 @@ import '../../core/app_spacing.dart';
 import '../../data/models/account_model.dart';
 import '../../data/models/transaction_model.dart';
 import '../providers/finance_provider.dart';
+import '../providers/fx_rate_provider.dart';
 import '../utils/currency_formatter.dart';
 
 enum _PaymentPreset { minimum, currentBalance, custom }
@@ -32,7 +33,7 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
   final Set<String> _closedInstallments = {};
   bool _saving = false;
 
-  late final String _debtCurrency = _pickInitialDebtCurrency();
+  late String _debtCurrency = _pickInitialDebtCurrency();
 
   String _pickInitialDebtCurrency() {
     final cop = widget.card.balance.abs();
@@ -41,6 +42,9 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
     if (cop > 0 && usd == 0) return 'COP';
     return cop >= usd ? 'COP' : 'USD';
   }
+
+  bool get _cardHasDualDebt =>
+      widget.card.balance.abs() > 0 && widget.card.balanceUsd.abs() > 0;
 
   double get _cardDebt =>
       _debtCurrency == 'USD' ? widget.card.balanceUsd.abs() : widget.card.balance.abs();
@@ -110,7 +114,34 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
           );
     if (!_crossCurrency) {
       _debitController.text = _settleController.text;
+    } else {
+      _prefillDebitFromFx(amount);
     }
+  }
+
+  /// When paying cross-currency, seed the debit field with the app's current
+  /// TRM as a reasonable guess. The user is expected to overwrite this with
+  /// what their bank actually charged, so the stored fx_rate reflects reality.
+  void _prefillDebitFromFx(double settleAmount) {
+    final fx = ref.read(fxRateProvider).valueOrNull;
+    if (fx == null || settleAmount <= 0) {
+      _debitController.text = '';
+      return;
+    }
+    // TRM is COP per 1 USD.
+    final double debit;
+    if (_debtCurrency == 'USD' && _sourceCurrency == 'COP') {
+      debit = settleAmount * fx.rate;
+    } else if (_debtCurrency == 'COP' && _sourceCurrency == 'USD') {
+      debit = settleAmount / fx.rate;
+    } else {
+      return;
+    }
+    _debitController.text = CurrencyFormatter.format(
+      debit,
+      includeSymbol: false,
+      currency: _sourceCurrency,
+    );
   }
 
   double _closedInstallmentsTotal() {
@@ -218,7 +249,7 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
     return AlertDialog(
       title: Text('Pay ${widget.card.name}'),
       content: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520),
+        constraints: const BoxConstraints(maxWidth: 640),
         child: SingleChildScrollView(
           child: Form(
             key: _formKey,
@@ -230,15 +261,30 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
                   'Current debt: ${CurrencyFormatter.format(_cardDebt, currency: _debtCurrency)}',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
+                if (_cardHasDualDebt) ...[
+                  kGapSm,
+                  _DebtCurrencySelector(
+                    selected: _debtCurrency,
+                    copAmount: widget.card.balance.abs(),
+                    usdAmount: widget.card.balanceUsd.abs(),
+                    onChanged: (value) => setState(() {
+                      _debtCurrency = value;
+                      _closedInstallments.clear();
+                      _applyPreset(_preset);
+                    }),
+                  ),
+                ],
                 kGapLg,
                 DropdownButtonFormField<String>(
                   value: _sourceAccountId,
+                  isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Pay from'),
                   items: sources
                       .map((a) => DropdownMenuItem(
                             value: a.id,
                             child: Text(
                               '${a.name} · ${CurrencyFormatter.format(a.balance > 0 ? a.balance : a.balanceUsd, currency: a.balance > 0 ? 'COP' : 'USD')}',
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ))
                       .toList(),
@@ -252,6 +298,7 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
                 kGapLg,
                 Wrap(
                   spacing: kSpaceLg,
+                  runSpacing: kSpaceSm,
                   children: [
                     ChoiceChip(
                       label: Text(_cardMinimum > 0
@@ -283,8 +330,6 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
                   decoration: InputDecoration(
                     labelText: 'Settle on card',
                     prefixText: CurrencyFormatter.prefixFor(_debtCurrency),
-                    helperText:
-                        'Amount subtracted from the card debt (in $_debtCurrency).',
                   ),
                   onChanged: (_) {
                     if (!_crossCurrency) {
@@ -301,8 +346,6 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
                     decoration: InputDecoration(
                       labelText: 'Debit from source',
                       prefixText: CurrencyFormatter.prefixFor(_sourceCurrency),
-                      helperText:
-                          'What your bank actually charges in $_sourceCurrency (the rate is derived from both amounts).',
                     ),
                   ),
                 ],
@@ -375,6 +418,58 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
               : const Text('Pay'),
         ),
       ],
+    );
+  }
+}
+
+class _DebtCurrencySelector extends StatelessWidget {
+  final String selected;
+  final double copAmount;
+  final double usdAmount;
+  final ValueChanged<String> onChanged;
+
+  const _DebtCurrencySelector({
+    required this.selected,
+    required this.copAmount,
+    required this.usdAmount,
+    required this.onChanged,
+  });
+
+  Widget _buildLabel(String text) {
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.center,
+      child: Text(text, maxLines: 1, softWrap: false),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SegmentedButton<String>(
+      style: ButtonStyle(
+        padding: WidgetStateProperty.all(
+          const EdgeInsets.symmetric(horizontal: kSpaceLg, vertical: kSpaceLg),
+        ),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        visualDensity: VisualDensity.compact,
+      ),
+      segments: [
+        ButtonSegment(
+          value: 'COP',
+          label: _buildLabel(
+            'COP ${CurrencyFormatter.format(copAmount, currency: 'COP')}',
+          ),
+        ),
+        ButtonSegment(
+          value: 'USD',
+          label: _buildLabel(
+            'USD ${CurrencyFormatter.format(usdAmount, currency: 'USD')}',
+          ),
+        ),
+      ],
+      showSelectedIcon: false,
+      selected: {selected},
+      onSelectionChanged: (sel) => onChanged(sel.first),
     );
   }
 }
