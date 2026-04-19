@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:budgett_frontend/data/models/account_model.dart';
@@ -331,6 +332,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
         fundCode: _fundCodeController.text.trim().isEmpty
             ? null
             : _fundCodeController.text.trim(),
+        initialBalance: widget.account.investmentDetails?.initialBalance,
       );
     } else {
       // Clear credit card specific fields if type changed
@@ -424,29 +426,40 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
       ),
     );
 
-    if (confirm != true) return;
+    if (confirm != true || !mounted) return;
 
     setState(() => _isLoading = true);
 
+    // Capture route/navigator/messenger before the async gap so we can use
+    // them even after the dialog is popped or the widget is unmounted.
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final router = GoRouter.of(context);
+    final currentPath = GoRouterState.of(context).uri.path;
+    final onDetailRoute = currentPath.startsWith('/credit-card/') ||
+        currentPath.startsWith('/investment/') ||
+        currentPath.startsWith('/pockets/');
+
     try {
       await ref.read(financeRepositoryProvider).deleteAccount(widget.account.id);
-      
+
       ref.invalidate(accountsProvider);
       ref.invalidate(recentTransactionsProvider); // Transactions might be gone
-      
-      if (mounted) {
-        Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Account deleted successfully')),
-        );
+
+      navigator.pop();
+      // If we were on a per-account detail route, the account no longer
+      // exists — bail out to the accounts list instead of stranding the
+      // user on a spinner.
+      if (onDetailRoute) {
+        router.go('/accounts');
       }
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Account deleted successfully')),
+      );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
-      }
-    } finally {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -783,6 +796,24 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                     }),
                   ),
                   const SizedBox(height: 12),
+
+                  if (_selectedInvestmentType == InvestmentType.stockEtf ||
+                      _selectedInvestmentType == InvestmentType.crypto) ...[
+                    DropdownButtonFormField<String>(
+                      value: _investmentBaseCurrency,
+                      decoration: const InputDecoration(
+                        labelText: 'Cash Currency',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'COP', child: Text('COP')),
+                        DropdownMenuItem(value: 'USD', child: Text('USD')),
+                      ],
+                      onChanged: (v) =>
+                          setState(() => _investmentBaseCurrency = v!),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
 
                   brokersAsync.when(
                     data: (brokers) {

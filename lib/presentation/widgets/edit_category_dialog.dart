@@ -5,6 +5,8 @@ import 'package:budgett_frontend/data/models/category_model.dart';
 import 'package:budgett_frontend/data/models/sub_category_model.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/presentation/utils/icon_helper.dart';
+import 'package:budgett_frontend/presentation/widgets/create_category_dialog.dart'
+    show savingsTargetAccountField;
 
 
 class EditCategoryDialog extends ConsumerStatefulWidget {
@@ -24,7 +26,8 @@ class _EditCategoryDialogState extends ConsumerState<EditCategoryDialog> {
   late String _selectedType;
   late String _selectedIcon;
   late String _selectedColor;
-  
+  String? _targetAccountId;
+
   bool _isLoading = false;
   
   List<SubCategory> _existingSubCategories = [];
@@ -54,6 +57,7 @@ class _EditCategoryDialogState extends ConsumerState<EditCategoryDialog> {
     _selectedType = widget.category.type;
     _selectedIcon = widget.category.icon ?? IconHelper.iconMap.keys.first;
     _selectedColor = widget.category.color ?? '0xFF9E9E9E';
+    _targetAccountId = widget.category.targetAccountId;
     
     if (widget.category.subCategories != null) {
       _existingSubCategories = List.from(widget.category.subCategories!);
@@ -104,16 +108,18 @@ class _EditCategoryDialogState extends ConsumerState<EditCategoryDialog> {
                         segments: const [
                           ButtonSegment(value: 'income', label: Text('Income'), icon: Icon(Icons.arrow_downward)),
                           ButtonSegment(value: 'expense', label: Text('Expense'), icon: Icon(Icons.arrow_upward)),
+                          ButtonSegment(value: 'savings', label: Text('Savings'), icon: Icon(Icons.savings_outlined)),
                         ],
                         selected: {_selectedType},
                         onSelectionChanged: (Set<String> newSelection) {
                           setState(() {
                             _selectedType = newSelection.first;
+                            if (_selectedType != 'savings') _targetAccountId = null;
                           });
                         },
                       ),
                       const SizedBox(height: 10),
-                      
+
                       // Name Input
                       TextFormField(
                         controller: _nameController,
@@ -124,6 +130,14 @@ class _EditCategoryDialogState extends ConsumerState<EditCategoryDialog> {
                         validator: (value) => value == null || value.isEmpty ? 'Required' : null,
                       ),
                       const SizedBox(height: 10),
+
+                      if (_selectedType == 'savings') ...[
+                        savingsTargetAccountField(
+                          selectedId: _targetAccountId,
+                          onChanged: (id) => setState(() => _targetAccountId = id),
+                        ),
+                        const SizedBox(height: 10),
+                      ],
                       
                       // Color Picker
                       const Text('Color', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -332,6 +346,7 @@ class _EditCategoryDialogState extends ConsumerState<EditCategoryDialog> {
         'type': _selectedType,
         'icon': _selectedIcon,
         'color': _selectedColor,
+        'target_account_id': _targetAccountId,
       };
 
       final repo = ref.read(financeRepositoryProvider);

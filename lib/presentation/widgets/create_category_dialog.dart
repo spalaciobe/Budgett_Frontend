@@ -22,7 +22,8 @@ class _CreateCategoryDialogState extends ConsumerState<CreateCategoryDialog> {
   String _selectedType = 'expense';
   String _selectedIcon = 'category';
   String _selectedColor = '0xFF4CAF50'; // Default Green (Hogar)
-  
+  String? _targetAccountId; // savings only — optional physical destination
+
   bool _isLoading = false;
   final List<String> _subCategories = [];
 
@@ -80,16 +81,18 @@ class _CreateCategoryDialogState extends ConsumerState<CreateCategoryDialog> {
                         segments: const [
                           ButtonSegment(value: 'income', label: Text('Income'), icon: Icon(Icons.arrow_downward)),
                           ButtonSegment(value: 'expense', label: Text('Expense'), icon: Icon(Icons.arrow_upward)),
+                          ButtonSegment(value: 'savings', label: Text('Savings'), icon: Icon(Icons.savings_outlined)),
                         ],
                         selected: {_selectedType},
                         onSelectionChanged: (Set<String> newSelection) {
                           setState(() {
                             _selectedType = newSelection.first;
+                            if (_selectedType != 'savings') _targetAccountId = null;
                           });
                         },
                       ),
                       const SizedBox(height: 10),
-                      
+
                       // Name Input
                       TextFormField(
                         controller: _nameController,
@@ -100,6 +103,15 @@ class _CreateCategoryDialogState extends ConsumerState<CreateCategoryDialog> {
                         validator: (value) => value == null || value.isEmpty ? 'Required' : null,
                       ),
                       const SizedBox(height: 10),
+
+                      // Optional destination account for savings categories
+                      if (_selectedType == 'savings') ...[
+                        savingsTargetAccountField(
+                          selectedId: _targetAccountId,
+                          onChanged: (id) => setState(() => _targetAccountId = id),
+                        ),
+                        const SizedBox(height: 10),
+                      ],
                       
                       // Color Picker
                       const Text('Color', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -241,6 +253,7 @@ class _CreateCategoryDialogState extends ConsumerState<CreateCategoryDialog> {
         type: _selectedType,
         icon: _selectedIcon,
         color: _selectedColor,
+        targetAccountId: _targetAccountId,
       );
 
       final repo = ref.read(financeRepositoryProvider);
@@ -298,6 +311,66 @@ class _CreateCategoryDialogState extends ConsumerState<CreateCategoryDialog> {
     _nameController.dispose();
     _subCategoryController.dispose();
     super.dispose();
+  }
+}
+
+/// Dropdown of savings/investment accounts (and their pockets) usable as the
+/// physical destination of a sinking-fund category. Selection is optional.
+/// Shared by [CreateCategoryDialog] and [EditCategoryDialog].
+Widget savingsTargetAccountField({
+  required String? selectedId,
+  required ValueChanged<String?> onChanged,
+}) {
+  return _SavingsTargetAccountField(
+    selectedId: selectedId,
+    onChanged: onChanged,
+  );
+}
+
+class _SavingsTargetAccountField extends ConsumerWidget {
+  final String? selectedId;
+  final ValueChanged<String?> onChanged;
+
+  const _SavingsTargetAccountField({
+    required this.selectedId,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final accountsAsync = ref.watch(accountsProvider);
+    return accountsAsync.when(
+      loading: () => const LinearProgressIndicator(minHeight: 2),
+      error: (e, _) => Text('Could not load accounts: $e',
+          style: const TextStyle(fontSize: 12, color: Colors.red)),
+      data: (accounts) {
+        final List<({String id, String label})> options = [];
+        for (final a in accounts) {
+          if (a.type == 'savings' || a.type == 'investment') {
+            options.add((id: a.id, label: a.name));
+            for (final p in a.pockets) {
+              options.add((id: p.id, label: '${a.name} → ${p.name}'));
+            }
+          }
+        }
+        return DropdownButtonFormField<String?>(
+          value: selectedId,
+          decoration: const InputDecoration(
+            labelText: 'Destination account (optional)',
+            helperText: 'Where the money physically lives. Purely informational.',
+            border: OutlineInputBorder(),
+          ),
+          items: [
+            const DropdownMenuItem<String?>(value: null, child: Text('None')),
+            ...options.map((o) => DropdownMenuItem<String?>(
+                  value: o.id,
+                  child: Text(o.label, overflow: TextOverflow.ellipsis),
+                )),
+          ],
+          onChanged: onChanged,
+        );
+      },
+    );
   }
 }
 

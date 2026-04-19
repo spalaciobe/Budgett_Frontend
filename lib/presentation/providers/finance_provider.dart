@@ -70,6 +70,14 @@ final categoriesProvider = FutureProvider<List<Category>>((ref) async {
   return repository.getCategories();
 });
 
+/// Lifetime running balance per savings category (sinking fund).
+/// Keyed by category_id. Categories with zero net activity are omitted.
+final categoryAccumulatedBalancesProvider =
+    FutureProvider<Map<String, double>>((ref) async {
+  final repository = ref.watch(financeRepositoryProvider);
+  return repository.getCategoryAccumulatedBalances();
+});
+
 final goalsProvider = FutureProvider<List<Goal>>((ref) async {
   final repository = ref.watch(financeRepositoryProvider);
   return repository.getGoals();
@@ -108,4 +116,13 @@ final accountHoldingsProvider =
         (ref, accountId) async {
   final repository = ref.watch(financeRepositoryProvider);
   return repository.getHoldings(accountId);
+});
+
+/// Sum of cash transfers INTO this account — the "funded" headline shown on
+/// investment accounts (what the user has actually put in, independent of how
+/// that money has since been rotated into positions).
+final accountFundedTotalProvider =
+    FutureProvider.family.autoDispose<double, String>((ref, accountId) async {
+  final repository = ref.watch(financeRepositoryProvider);
+  return repository.accountFundedTotal(accountId);
 });

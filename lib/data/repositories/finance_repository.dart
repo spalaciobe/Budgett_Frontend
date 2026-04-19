@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:image/image.dart' as img;
@@ -158,9 +159,10 @@ class FinanceRepository {
       'type': category.type,
       'icon': category.icon,
       'color': category.color,
+      'target_account_id': category.targetAccountId,
       'user_id': userId,
     }).select();
-    
+
     return Category.fromJson(data.first);
   }
 
@@ -640,9 +642,23 @@ class FinanceRepository {
     return result.fold<double>(0.0, (sum, item) => sum + (item['amount'] as num).toDouble());
   }
 
+  /// Monthly spending aggregated by category.
+  ///
+  /// For expense categories: sums expense transactions, EXCLUDING those whose
+  /// [funded_by_category_id] is set (those are paid out of a sinking fund and
+  /// are tracked against that fund's accumulated balance instead).
+  ///
+  /// For savings categories: sums this month's contributions to the sinking
+  /// fund — i.e. transfers whose [category_id] is the savings category. This
+  /// is what the BudgetScreen shows as "Spent" against the monthly target.
   Future<Map<String, CategorySpending>> getSpendingByCategory(int month, int year) async {
     final userId = _client.auth.currentUser!.id;
-    final result = await _client
+    final firstDay = '$year-${month.toString().padLeft(2, '0')}-01';
+    final nextMonth = month == 12
+        ? '${year + 1}-01-01'
+        : '$year-${(month + 1).toString().padLeft(2, '0')}-01';
+
+    final expenses = await _client
         .from('transactions')
         .select('category_id, sub_category_id, amount')
         .eq('user_id', userId)
@@ -650,31 +666,91 @@ class FinanceRepository {
         .eq('currency', 'COP') // Budgets are COP-only
         .eq('is_installment_parent', false) // exclude display-only parent rows
         .neq('status', 'pending') // pending transactions don't count as spent
-        .gte('date', '$year-${month.toString().padLeft(2, '0')}-01')
-        .lt('date', month == 12
-            ? '${year + 1}-01-01'
-            : '$year-${(month + 1).toString().padLeft(2, '0')}-01');
-    
+        .isFilter('funded_by_category_id', null) // funded-out expenses hit the sinking fund, not the expense budget
+        .gte('date', firstDay)
+        .lt('date', nextMonth);
+
+    final savingsContribs = await _client
+        .from('transactions')
+        .select('category_id, amount')
+        .eq('user_id', userId)
+        .eq('type', 'transfer')
+        .eq('currency', 'COP')
+        .neq('status', 'pending')
+        .not('category_id', 'is', null)
+        .gte('date', firstDay)
+        .lt('date', nextMonth);
+
     final Map<String, CategorySpending> spending = {};
-    for (var item in result) {
+
+    for (var item in expenses) {
       final categoryId = item['category_id'] as String?;
       final subCategoryId = item['sub_category_id'] as String?;
       final amount = (item['amount'] as num).toDouble();
-      
+
       if (categoryId != null) {
         spending.putIfAbsent(categoryId, () => CategorySpending());
         spending[categoryId]!.total += amount;
-        
+
         if (subCategoryId != null) {
           spending[categoryId]!.subCategories.update(
-            subCategoryId, 
-            (val) => val + amount, 
-            ifAbsent: () => amount
+            subCategoryId,
+            (val) => val + amount,
+            ifAbsent: () => amount,
           );
         }
       }
     }
+
+    for (var item in savingsContribs) {
+      final categoryId = item['category_id'] as String?;
+      final amount = (item['amount'] as num).toDouble();
+      if (categoryId == null) continue;
+      spending.putIfAbsent(categoryId, () => CategorySpending());
+      spending[categoryId]!.total += amount;
+    }
+
     return spending;
+  }
+
+  /// Lifetime running balance per savings category: sum of all contributions
+  /// (transfers tagged with the category) minus sum of all funded expenses.
+  /// Returned map is keyed by category_id; categories with zero net activity
+  /// are omitted.
+  Future<Map<String, double>> getCategoryAccumulatedBalances() async {
+    final userId = _client.auth.currentUser!.id;
+
+    final contribs = await _client
+        .from('transactions')
+        .select('category_id, amount')
+        .eq('user_id', userId)
+        .eq('type', 'transfer')
+        .eq('currency', 'COP')
+        .neq('status', 'pending')
+        .not('category_id', 'is', null);
+
+    final fundedExpenses = await _client
+        .from('transactions')
+        .select('funded_by_category_id, amount')
+        .eq('user_id', userId)
+        .eq('type', 'expense')
+        .eq('currency', 'COP')
+        .eq('is_installment_parent', false)
+        .neq('status', 'pending')
+        .not('funded_by_category_id', 'is', null);
+
+    final Map<String, double> balances = {};
+    for (var item in contribs) {
+      final id = item['category_id'] as String;
+      balances.update(id, (v) => v + (item['amount'] as num).toDouble(),
+          ifAbsent: () => (item['amount'] as num).toDouble());
+    }
+    for (var item in fundedExpenses) {
+      final id = item['funded_by_category_id'] as String;
+      balances.update(id, (v) => v - (item['amount'] as num).toDouble(),
+          ifAbsent: () => -(item['amount'] as num).toDouble());
+    }
+    return balances;
   }
 
   Future<Map<String, CategorySpending>> getIncomeByCategory(int month, int year) async {
@@ -854,6 +930,7 @@ class FinanceRepository {
     required double pricePerUnit,
     double fee = 0.0,
     String currency = 'COP',
+    String? feeCurrency,
     Map<String, dynamic> transactionData = const {},
   }) async {
     final userId = _client.auth.currentUser!.id;
@@ -873,7 +950,9 @@ class FinanceRepository {
         ? 0.0
         : (currentQty * currentAvg + quantity * pricePerUnit) / newQty;
 
-    // 2. Insert expense transaction (decreases cash in investment account)
+    // 2. Insert expense transaction. `amount` is the cash outflow (principal +
+    //    fee) so the balance trigger sees the full debit, but `fee_amount` is
+    //    persisted separately so reports can split principal from commission.
     await _client.from('transactions').insert({
       ...transactionData,
       'user_id': userId,
@@ -882,6 +961,9 @@ class FinanceRepository {
       'type': 'expense',
       'currency': currency,
       'holding_id': holdingId,
+      'fee_amount': fee,
+      'fee_currency': fee > 0 ? (feeCurrency ?? currency) : null,
+      'holding_qty_delta': quantity,
     });
 
     // 3. Update holding position
@@ -901,6 +983,7 @@ class FinanceRepository {
     required double pricePerUnit,
     double fee = 0.0,
     String currency = 'COP',
+    String? feeCurrency,
     Map<String, dynamic> transactionData = const {},
   }) async {
     final userId = _client.auth.currentUser!.id;
@@ -916,7 +999,9 @@ class FinanceRepository {
     final currentQty = (holdingRow['quantity'] as num).toDouble();
     final newQty = (currentQty - quantity).clamp(0.0, double.infinity);
 
-    // 2. Insert income transaction (increases cash in investment account)
+    // 2. Insert income transaction. `amount` is the net cash inflow so the
+    //    balance trigger credits the correct amount; `fee_amount` keeps the
+    //    commission visible for reporting.
     await _client.from('transactions').insert({
       ...transactionData,
       'user_id': userId,
@@ -925,6 +1010,9 @@ class FinanceRepository {
       'type': 'income',
       'currency': currency,
       'holding_id': holdingId,
+      'fee_amount': fee,
+      'fee_currency': fee > 0 ? (feeCurrency ?? currency) : null,
+      'holding_qty_delta': -quantity,
     });
 
     // 3. Update holding quantity (avg_cost stays the same on a sell)
@@ -932,6 +1020,204 @@ class FinanceRepository {
       'quantity': newQty,
       'updated_at': DateTime.now().toIso8601String(),
     }).eq('id', holdingId);
+  }
+
+  /// Records a crypto-to-crypto (or stablecoin-to-crypto) swap inside an
+  /// investment account. No cash enters or leaves the account — only holding
+  /// quantities shift — so both legs use `type='swap'`, which the balance
+  /// triggers ignore by design.
+  ///
+  /// Cost basis handling: the destination holding's avg_cost absorbs the
+  /// source's cost basis proportional to [sourceQty], so a COP value that
+  /// travelled COP → COPW → BTC ends up embedded in BTC's avg_cost and
+  /// propagates into P&L / "Invested" correctly.
+  ///
+  /// Fees are recorded informationally on the destination leg (they do not
+  /// alter avg_cost in this MVP).
+  Future<void> swapHoldings({
+    required String accountId,
+    required String sourceHoldingId,
+    required String destHoldingId,
+    required double sourceQty,
+    required double destQty,
+    double fee = 0.0,
+    String? feeCurrency,
+    DateTime? date,
+    String description = 'Swap',
+    Map<String, dynamic> transactionData = const {},
+  }) async {
+    if (sourceHoldingId == destHoldingId) {
+      throw ArgumentError('swapHoldings: source and destination must differ');
+    }
+    final userId = _client.auth.currentUser!.id;
+    final groupId = _uuidV4();
+
+    final dateStr = (date ?? DateTime.now()).toIso8601String().substring(0, 10);
+
+    // 1. Fetch both holdings
+    final sourceRow = await _client
+        .from('investment_holdings')
+        .select('quantity, avg_cost, currency, symbol')
+        .eq('id', sourceHoldingId)
+        .single();
+    final destRow = await _client
+        .from('investment_holdings')
+        .select('quantity, avg_cost, currency, symbol')
+        .eq('id', destHoldingId)
+        .single();
+
+    final srcQty = (sourceRow['quantity'] as num).toDouble();
+    final srcAvg = (sourceRow['avg_cost'] as num).toDouble();
+    final srcCurrency = sourceRow['currency'] as String? ?? 'COP';
+    final srcSymbol = sourceRow['symbol'] as String? ?? '';
+
+    final dstQty = (destRow['quantity'] as num).toDouble();
+    final dstAvg = (destRow['avg_cost'] as num).toDouble();
+    final dstCurrency = destRow['currency'] as String? ?? 'COP';
+    final dstSymbol = destRow['symbol'] as String? ?? '';
+
+    if (sourceQty > srcQty) {
+      throw ArgumentError(
+          'swapHoldings: sourceQty $sourceQty exceeds available $srcQty');
+    }
+
+    // 2. Compute post-swap quantities and carry cost basis source → dest.
+    final newSrcQty = (srcQty - sourceQty).clamp(0.0, double.infinity);
+    final newDstQty = dstQty + destQty;
+    final carriedCostBasis = sourceQty * srcAvg; // in src.currency units
+    final newDstAvg = newDstQty == 0
+        ? 0.0
+        : (dstQty * dstAvg + carriedCostBasis) / newDstQty;
+
+    // 3. Insert two swap legs sharing the same swap_group_id. `amount = 0`
+    //    keeps balance triggers out of it; qty lives in holding_qty_delta.
+    // PostgREST batch insert treats the union of keys across rows as the
+    // column list and sends NULL for any key missing in a given row — which
+    // would override the NOT NULL DEFAULT 0 on fee_amount. So we include
+    // fee_amount (and fee_currency) in the shared data with neutral values
+    // and let the dest leg override when there's an actual fee.
+    final sharedTxData = {
+      ...transactionData,
+      'user_id': userId,
+      'account_id': accountId,
+      'type': 'swap',
+      'status': 'paid',
+      'date': dateStr,
+      'amount': 0,
+      'fee_amount': 0,
+      'fee_currency': null,
+      'swap_group_id': groupId,
+    };
+    await _client.from('transactions').insert([
+      {
+        ...sharedTxData,
+        'description': '$description  $srcSymbol → $dstSymbol (out)',
+        'currency': srcCurrency,
+        'holding_id': sourceHoldingId,
+        'holding_qty_delta': -sourceQty,
+      },
+      {
+        ...sharedTxData,
+        'description': '$description  $srcSymbol → $dstSymbol (in)',
+        'currency': dstCurrency,
+        'holding_id': destHoldingId,
+        'holding_qty_delta': destQty,
+        'fee_amount': fee,
+        'fee_currency': fee > 0 ? (feeCurrency ?? dstCurrency) : null,
+      },
+    ]);
+
+    // 4. Update both holdings.
+    final now = DateTime.now().toIso8601String();
+    await _client.from('investment_holdings').update({
+      'quantity': newSrcQty,
+      'updated_at': now,
+    }).eq('id', sourceHoldingId);
+    await _client.from('investment_holdings').update({
+      'quantity': newDstQty,
+      'avg_cost': newDstAvg,
+      'updated_at': now,
+    }).eq('id', destHoldingId);
+  }
+
+  /// Reverses a swap: deletes both legs and restores the `quantity` on each
+  /// affected holding by subtracting the stored `holding_qty_delta`. Because
+  /// the original dest `avg_cost` pre-swap is not preserved anywhere, avg_cost
+  /// is reset to 0 when the reversal empties the position; otherwise it's
+  /// left as-is (the caller should warn the user that avg_cost may be off
+  /// after a partial-undo).
+  Future<void> deleteSwap(String swapGroupId) async {
+    final legs = await _client
+        .from('transactions')
+        .select('holding_id, holding_qty_delta')
+        .eq('swap_group_id', swapGroupId);
+
+    final list = legs as List;
+    if (list.length != 2) {
+      throw Exception(
+          'Cannot delete swap: expected 2 legs, found ${list.length}');
+    }
+
+    final now = DateTime.now().toIso8601String();
+    for (final leg in list) {
+      final holdingId = leg['holding_id'] as String?;
+      final qtyDelta = (leg['holding_qty_delta'] as num?)?.toDouble() ?? 0.0;
+      if (holdingId == null) continue;
+
+      final current = await _client
+          .from('investment_holdings')
+          .select('quantity')
+          .eq('id', holdingId)
+          .single();
+      final currQty = (current['quantity'] as num).toDouble();
+      final newQty = (currQty - qtyDelta).clamp(0.0, double.infinity);
+
+      final update = <String, dynamic>{
+        'quantity': newQty,
+        'updated_at': now,
+      };
+      if (newQty == 0) update['avg_cost'] = 0;
+      await _client
+          .from('investment_holdings')
+          .update(update)
+          .eq('id', holdingId);
+    }
+
+    await _client
+        .from('transactions')
+        .delete()
+        .eq('swap_group_id', swapGroupId);
+  }
+
+  /// Total cash the user has committed to [accountId]: the initial seed
+  /// captured on investment account creation plus every incoming transfer
+  /// settled since then. Kept separate from cost basis, which excludes fees
+  /// and shifts as positions rotate.
+  Future<double> accountFundedTotal(String accountId) async {
+    final rows = await _client
+        .from('transactions')
+        .select('amount')
+        .eq('target_account_id', accountId)
+        .eq('type', 'transfer')
+        .eq('status', 'paid');
+    double total = 0;
+    for (final r in rows as List) {
+      total += ((r['amount'] as num?)?.toDouble() ?? 0.0);
+    }
+
+    // Investment accounts can be seeded at creation with an off-app balance
+    // (an existing crypto holding, pre-funded broker account, etc.). That
+    // seed never shows up in `transactions`, so pull it from investment_details.
+    final seed = await _client
+        .from('investment_details')
+        .select('initial_balance')
+        .eq('account_id', accountId)
+        .maybeSingle();
+    if (seed != null) {
+      total += ((seed['initial_balance'] as num?)?.toDouble() ?? 0.0);
+    }
+
+    return total;
   }
 
   // Goals
@@ -1425,6 +1711,19 @@ class FinanceRepository {
     } catch (e) {
       throw Exception('Error updating account sort order: $e');
     }
+  }
+
+  // RFC-4122 v4 UUID — used for grouping paired swap legs without adding a
+  // dependency on the `uuid` package.
+  static final Random _rand = Random.secure();
+  static String _uuidV4() {
+    final b = List<int>.generate(16, (_) => _rand.nextInt(256));
+    b[6] = (b[6] & 0x0f) | 0x40; // version 4
+    b[8] = (b[8] & 0x3f) | 0x80; // variant 1
+    String hex(int i) => b[i].toRadixString(16).padLeft(2, '0');
+    final s = List.generate(16, hex).join();
+    return '${s.substring(0, 8)}-${s.substring(8, 12)}-'
+        '${s.substring(12, 16)}-${s.substring(16, 20)}-${s.substring(20)}';
   }
 }
 

@@ -31,7 +31,13 @@ class _EditHoldingDialogState extends ConsumerState<EditHoldingDialog> {
   late TextEditingController _sourceSymbolCtrl;
   late String _assetClass;
   late String _currency;
+  bool _isCashEquivalent = false;
   bool _isLoading = false;
+
+  // Initial-purchase flow (create mode only).
+  bool _recordAsPurchase = false;
+  final _feeCtrl = TextEditingController();
+  String? _feeCurrency;
 
   @override
   void initState() {
@@ -58,6 +64,8 @@ class _EditHoldingDialogState extends ConsumerState<EditHoldingDialog> {
     _sourceSymbolCtrl = TextEditingController(text: h?.sourceSymbol ?? '');
     _assetClass = h?.assetClass ?? 'stock';
     _currency = h?.currency ?? 'COP';
+    _isCashEquivalent = h?.isCashEquivalent ?? false;
+    _feeCurrency = _currency;
   }
 
   @override
@@ -69,6 +77,7 @@ class _EditHoldingDialogState extends ConsumerState<EditHoldingDialog> {
     _currentPriceCtrl.dispose();
     _notesCtrl.dispose();
     _sourceSymbolCtrl.dispose();
+    _feeCtrl.dispose();
     super.dispose();
   }
 
@@ -78,24 +87,56 @@ class _EditHoldingDialogState extends ConsumerState<EditHoldingDialog> {
 
     final repo = ref.read(financeRepositoryProvider);
     final sourceSymbol = _sourceSymbolCtrl.text.trim();
+    final enteredQty =
+        double.tryParse(_qtyCtrl.text.replaceAll(',', '.')) ?? 0.0;
+    final enteredPrice =
+        CurrencyFormatter.parse(_avgCostCtrl.text, currency: _currency);
+    final isCreateWithPurchase =
+        widget.holding == null && _recordAsPurchase && enteredQty > 0;
+
+    // When the user opts in to "record as initial purchase", we let
+    // buyHolding apply qty/avg_cost through the canonical code path (same one
+    // later buys use) and log the expense + fee. The holding row itself is
+    // created empty, then immediately filled by buyHolding.
     final data = {
       'account_id': widget.accountId,
       'symbol': _symbolCtrl.text.trim().toUpperCase(),
       'name': _nameCtrl.text.trim().isEmpty ? null : _nameCtrl.text.trim(),
       'asset_class': _assetClass,
       'currency': _currency,
-      'quantity': double.tryParse(_qtyCtrl.text.replaceAll(',', '.')) ?? 0.0,
-      'avg_cost': CurrencyFormatter.parse(_avgCostCtrl.text, currency: _currency),
+      'quantity': isCreateWithPurchase ? 0.0 : enteredQty,
+      'avg_cost': isCreateWithPurchase ? 0.0 : enteredPrice,
       'current_price':
           CurrencyFormatter.parse(_currentPriceCtrl.text, currency: _currency),
       'price_updated_at': DateTime.now().toIso8601String(),
       'notes': _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
       'source_symbol': sourceSymbol.isEmpty ? null : sourceSymbol,
+      'is_cash_equivalent': _isCashEquivalent,
     };
 
     try {
       if (widget.holding == null) {
-        await repo.createHolding(data);
+        final created = await repo.createHolding(data);
+        if (isCreateWithPurchase) {
+          final fee = _feeCtrl.text.isEmpty
+              ? 0.0
+              : double.tryParse(_feeCtrl.text.replaceAll(',', '.')) ?? 0.0;
+          await repo.buyHolding(
+            accountId: widget.accountId,
+            holdingId: created.id,
+            quantity: enteredQty,
+            pricePerUnit: enteredPrice,
+            fee: fee,
+            currency: _currency,
+            feeCurrency: _feeCurrency,
+            transactionData: {
+              'description': 'Buy ${created.symbol} (initial)',
+              'date': DateTime.now().toIso8601String().substring(0, 10),
+              'movement_type': 'variable',
+            },
+          );
+          ref.invalidate(accountsProvider);
+        }
       } else {
         await repo.updateHolding(widget.holding!.id, data);
       }
@@ -270,6 +311,81 @@ class _EditHoldingDialogState extends ConsumerState<EditHoldingDialog> {
                     border: OutlineInputBorder(),
                   ),
                   maxLines: 2,
+                ),
+                const SizedBox(height: 8),
+
+                // Initial-purchase toggle (create mode only). When enabled,
+                // the "Avg Cost" field is interpreted as the purchase price
+                // per unit, a Fee input appears, and buyHolding is fired
+                // after the row is created so the expense + qty/avg_cost land
+                // through the same canonical code path as later buys.
+                if (!isEdit) ...[
+                  SwitchListTile(
+                    value: _recordAsPurchase,
+                    onChanged: (v) => setState(() => _recordAsPurchase = v),
+                    title: const Text('Record as initial purchase'),
+                    subtitle: const Text(
+                      'Deducts cash from this account and logs the buy as a transaction.',
+                    ),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  if (_recordAsPurchase) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: TextFormField(
+                            controller: _feeCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Fee / Commission (optional)',
+                              border: OutlineInputBorder(),
+                              hintText: '0.00',
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          flex: 2,
+                          child: DropdownButtonFormField<String>(
+                            value: _feeCurrency ?? _currency,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'In',
+                              border: OutlineInputBorder(),
+                            ),
+                            items: {
+                              _currency,
+                              _symbolCtrl.text.trim().toUpperCase(),
+                            }
+                                .where((s) => s.isNotEmpty)
+                                .toSet()
+                                .map((c) => DropdownMenuItem(
+                                    value: c, child: Text(c)))
+                                .toList(),
+                            onChanged: (v) =>
+                                setState(() => _feeCurrency = v),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                ],
+
+                // Cash-equivalent toggle (e.g. COPW stablecoin parked inside
+                // an investment account). Holdings flagged here are excluded
+                // from P&L / donut / "Invested", but still swap-able.
+                SwitchListTile(
+                  value: _isCashEquivalent,
+                  onChanged: (v) => setState(() => _isCashEquivalent = v),
+                  title: const Text('Cash-equivalent (stablecoin)'),
+                  subtitle: const Text(
+                    'Excluded from P&L and portfolio donut. Use for COPW, USDT, etc.',
+                  ),
+                  contentPadding: EdgeInsets.zero,
                 ),
                 const SizedBox(height: 16),
 

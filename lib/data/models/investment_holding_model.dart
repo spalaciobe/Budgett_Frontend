@@ -15,6 +15,13 @@ class InvestmentHolding {
   /// `nombre_patrimonio` on datos.gov.co (dataset qhpu-8ixx) used by the
   /// `update-prices` Edge Function. Null for crypto/stocks.
   final String? sourceSymbol;
+
+  /// When true, this holding behaves like a stablecoin / cash balance parked
+  /// inside the investment account (e.g. COPW on Wenia). It still tracks a
+  /// quantity so the user sees "how much liquid I have" and can swap it, but
+  /// it's excluded from P&L, portfolio donut, and the "Invested" aggregate.
+  final bool isCashEquivalent;
+
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -32,6 +39,7 @@ class InvestmentHolding {
     this.priceUpdatedAt,
     this.notes,
     this.sourceSymbol,
+    this.isCashEquivalent = false,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -53,6 +61,7 @@ class InvestmentHolding {
           : null,
       notes: json['notes'],
       sourceSymbol: json['source_symbol'],
+      isCashEquivalent: (json['is_cash_equivalent'] as bool?) ?? false,
       createdAt: DateTime.parse(json['created_at']),
       updatedAt: DateTime.parse(json['updated_at']),
     );

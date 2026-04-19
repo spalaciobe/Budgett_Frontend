@@ -1,6 +1,6 @@
 import 'package:supabase/supabase.dart';
 
-const supabaseUrl = 'http://127.0.0.1:54321';
+const supabaseUrl = 'http://127.0.0.1:55321';
 const supabaseServiceRoleKey = 'sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz';
 
 void main() async {

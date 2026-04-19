@@ -71,6 +71,11 @@ class InvestmentDetails {
   final String? fundCode;
   final String? navCurrency;
 
+  /// Seed amount (in [baseCurrency]) the user deposited when creating the
+  /// account. Counts toward "Funded" together with subsequent incoming
+  /// transfers.
+  final double? initialBalance;
+
   final String? notes;
 
   InvestmentDetails({
@@ -87,6 +92,7 @@ class InvestmentDetails {
     this.autoRenew = false,
     this.fundCode,
     this.navCurrency,
+    this.initialBalance,
     this.notes,
   });
 
@@ -110,6 +116,7 @@ class InvestmentDetails {
       autoRenew: json['auto_renew'] ?? false,
       fundCode: json['fund_code'],
       navCurrency: json['nav_currency'],
+      initialBalance: (json['initial_balance'] as num?)?.toDouble(),
       notes: json['notes'],
     );
   }

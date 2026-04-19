@@ -73,6 +73,7 @@ Map<String, dynamic> buildInvestmentDetailsMap({
   DateTime? maturityDate,
   bool autoRenew = false,
   String? fundCode,
+  double? initialBalance,
 }) {
   String? startDateStr;
   String? maturityDateStr;
@@ -97,6 +98,7 @@ Map<String, dynamic> buildInvestmentDetailsMap({
     'auto_renew': investmentType == InvestmentType.cdt ? autoRenew : false,
     'fund_code': investmentType == InvestmentType.fic ? fundCode : null,
     'nav_currency': investmentType == InvestmentType.fic ? baseCurrency : null,
+    'initial_balance': initialBalance,
   };
 }
 
@@ -262,13 +264,27 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
         );
       }
     } else if (_selectedType == 'investment') {
+      final principalValue = _principalController.text.isEmpty
+          ? null
+          : CurrencyFormatter.parse(_principalController.text);
+      final balanceInBase = _balanceController.text.isEmpty
+          ? null
+          : CurrencyFormatter.parse(
+              _balanceController.text,
+              currency: _investmentBaseCurrency,
+            );
+      // CDTs lock their seed inside `principal`; multi-holding accounts hold
+      // it as cash in the base currency. Either way, it's the user's initial
+      // commitment and should count toward Funded.
+      final initialBalance = _selectedInvestmentType == InvestmentType.cdt
+          ? principalValue
+          : balanceInBase;
+
       accountData['investment_details'] = buildInvestmentDetailsMap(
         investmentType: _selectedInvestmentType,
         brokerId: _selectedBroker?.id,
         baseCurrency: _investmentBaseCurrency,
-        principal: _principalController.text.isEmpty
-            ? null
-            : CurrencyFormatter.parse(_principalController.text),
+        principal: principalValue,
         interestRate: double.tryParse(_interestRateController.text) != null
             ? double.parse(_interestRateController.text) / 100
             : null,
@@ -278,6 +294,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
         fundCode: _fundCodeController.text.trim().isEmpty
             ? null
             : _fundCodeController.text.trim(),
+        initialBalance: initialBalance,
       );
       if (_investmentBaseCurrency == 'USD') {
         accountData['balance_usd'] = CurrencyFormatter.parse(

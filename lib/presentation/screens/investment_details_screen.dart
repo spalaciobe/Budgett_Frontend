@@ -19,6 +19,7 @@ import '../widgets/update_prices_dialog.dart';
 import '../widgets/cdt_collect_dialog.dart';
 import '../widgets/investment_holding_card.dart';
 import '../widgets/portfolio_donut_chart.dart';
+import '../widgets/swap_holding_dialog.dart';
 import '../widgets/transaction_tile.dart';
 
 class InvestmentDetailsScreen extends ConsumerWidget {
@@ -127,6 +128,7 @@ class _Body extends ConsumerWidget {
       fxRate: fxRate,
     );
     final pnl = InvestmentCalculator.computePnl(holdings);
+    final fundedAsync = ref.watch(accountFundedTotalProvider(account.id));
 
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -142,6 +144,7 @@ class _Body extends ConsumerWidget {
             pnl: pnl,
             holdings: holdings,
             fxRate: fxRate,
+            funded: fundedAsync.valueOrNull,
           ),
 
           const SizedBox(height: 16),
@@ -180,10 +183,23 @@ class _Body extends ConsumerWidget {
                   itemCount: txs.length,
                   separatorBuilder: (_, __) =>
                       const Divider(height: 1, indent: 16, endIndent: 16),
-                  itemBuilder: (context, i) => TransactionTile(
-                    transaction: txs[i],
-                    perspectiveAccountId: account.id,
-                  ),
+                  itemBuilder: (context, i) {
+                    final tx = txs[i];
+                    final isSwapLeg =
+                        tx.type == 'swap' && tx.swapGroupId != null;
+                    return TransactionTile(
+                      transaction: tx,
+                      perspectiveAccountId: account.id,
+                      onTap: isSwapLeg
+                          ? () => _confirmDeleteSwap(
+                                context,
+                                ref,
+                                accountId: account.id,
+                                swapGroupId: tx.swapGroupId!,
+                              )
+                          : null,
+                    );
+                  },
                 ),
               );
             },
@@ -191,6 +207,56 @@ class _Body extends ConsumerWidget {
         ],
       ),
     );
+  }
+}
+
+// Reverse a swap: deletes both linked legs and restores holding quantities.
+// avg_cost is best-effort — it's reset to 0 when the reversal empties the
+// position, otherwise left as-is (we can't recover the exact pre-swap cost
+// basis without extra state). The dialog warns about this.
+Future<void> _confirmDeleteSwap(
+  BuildContext context,
+  WidgetRef ref, {
+  required String accountId,
+  required String swapGroupId,
+}) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogCtx) => AlertDialog(
+      title: const Text('Delete swap?'),
+      content: const Text(
+        'Both legs will be removed and quantities on the two holdings restored. '
+        'Average cost on the destination holding can\'t be perfectly recovered '
+        'and will be left at its current value unless the position becomes empty.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogCtx).pop(false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: Theme.of(dialogCtx).colorScheme.error,
+          ),
+          onPressed: () => Navigator.of(dialogCtx).pop(true),
+          child: const Text('Delete'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true) return;
+
+  try {
+    await ref.read(financeRepositoryProvider).deleteSwap(swapGroupId);
+    ref.invalidate(accountHoldingsProvider(accountId));
+    ref.invalidate(accountDetailTransactionsProvider(accountId));
+    ref.invalidate(accountsProvider);
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error deleting swap: $e')),
+      );
+    }
   }
 }
 
@@ -204,6 +270,10 @@ class _SummaryHeader extends StatelessWidget {
   final List<InvestmentHolding> holdings;
   final FxRate? fxRate;
 
+  /// Total cash transferred INTO this account (sum of incoming transfers).
+  /// Null while still loading; we simply hide the row rather than flash a 0.
+  final double? funded;
+
   const _SummaryHeader({
     required this.account,
     required this.details,
@@ -211,6 +281,7 @@ class _SummaryHeader extends StatelessWidget {
     required this.pnl,
     required this.holdings,
     required this.fxRate,
+    required this.funded,
   });
 
   @override
@@ -219,6 +290,7 @@ class _SummaryHeader extends StatelessWidget {
     final baseCurrency = details?.baseCurrency ?? 'COP';
     final isApprox = totalValue.isApprox;
     final hasHoldings = holdings.isNotEmpty;
+    final invType = details?.investmentType ?? InvestmentType.cdt;
 
     // Stale indicator
     final isStale = fxRate?.isStale ?? false;
@@ -237,6 +309,12 @@ class _SummaryHeader extends StatelessWidget {
     final pnlPositive = pnl.pnl >= 0;
     final pnlColor =
         pnlPositive ? Colors.green.shade600 : theme.colorScheme.error;
+
+    // Total invested (what the user has actually paid for current positions).
+    // CDT → principal; multi-holding → aggregated cost basis.
+    final double? invested = invType == InvestmentType.cdt
+        ? details?.principal
+        : (hasHoldings ? pnl.costBasis : null);
 
     return Card(
       elevation: 2,
@@ -289,27 +367,79 @@ class _SummaryHeader extends StatelessWidget {
               ),
             ],
 
-            // P&L (only when there are multi-holding positions)
-            if (hasHoldings && pnl.costBasis != 0) ...[
+            // Funded (real cash transferred into this account) — always shown
+            // when we have a value, independent of whether positions exist.
+            if (funded != null && funded! > 0) ...[
               kGapLg,
               Row(
                 children: [
                   Icon(
-                    pnlPositive
-                        ? Icons.trending_up
-                        : Icons.trending_down,
+                    Icons.account_balance_wallet_outlined,
                     size: 16,
-                    color: pnlColor,
+                    color: theme.colorScheme.onSurface.withOpacity(0.6),
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    '${pnlPositive ? '+' : ''}${CurrencyFormatter.format(pnl.pnl, currency: baseCurrency)}  '
-                    '(${pnlPositive ? '+' : ''}${pnl.pnlPct.toStringAsFixed(2)}%)',
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(color: pnlColor, fontWeight: FontWeight.w600),
+                    'Funded ',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                    ),
+                  ),
+                  Text(
+                    CurrencyFormatter.format(funded!, currency: baseCurrency),
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(fontWeight: FontWeight.w600),
                   ),
                 ],
               ),
+            ],
+
+            // Invested / P&L summary
+            if (invested != null && invested != 0) ...[
+              SizedBox(height: funded != null && funded! > 0 ? 4 : kSpaceLg),
+              Row(
+                children: [
+                  Icon(
+                    Icons.savings_outlined,
+                    size: 16,
+                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Invested ',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                    ),
+                  ),
+                  Text(
+                    CurrencyFormatter.format(invested,
+                        currency: baseCurrency),
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+              if (hasHoldings && pnl.costBasis != 0) ...[
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(
+                      pnlPositive
+                          ? Icons.trending_up
+                          : Icons.trending_down,
+                      size: 16,
+                      color: pnlColor,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${pnlPositive ? '+' : ''}${CurrencyFormatter.format(pnl.pnl, currency: baseCurrency)}  '
+                      '(${pnlPositive ? '+' : ''}${pnl.pnlPct.toStringAsFixed(2)}%)',
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: pnlColor, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ],
             ],
 
             // Price age
@@ -472,6 +602,23 @@ class _HoldingsListState extends ConsumerState<_HoldingsList> {
                   accountId: account.id,
                   holdings: holdings,
                 ),
+              if (holdings.length >= 2) ...[
+                TextButton.icon(
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (_) => SwapHoldingDialog(
+                        accountId: account.id,
+                        holdings: holdings,
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.swap_horiz, size: 16),
+                  label: const Text('Swap'),
+                  style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact),
+                ),
+              ],
               FilledButton.icon(
                 onPressed: () {
                   showDialog(
@@ -559,6 +706,23 @@ class _HoldingsListState extends ConsumerState<_HoldingsList> {
                       accountId: account.id,
                       holdings: holdings,
                     ),
+                  if (holdings.length >= 2) ...[
+                    TextButton.icon(
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (_) => SwapHoldingDialog(
+                            accountId: account.id,
+                            holdings: holdings,
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.swap_horiz, size: 16),
+                      label: const Text('Swap'),
+                      style: TextButton.styleFrom(
+                          visualDensity: VisualDensity.compact),
+                    ),
+                  ],
                   FilledButton.icon(
                     onPressed: () {
                       showDialog(
@@ -632,21 +796,21 @@ class _HoldingsListState extends ConsumerState<_HoldingsList> {
                     onDelete: () async {
                       final confirmed = await showDialog<bool>(
                         context: context,
-                        builder: (_) => AlertDialog(
+                        builder: (dialogContext) => AlertDialog(
                           title: const Text('Delete Position?'),
                           content: Text(
                               'Delete ${h.symbol}? Transaction history will be preserved.'),
                           actions: [
                             TextButton(
-                              onPressed: () => Navigator.of(context).pop(false),
+                              onPressed: () => Navigator.of(dialogContext).pop(false),
                             child: const Text('Cancel'),
                           ),
                           FilledButton(
                             style: FilledButton.styleFrom(
                               backgroundColor:
-                                  Theme.of(context).colorScheme.error,
+                                  Theme.of(dialogContext).colorScheme.error,
                             ),
-                            onPressed: () => Navigator.of(context).pop(true),
+                            onPressed: () => Navigator.of(dialogContext).pop(true),
                             child: const Text('Delete'),
                           ),
                         ],
@@ -677,9 +841,13 @@ class _HoldingsListState extends ConsumerState<_HoldingsList> {
 
     // Group holdings by symbol+currency so buying the same asset twice
     // shows as a single slice even if the user created two rows.
+    // Cash-equivalent holdings (stablecoins like COPW) are excluded — they're
+    // liquid balance, not a portfolio position, and would otherwise dominate
+    // the donut with a "same as account cash" slice.
     final grouped = <String, _SymbolSlice>{};
     for (final h in holdings) {
       if (h.marketValue <= 0) continue;
+      if (h.isCashEquivalent) continue;
       final key = '${h.symbol}|${h.currency}';
       final existing = grouped[key];
       if (existing == null) {
@@ -890,13 +1058,18 @@ class _UpdatePricesButtonState extends ConsumerState<_UpdatePricesButton> {
         );
       } else {
         final symbols = skipped.map((s) => s.symbol).join(', ');
+        messenger.hideCurrentSnackBar();
         messenger.showSnackBar(
           SnackBar(
-            duration: const Duration(seconds: 6),
+            duration: const Duration(seconds: 4),
+            showCloseIcon: true,
             content: Text('Updated $updated, skipped: $symbols'),
             action: SnackBarAction(
               label: 'Edit manually',
-              onPressed: _openManualDialog,
+              onPressed: () {
+                messenger.hideCurrentSnackBar();
+                _openManualDialog();
+              },
             ),
           ),
         );
@@ -905,6 +1078,7 @@ class _UpdatePricesButtonState extends ConsumerState<_UpdatePricesButton> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
+          showCloseIcon: true,
           content: Text('Failed to fetch prices: $e'),
           action: SnackBarAction(
             label: 'Edit manually',

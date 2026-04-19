@@ -3,6 +3,7 @@ import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
+import 'package:budgett_frontend/presentation/widgets/edit_recurring_transaction_dialog.dart';
 import 'package:intl/intl.dart';
 
 class RecurringTransactionsScreen extends ConsumerWidget {
@@ -55,6 +56,10 @@ class RecurringTransactionsScreen extends ConsumerWidget {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 child: ListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  onTap: () => showDialog(
+                    context: context,
+                    builder: (_) => EditRecurringTransactionDialog(transaction: item),
+                  ),
                   leading: CircleAvatar(
                     backgroundColor: item.type == 'income' 
                         ? Colors.green.withOpacity(0.1) 
@@ -86,6 +91,16 @@ class RecurringTransactionsScreen extends ConsumerWidget {
                       PopupMenuButton(
                         itemBuilder: (context) => [
                           const PopupMenuItem(
+                            value: 'edit',
+                            child: Row(
+                              children: [
+                                Icon(Icons.edit, size: 18),
+                                SizedBox(width: 8),
+                                Text('Edit'),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuItem(
                             value: 'generate',
                             child: Row(
                               children: [
@@ -107,7 +122,12 @@ class RecurringTransactionsScreen extends ConsumerWidget {
                           ),
                         ],
                         onSelected: (value) async {
-                          if (value == 'delete') {
+                          if (value == 'edit') {
+                            await showDialog(
+                              context: context,
+                              builder: (_) => EditRecurringTransactionDialog(transaction: item),
+                            );
+                          } else if (value == 'delete') {
                             final confirm = await showDialog<bool>(
                               context: context,
                               builder: (context) => AlertDialog(

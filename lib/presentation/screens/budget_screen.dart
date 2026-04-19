@@ -30,6 +30,7 @@ class BudgetScreen extends ConsumerWidget {
     final selectedDate = ref.watch(budgetDateProvider);
     final budgetsAsync = ref.watch(budgetsProvider((month: selectedDate.month, year: selectedDate.year)));
     final categoriesAsync = ref.watch(categoriesProvider);
+    final accumulatedBalancesAsync = ref.watch(categoryAccumulatedBalancesProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -203,6 +204,82 @@ class BudgetScreen extends ConsumerWidget {
                           return bBudget.compareTo(aBudget);
                         });
 
+                        // Split budget/spent totals into expense vs savings so the
+                        // Financial Health card can show commitments distinctly.
+                        double savingsBudget = 0.0;
+                        double savingsContributed = 0.0;
+                        for (final cat in categories) {
+                          if (cat.type != 'savings') continue;
+                          savingsBudget += budgetAmountsMap[cat.id] ?? 0.0;
+                          final sc = spending[cat.id];
+                          if (sc is CategorySpending) savingsContributed += sc.total;
+                        }
+                        final expenseBudget = (totalBudget - savingsBudget).clamp(0.0, double.infinity);
+                        final expenseSpent = (totalSpent - savingsContributed).clamp(0.0, double.infinity);
+
+                        final savingsCategories = sortedCategories
+                            .where((c) => c.type == 'savings')
+                            .toList();
+                        final nonSavingsCategories = sortedCategories
+                            .where((c) => c.type != 'savings')
+                            .toList();
+                        final accumulated =
+                            accumulatedBalancesAsync.valueOrNull ?? const {};
+
+                        Widget buildRow(Category cat) {
+                          final budget = budgets.cast<dynamic>().firstWhere(
+                            (b) => b.categoryId == cat.id,
+                            orElse: () => null,
+                          );
+                          final actualSpent = cat.type == 'income'
+                              ? (incomeFlows[cat.id]?.total ?? 0.0)
+                              : (spending[cat.id]?.total ?? 0.0);
+                          final budgetAmount = budget?.amount ?? 0.0;
+
+                          final subSpending = cat.type == 'income'
+                              ? incomeFlows[cat.id]?.subCategories
+                              : spending[cat.id]?.subCategories;
+
+                          return BudgetComparisonWidget(
+                            categoryName: cat.name,
+                            budgetAmount: budgetAmount,
+                            spentAmount: actualSpent,
+                            color: cat.color != null
+                                ? _parseColor(cat.color!)
+                                : null,
+                            iconName: cat.icon,
+                            isIncome: cat.type == 'income',
+                            isSavings: cat.type == 'savings',
+                            accumulatedBalance: cat.type == 'savings'
+                                ? (accumulated[cat.id] ?? 0.0)
+                                : null,
+                            subCategories: cat.subCategories,
+                            subCategorySpending: subSpending,
+                            onEditBudget: () {
+                              showDialog(
+                                context: context,
+                                builder: (context) => EditBudgetDialog(
+                                  categoryId: cat.id,
+                                  categoryName: cat.name,
+                                  month: selectedDate.month,
+                                  year: selectedDate.year,
+                                  currentAmount: budget?.amount,
+                                  categoryType: cat.type,
+                                  categoryIcon: cat.icon,
+                                  categoryColor: cat.color,
+                                ),
+                              );
+                            },
+                            onEditCategory: () {
+                              showDialog(
+                                context: context,
+                                builder: (context) =>
+                                    EditCategoryDialog(category: cat),
+                              );
+                            },
+                          );
+                        }
+
                         return Column(
                           children: [
                             _BudgetTopCard(
@@ -210,6 +287,10 @@ class BudgetScreen extends ConsumerWidget {
                               expectedIncome: expectedIncome,
                               totalBudget: totalBudget,
                               totalSpent: totalSpent,
+                              expenseBudget: expenseBudget,
+                              expenseSpent: expenseSpent,
+                              savingsBudget: savingsBudget,
+                              savingsContributed: savingsContributed,
                               allocationPercentage: allocationPercentage,
                               availableToAllocate: availableToAllocate,
                               categories: sortedCategories,
@@ -217,61 +298,43 @@ class BudgetScreen extends ConsumerWidget {
                               budgetAmounts: budgetAmountsMap,
                             ),
 
-                            // Categories List
+                            // Categories list (expense + income, then savings).
                             Expanded(
-                              child: ListView.builder(
+                              child: ListView(
                                 physics: const AlwaysScrollableScrollPhysics(),
                                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                                itemCount: sortedCategories.length,
-                                itemBuilder: (context, index) {
-                                  final cat = sortedCategories[index];
-                                  final budget = budgets.cast<dynamic>().firstWhere(
-                                    (b) => b.categoryId == cat.id,
-                                    orElse: () => null,
-                                  );
-                                  final actualSpent = cat.type == 'income'
-                                      ? (incomeFlows[cat.id]?.total ?? 0.0)
-                                      : (spending[cat.id]?.total ?? 0.0);
-                                  final budgetAmount = budget?.amount ?? 0.0;
-
-                                  final subSpending = cat.type == 'income'
-                                      ? incomeFlows[cat.id]?.subCategories
-                                      : spending[cat.id]?.subCategories;
-
-                                  return BudgetComparisonWidget(
-                                    categoryName: cat.name,
-                                    budgetAmount: budgetAmount,
-                                    spentAmount: actualSpent,
-                                    color: cat.color != null ? _parseColor(cat.color!) : null,
-                                    iconName: cat.icon,
-                                    isIncome: cat.type == 'income',
-                                    subCategories: cat.subCategories,
-                                    subCategorySpending: subSpending,
-                                    onEditBudget: () {
-                                      showDialog(
-                                        context: context,
-                                        builder: (context) => EditBudgetDialog(
-                                          categoryId: cat.id,
-                                          categoryName: cat.name,
-                                          month: selectedDate.month,
-                                          year: selectedDate.year,
-                                          currentAmount: budget?.amount,
-                                          categoryType: cat.type,
-                                          categoryIcon: cat.icon,
-                                          categoryColor: cat.color,
-                                        ),
-                                      );
-                                    },
-                                    onEditCategory: () {
-                                      showDialog(
-                                        context: context,
-                                        builder: (context) => EditCategoryDialog(
-                                          category: cat,
-                                        ),
-                                      );
-                                    },
-                                  );
-                                },
+                                children: [
+                                  ...nonSavingsCategories.map(buildRow),
+                                  if (savingsCategories.isNotEmpty) ...[
+                                    Padding(
+                                      padding: const EdgeInsets.only(
+                                          top: 16, bottom: 8, left: 4),
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.savings_outlined,
+                                              size: 16,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurface
+                                                  .withOpacity(0.7)),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            'Savings & Sinking Funds',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w700,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurface
+                                                  .withOpacity(0.75),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    ...savingsCategories.map(buildRow),
+                                  ],
+                                ],
                               ),
                             ),
                           ],
@@ -315,6 +378,10 @@ class _BudgetTopCard extends StatefulWidget {
   final double expectedIncome;
   final double totalBudget;
   final double totalSpent;
+  final double expenseBudget;
+  final double expenseSpent;
+  final double savingsBudget;
+  final double savingsContributed;
   final double allocationPercentage;
   final double availableToAllocate;
   final List<Category> categories;
@@ -326,6 +393,10 @@ class _BudgetTopCard extends StatefulWidget {
     required this.expectedIncome,
     required this.totalBudget,
     required this.totalSpent,
+    required this.expenseBudget,
+    required this.expenseSpent,
+    required this.savingsBudget,
+    required this.savingsContributed,
     required this.allocationPercentage,
     required this.availableToAllocate,
     required this.categories,
@@ -489,11 +560,14 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
         _FinancialHealthBar(
           income: widget.monthlyIncome,
           expectedIncome: widget.expectedIncome,
-          budget: widget.totalBudget,
-          spent: widget.totalSpent,
+          budget: widget.expenseBudget,
+          spent: widget.expenseSpent,
+          savingsBudget: widget.savingsBudget,
+          savingsContributed: widget.savingsContributed,
           incomeColor: const Color(0xFF1ABC9C),
           budgetColor: const Color(0xFF9b59b6),
           spentColor: const Color(0xFFFF6F61),
+          savingsColor: const Color(0xFF3498DB),
         ),
         kGapXxl,
         Padding(
@@ -520,17 +594,32 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
               _buildSummaryColumn(
                 context,
                 label: 'Budget',
-                amount: widget.totalBudget,
+                amount: widget.expenseBudget,
                 color: const Color(0xFF9b59b6),
               ),
               _buildSummaryColumn(
                 context,
                 label: 'Spent',
-                amount: widget.totalSpent,
-                color: widget.totalSpent > widget.totalBudget
+                amount: widget.expenseSpent,
+                color: widget.expenseSpent > widget.expenseBudget
                     ? const Color(0xFFD32F2F)
                     : const Color(0xFFFF6F61),
               ),
+              if (widget.savingsBudget > 0 || widget.savingsContributed > 0) ...[
+                _buildSummaryColumn(
+                  context,
+                  label: 'Savings target',
+                  amount: widget.savingsBudget,
+                  color: const Color(0xFF3498DB),
+                  isHatched: true,
+                ),
+                _buildSummaryColumn(
+                  context,
+                  label: 'Saved',
+                  amount: widget.savingsContributed,
+                  color: const Color(0xFF3498DB),
+                ),
+              ],
             ],
           ),
         ),
@@ -604,12 +693,16 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
 
   Widget _buildDonutContent(BuildContext context) {
     final isBudgetMode = _donutMode == 0;
-    final expenseCategories = widget.categories.where((c) => c.type == 'expense').toList();
+    // Includes both expense and savings categories — savings commitments are
+    // part of your monthly outflow and should be visible in the distribution.
+    final committableCategories = widget.categories
+        .where((c) => c.type == 'expense' || c.type == 'savings')
+        .toList();
 
     // Each mode filters and sizes slices independently
     final visibleCategories = isBudgetMode
-        ? expenseCategories.where((c) => (widget.budgetAmounts[c.id] ?? 0.0) > 0).toList()
-        : expenseCategories
+        ? committableCategories.where((c) => (widget.budgetAmounts[c.id] ?? 0.0) > 0).toList()
+        : committableCategories
             .where((c) => ((widget.spending[c.id] as CategorySpending?)?.total ?? 0.0) > 0)
             .toList();
 
@@ -763,25 +856,39 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
 class _FinancialHealthBar extends StatelessWidget {
   final double income;
   final double expectedIncome;
+  /// Expense-only planned; the "Budget" marker lands here.
   final double budget;
+  /// Expense-only actual; the "Spent" marker lands here.
   final double spent;
+  /// Savings target for the month; rendered as a hatched teal segment
+  /// stacked right after [budget] and as a "Target" marker at [budget]+[savingsBudget].
+  final double savingsBudget;
+  /// Savings contributed this month; rendered as a solid teal segment
+  /// stacked right after [spent] and as a "Saved" marker at [spent]+[savingsContributed].
+  final double savingsContributed;
   final Color incomeColor;
   final Color budgetColor;
   final Color spentColor;
+  final Color savingsColor;
 
   const _FinancialHealthBar({
     required this.income,
     this.expectedIncome = 0,
     required this.budget,
     required this.spent,
+    this.savingsBudget = 0,
+    this.savingsContributed = 0,
     required this.incomeColor,
     required this.budgetColor,
     required this.spentColor,
+    required this.savingsColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    if (income == 0 && expectedIncome == 0 && budget == 0 && spent == 0) {
+    final double planned = budget + savingsBudget;
+    final double committed = spent + savingsContributed;
+    if (income == 0 && expectedIncome == 0 && planned == 0 && committed == 0) {
       return Container(
         height: 36,
         decoration: BoxDecoration(
@@ -794,7 +901,7 @@ class _FinancialHealthBar extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final double maxWidth = constraints.maxWidth;
-        final double maxVal = [income, expectedIncome, budget, spent]
+        final double maxVal = [income, expectedIncome, planned, committed]
             .reduce((a, b) => a > b ? a : b);
         final double scale = maxVal > 0 ? maxWidth / maxVal : 0;
 
@@ -808,10 +915,21 @@ class _FinancialHealthBar extends StatelessWidget {
         final double expectedWidth = clampW(expectedIncome);
         final double budgetWidth = clampW(budget);
         final double spentWidth = clampW(spent);
+        final double targetWidth = clampW(planned);
+        final double savedWidth = clampW(committed);
+        final double savingsTargetSegmentWidth =
+            (targetWidth - budgetWidth).clamp(0.0, maxWidth);
+        final double savingsSegmentWidth =
+            (savedWidth - spentWidth).clamp(0.0, maxWidth);
 
-        final bool overBudget = spent > budget && budget > 0;
+        // Compare like-with-like: expenses vs expense budget, and total
+        // committed vs total planned.
+        final bool overExpenseBudget = spent > budget && budget > 0;
+        final bool overPlanned = committed > planned && planned > 0;
         final Color effectiveSpentColor =
-            overBudget ? const Color(0xFFD32F2F) : spentColor;
+            overExpenseBudget ? const Color(0xFFD32F2F) : spentColor;
+        final Color effectiveSavingsColor =
+            overPlanned ? const Color(0xFFD32F2F) : savingsColor;
 
         const double barHeight = 36.0;
         const double radius = 8.0;
@@ -840,6 +958,10 @@ class _FinancialHealthBar extends StatelessWidget {
             budget > 0 ? clampLabelLeft(budgetWidth) : 0;
         final double spentLabelLeft =
             spent > 0 ? clampLabelLeft(spentWidth) : 0;
+        final double savedLabelLeft =
+            savingsContributed > 0 ? clampLabelLeft(savedWidth) : 0;
+        final double targetLabelLeft =
+            savingsBudget > 0 ? clampLabelLeft(targetWidth) : 0;
 
         final bool bothLabels = budget > 0 && spent > 0;
         final bool labelsCollide = bothLabels &&
@@ -855,6 +977,20 @@ class _FinancialHealthBar extends StatelessWidget {
             ? labelRowHeight + labelGap
             : 0;
         final double spentLabelTop = 0;
+        // Saved label sits on the same row as Spent when they're far apart;
+        // drops to the budget row if it would overlap spent.
+        final bool savedOverlapsSpent = savingsContributed > 0 &&
+            spent > 0 &&
+            (savedLabelLeft - spentLabelLeft).abs() < labelWidth;
+        final double savedLabelTop =
+            savedOverlapsSpent ? budgetLabelTop : spentLabelTop;
+        // Target label mirrors Saved — same row as Budget when far apart;
+        // drops to the Spent row if it would overlap Budget.
+        final bool targetOverlapsBudget = savingsBudget > 0 &&
+            budget > 0 &&
+            (targetLabelLeft - budgetLabelLeft).abs() < labelWidth;
+        final double targetLabelTop =
+            targetOverlapsBudget ? spentLabelTop : budgetLabelTop;
 
         return SizedBox(
           height: barHeight + labelAreaHeight,
@@ -891,6 +1027,40 @@ class _FinancialHealthBar extends StatelessWidget {
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
                       color: budgetColor,
+                    ),
+                  ),
+                ),
+
+              // Saved marker label above the bar (end of the solid teal segment).
+              if (savingsContributed > 0)
+                Positioned(
+                  left: savedLabelLeft,
+                  top: savedLabelTop,
+                  width: labelWidth,
+                  child: Text(
+                    'Saved',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: effectiveSavingsColor,
+                    ),
+                  ),
+                ),
+
+              // Target marker label above the bar (end of the hatched teal segment).
+              if (savingsBudget > 0)
+                Positioned(
+                  left: targetLabelLeft,
+                  top: targetLabelTop,
+                  width: labelWidth,
+                  child: Text(
+                    'Target',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: savingsColor,
                     ),
                   ),
                 ),
@@ -951,13 +1121,72 @@ class _FinancialHealthBar extends StatelessWidget {
                         child: Container(width: 2, color: budgetColor),
                       ),
 
-                    // Spent vertical marker.
+                    // Spent vertical marker (expense spent only).
                     if (spent > 0)
                       Positioned(
                         left: (spentWidth - 1).clamp(0, maxWidth - 2),
                         top: 0,
                         bottom: 0,
                         child: Container(width: 2, color: effectiveSpentColor),
+                      ),
+
+                    // Savings target: hatched teal band in the TOP half of the
+                    // bar, stacked right after the Budget marker. Mirrors the
+                    // solid "Saved" segment below.
+                    if (savingsBudget > 0 && savingsTargetSegmentWidth > 0)
+                      Positioned(
+                        left: budgetWidth,
+                        top: 0,
+                        height: barHeight * 0.45,
+                        width: savingsTargetSegmentWidth,
+                        child: ClipRect(
+                          child: CustomPaint(
+                            painter: _HatchedPainter(
+                              color: savingsColor.withOpacity(0.75),
+                            ),
+                            size: Size.infinite,
+                          ),
+                        ),
+                      ),
+
+                    // Savings contributed: solid teal band in the BOTTOM half
+                    // of the bar, stacked right after the Spent marker.
+                    if (savingsContributed > 0 && savingsSegmentWidth > 0)
+                      Positioned(
+                        left: spentWidth,
+                        top: barHeight * 0.55,
+                        height: barHeight * 0.45,
+                        width: savingsSegmentWidth,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: effectiveSavingsColor.withOpacity(0.85),
+                            borderRadius: BorderRadius.only(
+                              topRight: savedWidth >= maxWidth - 0.5
+                                  ? const Radius.circular(radius)
+                                  : Radius.zero,
+                              bottomRight: savedWidth >= maxWidth - 0.5
+                                  ? const Radius.circular(radius)
+                                  : Radius.zero,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                    // Vertical markers at the end of each teal segment so the
+                    // total (expense + savings) is visible at a glance.
+                    if (savingsBudget > 0)
+                      Positioned(
+                        left: (targetWidth - 1).clamp(0, maxWidth - 2),
+                        top: 0,
+                        bottom: 0,
+                        child: Container(width: 2, color: savingsColor),
+                      ),
+                    if (savingsContributed > 0)
+                      Positioned(
+                        left: (savedWidth - 1).clamp(0, maxWidth - 2),
+                        top: 0,
+                        bottom: 0,
+                        child: Container(width: 2, color: effectiveSavingsColor),
                       ),
                   ],
                 ),

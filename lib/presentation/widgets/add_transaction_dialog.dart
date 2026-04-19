@@ -35,6 +35,13 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
   String? _selectedCategoryId;
   String? _selectedExpenseGroupId;
 
+  /// Expense paid out of a sinking fund. Subtracts from that fund's
+  /// accumulated balance instead of from this month's category budget.
+  String? _fundedByCategoryId;
+  /// Transfer tagged as a contribution to a sinking fund. Becomes the
+  /// transaction's [category_id] so the savings category aggregates it.
+  String? _savingsContributionCategoryId;
+
   String _status = 'paid';
   bool _isRecurring = false;
   String _frequency = 'monthly';
@@ -257,6 +264,15 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
       transactionData['target_account_id'] = _selectedTargetAccountId;
     }
 
+    // Sinking-fund linkage (Model B).
+    if (_selectedType == 'expense' && _fundedByCategoryId != null) {
+      transactionData['funded_by_category_id'] = _fundedByCategoryId;
+    }
+    if (_selectedType == 'transfer' && _savingsContributionCategoryId != null) {
+      transactionData['category_id'] = _savingsContributionCategoryId;
+      transactionData['movement_type'] = 'savings';
+    }
+
     if (_notesController.text.isNotEmpty) {
       transactionData['notes'] = _notesController.text;
     }
@@ -385,6 +401,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
 
       ref.invalidate(recentTransactionsProvider);
       ref.invalidate(accountsProvider);
+      ref.invalidate(categoryAccumulatedBalancesProvider);
 
       if (mounted) {
         Navigator.of(context).pop();
@@ -738,10 +755,12 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                   ],
                   onChanged: (value) => setState(() {
                     _selectedType = value!;
-                    // Reset currency and installments when changing type
+                    // Reset currency, installments and sinking-fund links when changing type
                     if (!_isCreditCardExpense) _currency = 'COP';
                     _isUsdPayment = false;
                     _payInInstallments = false;
+                    _fundedByCategoryId = null;
+                    _savingsContributionCategoryId = null;
                   }),
                 ),
                 const SizedBox(height: 10),
@@ -938,6 +957,77 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                     ],
                   ],
                 ],
+
+                // Funded-by sinking fund (optional, expenses only)
+                if (_selectedType == 'expense')
+                  categoriesAsync.when(
+                    data: (categories) {
+                      final savings = categories.where((c) => c.isSavings).toList();
+                      if (savings.isEmpty) return const SizedBox();
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: DropdownButtonFormField<String?>(
+                          value: _fundedByCategoryId,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Funded by sinking fund (optional)',
+                            helperText:
+                                "Won't count against this month's category budget; "
+                                'subtracts from the fund\'s accumulated balance.',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: [
+                            const DropdownMenuItem<String?>(
+                                value: null, child: Text('None')),
+                            ...savings.map((c) => DropdownMenuItem<String?>(
+                                  value: c.id,
+                                  child: Text(c.name,
+                                      overflow: TextOverflow.ellipsis),
+                                )),
+                          ],
+                          onChanged: (v) =>
+                              setState(() => _fundedByCategoryId = v),
+                        ),
+                      );
+                    },
+                    loading: () => const SizedBox(),
+                    error: (_, __) => const SizedBox(),
+                  ),
+
+                // Sinking-fund contribution tag (optional, transfers only)
+                if (_selectedType == 'transfer')
+                  categoriesAsync.when(
+                    data: (categories) {
+                      final savings = categories.where((c) => c.isSavings).toList();
+                      if (savings.isEmpty) return const SizedBox();
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: DropdownButtonFormField<String?>(
+                          value: _savingsContributionCategoryId,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Contribute to sinking fund (optional)',
+                            helperText:
+                                "Counts as this month's contribution toward the fund's monthly target.",
+                            border: OutlineInputBorder(),
+                          ),
+                          items: [
+                            const DropdownMenuItem<String?>(
+                                value: null, child: Text('None')),
+                            ...savings.map((c) => DropdownMenuItem<String?>(
+                                  value: c.id,
+                                  child: Text(c.name,
+                                      overflow: TextOverflow.ellipsis),
+                                )),
+                          ],
+                          onChanged: (v) =>
+                              setState(() => _savingsContributionCategoryId = v),
+                        ),
+                      );
+                    },
+                    loading: () => const SizedBox(),
+                    error: (_, __) => const SizedBox(),
+                  ),
 
                 // Expense Group (Optional, only for expenses)
                 if (_selectedType == 'expense')

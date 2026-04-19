@@ -133,11 +133,16 @@ class InvestmentCalculator {
   /// All holdings are expected to share the same [currency] (or conversion is
   /// skipped for simplicity in this MVP). For multi-currency portfolios, call
   /// per-holding unrealizedPnl and convert at the widget layer.
+  ///
+  /// Cash-equivalent holdings (e.g. COPW stablecoins parked inside a Wenia
+  /// account) are skipped: their "P&L" is structurally zero and counting them
+  /// would distort both cost basis and the "Invested" headline.
   static InvestmentPnl computePnl(List<InvestmentHolding> holdings) {
     double costBasis = 0.0;
     double marketValue = 0.0;
 
     for (final h in holdings) {
+      if (h.isCashEquivalent) continue;
       costBasis += h.costBasis;
       marketValue += h.marketValue;
     }

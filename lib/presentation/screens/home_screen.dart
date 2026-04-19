@@ -518,11 +518,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         return ListTile(
                           contentPadding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 3),
-                          onTap: () => showDialog(
-                            context: context,
-                            builder: (_) =>
-                                EditTransactionDialog(transaction: t),
-                          ),
+                          onTap: () {
+                            // Swap legs are part of a linked pair — editing a
+                            // single leg through the generic dialog would
+                            // corrupt the other leg and mismatch holding
+                            // qty_delta. To change a swap the user should
+                            // delete and re-create it from the investment
+                            // screen.
+                            if (t.type == 'swap') {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Swap transactions can\'t be edited directly — delete and re-create from the investment account.',
+                                  ),
+                                ),
+                              );
+                              return;
+                            }
+                            showDialog(
+                              context: context,
+                              builder: (_) =>
+                                  EditTransactionDialog(transaction: t),
+                            );
+                          },
                           leading: CircleAvatar(
                             backgroundColor: typeColor.withOpacity(0.12),
                             child: Icon(icon, color: typeColor, size: 20),

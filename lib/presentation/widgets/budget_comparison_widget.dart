@@ -11,6 +11,10 @@ class BudgetComparisonWidget extends StatefulWidget {
   final double spentAmount;
   final Color? color;
   final bool isIncome;
+  /// True when this row represents a sinking-fund category. Re-labels
+  /// "Spent/Budget" → "Contributed/Monthly target" and renders [accumulatedBalance].
+  final bool isSavings;
+  final double? accumulatedBalance;
   final String? iconName;
   final VoidCallback? onEditBudget;
   final VoidCallback? onEditCategory;
@@ -27,6 +31,8 @@ class BudgetComparisonWidget extends StatefulWidget {
     this.onEditBudget,
     this.onEditCategory,
     this.isIncome = false,
+    this.isSavings = false,
+    this.accumulatedBalance,
     this.subCategories,
     this.subCategorySpending,
   });
@@ -68,7 +74,9 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                       Text(
                         widget.isIncome
                             ? 'No expected income set'
-                            : 'No budget set',
+                            : widget.isSavings
+                                ? 'No monthly target set'
+                                : 'No budget set',
                         style: TextStyle(fontSize: 12, color: Colors.grey[400]),
                       ),
                     ],
@@ -202,7 +210,11 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            widget.isIncome ? 'Earned' : 'Spent',
+                            widget.isIncome
+                                ? 'Earned'
+                                : widget.isSavings
+                                    ? 'Contributed'
+                                    : 'Spent',
                             style: TextStyle(
                                 fontSize: 12, color: Colors.grey[200]),
                           ),
@@ -211,7 +223,9 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                                 decimalDigits: 2),
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              color: !widget.isIncome && isOverBudget
+                              color: !widget.isIncome &&
+                                      !widget.isSavings &&
+                                      isOverBudget
                                   ? Theme.of(context).colorScheme.error
                                   : null,
                             ),
@@ -222,7 +236,11 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text(
-                            widget.isIncome ? 'Target' : 'Budget',
+                            widget.isIncome
+                                ? 'Target'
+                                : widget.isSavings
+                                    ? 'Monthly target'
+                                    : 'Budget',
                             style: TextStyle(
                                 fontSize: 12, color: Colors.grey[200]),
                           ),
@@ -301,6 +319,34 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                       ],
                     ),
                   ),
+
+                  // Sinking-fund accumulated balance footer.
+                  if (widget.isSavings && widget.accumulatedBalance != null) ...[
+                    kGapMd,
+                    Row(
+                      children: [
+                        Icon(Icons.savings_outlined,
+                            size: 14, color: Colors.grey[300]),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Fund balance: ',
+                          style: TextStyle(
+                              fontSize: 12, color: Colors.grey[200]),
+                        ),
+                        Text(
+                          CurrencyFormatter.format(widget.accumulatedBalance!,
+                              decimalDigits: 2),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: widget.accumulatedBalance! < 0
+                                ? Theme.of(context).colorScheme.error
+                                : null,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
 
                   // Subcategories section
                   if (hasSubs) ...[

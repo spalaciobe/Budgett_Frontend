@@ -37,6 +37,25 @@ class Transaction {
   final bool isCreditCardPayment;
   final List<String> closedInstallmentIds;
 
+  /// When set, this expense is paid out of a sinking-fund category's
+  /// accumulated balance. The expense keeps its real [categoryId] for
+  /// reporting but is excluded from that category's monthly budget tracking
+  /// and instead subtracts from the sinking fund's running balance.
+  final String? fundedByCategoryId;
+
+  // Investment fee (decoupled from amount so we can report fees separately).
+  final double feeAmount;
+  final String? feeCurrency;
+
+  /// Groups the two legs of a holding-to-holding swap. Each leg is a row with
+  /// type='swap', a signed [holdingQtyDelta], and a shared [swapGroupId].
+  final String? swapGroupId;
+
+  /// Signed quantity change applied to the linked holding (positive = received,
+  /// negative = given up). Populated on swap legs and optionally on buy/sell so
+  /// history rows carry the unit change, not just the cash amount.
+  final double? holdingQtyDelta;
+
   Transaction({
     required this.id,
     required this.accountId,
@@ -67,6 +86,11 @@ class Transaction {
     this.originalPurchaseAmount,
     this.isCreditCardPayment = false,
     this.closedInstallmentIds = const [],
+    this.fundedByCategoryId,
+    this.feeAmount = 0.0,
+    this.feeCurrency,
+    this.swapGroupId,
+    this.holdingQtyDelta,
   });
 
   bool get isCrossCurrencyPayment =>
@@ -74,6 +98,9 @@ class Transaction {
 
   bool get isInstallmentChild => parentTransactionId != null;
   bool get isInstallment => isInstallmentParent || isInstallmentChild;
+
+  bool get isSwap => type == 'swap';
+  bool get isSwapLeg => swapGroupId != null;
 
   factory Transaction.fromJson(Map<String, dynamic> json) {
     return Transaction(
@@ -115,6 +142,11 @@ class Transaction {
               ?.map((e) => e.toString())
               .toList() ??
           const [],
+      fundedByCategoryId: json['funded_by_category_id'] as String?,
+      feeAmount: (json['fee_amount'] as num?)?.toDouble() ?? 0.0,
+      feeCurrency: json['fee_currency'] as String?,
+      swapGroupId: json['swap_group_id'] as String?,
+      holdingQtyDelta: (json['holding_qty_delta'] as num?)?.toDouble(),
     );
   }
 }

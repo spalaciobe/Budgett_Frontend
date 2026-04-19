@@ -30,6 +30,8 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
   String? _selectedAccountId;
   String? _selectedTargetAccountId;
   String? _selectedCategoryId;
+  String? _fundedByCategoryId; // Model B: expense paid out of a sinking fund
+  String? _savingsContributionCategoryId; // Model B: transfer tagged as fund contribution
   late String _status;
   late String _currency;
   bool _isUsdPayment = false;
@@ -64,6 +66,11 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
     _selectedAccountId = t.accountId;
     _selectedTargetAccountId = t.targetAccountId;
     _selectedCategoryId = t.subCategoryId ?? t.categoryId;
+    _fundedByCategoryId = t.fundedByCategoryId;
+    // For a transfer that already carries a category_id, treat it as the
+    // savings-fund contribution (transfers don't have any other category UX).
+    _savingsContributionCategoryId =
+        t.type == 'transfer' ? t.categoryId : null;
     _status = t.status;
     _isUsdPayment = t.isCrossCurrencyPayment;
 
@@ -248,6 +255,15 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
        transactionData['sub_category_id'] = null;
     }
 
+    // Sinking-fund linkage (Model B). Always emit the field so unsetting works.
+    transactionData['funded_by_category_id'] =
+        _selectedType == 'expense' ? _fundedByCategoryId : null;
+    if (_selectedType == 'transfer') {
+      transactionData['category_id'] = _savingsContributionCategoryId;
+      transactionData['movement_type'] =
+          _savingsContributionCategoryId != null ? 'savings' : null;
+    }
+
     try {
       final repo = ref.read(financeRepositoryProvider);
 
@@ -353,7 +369,8 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
 
       ref.invalidate(recentTransactionsProvider);
       ref.invalidate(accountsProvider);
-      ref.invalidate(budgetsProvider); // Budgets might change
+      ref.invalidate(budgetsProvider);
+      ref.invalidate(categoryAccumulatedBalancesProvider); // Budgets might change
 
       if (mounted) {
         Navigator.of(context).pop();
@@ -405,6 +422,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
       ref.invalidate(recentTransactionsProvider);
       ref.invalidate(accountsProvider);
       ref.invalidate(budgetsProvider);
+      ref.invalidate(categoryAccumulatedBalancesProvider);
       
       if (mounted) {
         Navigator.of(context).pop();
@@ -425,6 +443,41 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
 
   @override
   Widget build(BuildContext context) {
+    // Swap legs are part of a linked pair (shared swap_group_id) and must be
+    // edited together, which this generic dialog doesn't support. Render a
+    // read-only explanation instead of crashing on the type dropdown.
+    if (widget.transaction.type == 'swap') {
+      return Dialog(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 420),
+          padding: kDialogPadding,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text('Swap transaction'),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'This row is one leg of a linked swap and can\'t be edited '
+                'here. To change it, open the investment account and delete '
+                'the swap, then re-create it.',
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final accountsAsync = ref.watch(accountsProvider);
     final categoriesAsync = ref.watch(categoriesProvider);
 
@@ -770,6 +823,58 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                           error: (e, s) => Text('Error loading accounts: $e'),
                         ),
                       if (_selectedType == 'transfer') const SizedBox(height: 10),
+
+                      // Sinking-fund linkage (Model B): expense → funded by, transfer → contribution.
+                      if (_selectedType == 'expense' || _selectedType == 'transfer')
+                        categoriesAsync.when(
+                          data: (categories) {
+                            final savings = categories
+                                .where((c) => c.isSavings)
+                                .toList();
+                            if (savings.isEmpty) return const SizedBox();
+                            final isExpense = _selectedType == 'expense';
+                            final selected = isExpense
+                                ? _fundedByCategoryId
+                                : _savingsContributionCategoryId;
+                            final exists =
+                                savings.any((c) => c.id == selected);
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: DropdownButtonFormField<String?>(
+                                value: exists ? selected : null,
+                                isExpanded: true,
+                                decoration: InputDecoration(
+                                  labelText: isExpense
+                                      ? 'Funded by sinking fund (optional)'
+                                      : 'Contribute to sinking fund (optional)',
+                                  helperText: isExpense
+                                      ? "Subtracts from the fund's accumulated balance instead of the category budget."
+                                      : "Counts as this month's contribution toward the fund's target.",
+                                  border: const OutlineInputBorder(),
+                                ),
+                                items: [
+                                  const DropdownMenuItem<String?>(
+                                      value: null, child: Text('None')),
+                                  ...savings.map((c) =>
+                                      DropdownMenuItem<String?>(
+                                        value: c.id,
+                                        child: Text(c.name,
+                                            overflow: TextOverflow.ellipsis),
+                                      )),
+                                ],
+                                onChanged: (v) => setState(() {
+                                  if (isExpense) {
+                                    _fundedByCategoryId = v;
+                                  } else {
+                                    _savingsContributionCategoryId = v;
+                                  }
+                                }),
+                              ),
+                            );
+                          },
+                          loading: () => const SizedBox(),
+                          error: (_, __) => const SizedBox(),
+                        ),
 
                       // Installment parent: cuota config fields
                       if (widget.transaction.isInstallmentParent) ...[
