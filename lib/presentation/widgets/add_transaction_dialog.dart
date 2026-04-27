@@ -42,6 +42,11 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
   /// transaction's [category_id] so the savings category aggregates it.
   String? _savingsContributionCategoryId;
 
+  /// Income flagged as a reimbursement: excluded from monthly income and,
+  /// when tagged with the original expense category, reduces that category's
+  /// net spend.
+  bool _isReimbursement = false;
+
   String _status = 'paid';
   bool _isRecurring = false;
   String _frequency = 'monthly';
@@ -281,6 +286,9 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
     if (_selectedType == 'transfer' && _savingsContributionCategoryId != null) {
       transactionData['category_id'] = _savingsContributionCategoryId;
       transactionData['movement_type'] = 'savings';
+    }
+    if (_selectedType == 'income' && _isReimbursement) {
+      transactionData['movement_type'] = 'reimbursement';
     }
 
     if (_notesController.text.isNotEmpty) {
@@ -773,6 +781,8 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                     _payInInstallments = false;
                     _fundedByCategoryId = null;
                     _savingsContributionCategoryId = null;
+                    if (_selectedType != 'income') _isReimbursement = false;
+                    _selectedCategoryId = null;
                   }),
                 ),
                 const SizedBox(height: 10),
@@ -859,12 +869,34 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                 ),
                 const SizedBox(height: 10),
 
+                // Reimbursement toggle (income only). Flips category filter
+                // to expense categories so the repayment offsets the original
+                // category's net spend.
+                if (_selectedType == 'income') ...[
+                  SwitchListTile(
+                    title: const Text('Is a reimbursement?'),
+                    subtitle: const Text(
+                        'Offsets the original expense category instead of counting as income'),
+                    value: _isReimbursement,
+                    onChanged: (v) => setState(() {
+                      _isReimbursement = v;
+                      _selectedCategoryId = null;
+                    }),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  const SizedBox(height: 10),
+                ],
+
                 // Category (only for income/expense)
                 if (_selectedType != 'transfer')
                   categoriesAsync.when(
                     data: (categories) {
+                      final categoryTypeForFilter =
+                          (_selectedType == 'income' && _isReimbursement)
+                              ? 'expense'
+                              : _selectedType;
                       final filteredCategories = categories
-                          .where((cat) => cat.type == _selectedType)
+                          .where((cat) => cat.type == categoryTypeForFilter)
                           .toList();
 
                       final List<DropdownMenuItem<String>> dropdownItems = [];

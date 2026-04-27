@@ -883,6 +883,145 @@ void main() {
     });
   });
 
+  // ─── Reimbursement aggregation logic ───────────────────────────────────────
+  //
+  // Reimbursements are income rows with movement_type = 'reimbursement'.
+  // The repository filters them out of monthly income and, when tagged with
+  // an expense category, subtracts them from that category's net spend.
+
+  group('Reimbursement filtering (monthly income)', () {
+    double monthlyIncomeOf(List<Map<String, dynamic>> rows) {
+      final kept = rows.where((r) {
+        final mt = r['movement_type'];
+        return mt == null || mt != 'reimbursement';
+      });
+      return kept.fold<double>(
+          0.0, (sum, item) => sum + (item['amount'] as num).toDouble());
+    }
+
+    test('plain income rows are summed', () {
+      final total = monthlyIncomeOf([
+        {'amount': 1000000, 'movement_type': null},
+        {'amount': 500000, 'movement_type': 'income'},
+      ]);
+      expect(total, 1500000.0);
+    });
+
+    test('reimbursement rows are excluded from the sum', () {
+      final total = monthlyIncomeOf([
+        {'amount': 1000000, 'movement_type': null},
+        {'amount': 50000, 'movement_type': 'reimbursement'},
+        {'amount': 200000, 'movement_type': 'reimbursement'},
+      ]);
+      expect(total, 1000000.0);
+    });
+
+    test('only reimbursements yields zero income', () {
+      final total = monthlyIncomeOf([
+        {'amount': 30000, 'movement_type': 'reimbursement'},
+      ]);
+      expect(total, 0.0);
+    });
+  });
+
+  group('Reimbursement offset in getSpendingByCategory', () {
+    // Applies the subtract-reimbursement step over a pre-seeded spending map.
+    Map<String, CategorySpending> applyReimbursements(
+      Map<String, CategorySpending> spending,
+      List<Map<String, dynamic>> reimbursements,
+    ) {
+      for (final item in reimbursements) {
+        final categoryId = item['category_id'] as String?;
+        final subCategoryId = item['sub_category_id'] as String?;
+        final amount = (item['amount'] as num).toDouble();
+        if (categoryId == null) continue;
+        spending.putIfAbsent(categoryId, () => CategorySpending());
+        spending[categoryId]!.total -= amount;
+        if (subCategoryId != null) {
+          spending[categoryId]!.subCategories.update(
+                subCategoryId,
+                (val) => val - amount,
+                ifAbsent: () => -amount,
+              );
+        }
+      }
+      return spending;
+    }
+
+    test('reimbursement reduces category total', () {
+      final spending = <String, CategorySpending>{
+        'food': CategorySpending(total: 100000),
+      };
+      final out = applyReimbursements(spending, [
+        {
+          'category_id': 'food',
+          'sub_category_id': null,
+          'amount': 50000,
+        }
+      ]);
+      expect(out['food']!.total, 50000.0);
+    });
+
+    test('multiple reimbursements accumulate on the same category', () {
+      final spending = <String, CategorySpending>{
+        'food': CategorySpending(total: 300000),
+      };
+      final out = applyReimbursements(spending, [
+        {'category_id': 'food', 'sub_category_id': null, 'amount': 50000},
+        {'category_id': 'food', 'sub_category_id': null, 'amount': 75000},
+      ]);
+      expect(out['food']!.total, 175000.0);
+    });
+
+    test('reimbursement tagged with subcategory offsets the subcategory too', () {
+      final spending = <String, CategorySpending>{
+        'food': CategorySpending(
+          total: 120000,
+          subCategories: {'groceries': 80000, 'eatout': 40000},
+        ),
+      };
+      final out = applyReimbursements(spending, [
+        {
+          'category_id': 'food',
+          'sub_category_id': 'groceries',
+          'amount': 30000,
+        },
+      ]);
+      expect(out['food']!.total, 90000.0);
+      expect(out['food']!.subCategories['groceries'], 50000.0);
+      expect(out['food']!.subCategories['eatout'], 40000.0);
+    });
+
+    test('reimbursement without matching expense creates negative spend', () {
+      // Edge case: reimbursement arrives in a month with no expense under
+      // that category (e.g. expense was last month, reimbursement this month).
+      // Net becomes negative — surfaces the inconsistency instead of hiding it.
+      final spending = <String, CategorySpending>{};
+      final out = applyReimbursements(spending, [
+        {'category_id': 'food', 'sub_category_id': null, 'amount': 25000},
+      ]);
+      expect(out['food']!.total, -25000.0);
+    });
+
+    test('null category_id rows are ignored', () {
+      final spending = <String, CategorySpending>{
+        'food': CategorySpending(total: 100000),
+      };
+      final out = applyReimbursements(spending, [
+        {'category_id': null, 'sub_category_id': null, 'amount': 50000},
+      ]);
+      expect(out['food']!.total, 100000.0);
+    });
+  });
+
+  group('Transaction.movementType reimbursement parsing', () {
+    test('parses movement_type = reimbursement', () {
+      final t = _tx(type: 'income', movementType: 'reimbursement');
+      expect(t.type, 'income');
+      expect(t.movementType, 'reimbursement');
+    });
+  });
+
   // ─── Repository date-range query string helpers ───────────────────────────
 
   group('Date range query string helpers (used in repo filters)', () {

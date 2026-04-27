@@ -627,12 +627,14 @@ class FinanceRepository {
   // Monthly Aggregations
   Future<double> getMonthlyIncome(int month, int year) async {
     final userId = _client.auth.currentUser!.id;
+    // Reimbursements are inflows but not real income — exclude from the total.
     final result = await _client
         .from('transactions')
         .select('amount')
         .eq('user_id', userId)
         .eq('type', 'income')
         .eq('currency', 'COP') // Budgets are COP-only
+        .or('movement_type.is.null,movement_type.neq.reimbursement')
         .gte('date', '$year-${month.toString().padLeft(2, '0')}-01')
         .lt('date', month == 12
             ? '${year + 1}-01-01'
@@ -681,6 +683,20 @@ class FinanceRepository {
         .gte('date', firstDay)
         .lt('date', nextMonth);
 
+    // Reimbursements: income rows tagged with the original expense category.
+    // Subtract them from that category's spend so the budget reflects the net.
+    final reimbursements = await _client
+        .from('transactions')
+        .select('category_id, sub_category_id, amount')
+        .eq('user_id', userId)
+        .eq('type', 'income')
+        .eq('movement_type', 'reimbursement')
+        .eq('currency', 'COP')
+        .neq('status', 'pending')
+        .not('category_id', 'is', null)
+        .gte('date', firstDay)
+        .lt('date', nextMonth);
+
     final Map<String, CategorySpending> spending = {};
 
     for (var item in expenses) {
@@ -708,6 +724,22 @@ class FinanceRepository {
       if (categoryId == null) continue;
       spending.putIfAbsent(categoryId, () => CategorySpending());
       spending[categoryId]!.total += amount;
+    }
+
+    for (var item in reimbursements) {
+      final categoryId = item['category_id'] as String?;
+      final subCategoryId = item['sub_category_id'] as String?;
+      final amount = (item['amount'] as num).toDouble();
+      if (categoryId == null) continue;
+      spending.putIfAbsent(categoryId, () => CategorySpending());
+      spending[categoryId]!.total -= amount;
+      if (subCategoryId != null) {
+        spending[categoryId]!.subCategories.update(
+          subCategoryId,
+          (val) => val - amount,
+          ifAbsent: () => -amount,
+        );
+      }
     }
 
     return spending;
@@ -755,12 +787,14 @@ class FinanceRepository {
 
   Future<Map<String, CategorySpending>> getIncomeByCategory(int month, int year) async {
     final userId = _client.auth.currentUser!.id;
+    // Reimbursements offset expenses, not income — keep them out of this view.
     final result = await _client
         .from('transactions')
         .select('category_id, sub_category_id, amount')
         .eq('user_id', userId)
         .eq('type', 'income')
         .eq('currency', 'COP') // Budgets are COP-only
+        .or('movement_type.is.null,movement_type.neq.reimbursement')
         .gte('date', '$year-${month.toString().padLeft(2, '0')}-01')
         .lt('date', month == 12
             ? '${year + 1}-01-01'

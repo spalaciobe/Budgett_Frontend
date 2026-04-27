@@ -32,6 +32,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
   String? _selectedCategoryId;
   String? _fundedByCategoryId; // Model B: expense paid out of a sinking fund
   String? _savingsContributionCategoryId; // Model B: transfer tagged as fund contribution
+  bool _isReimbursement = false; // income that offsets a prior expense
   late String _status;
   late String _currency;
   bool _isUsdPayment = false;
@@ -71,6 +72,8 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
     // savings-fund contribution (transfers don't have any other category UX).
     _savingsContributionCategoryId =
         t.type == 'transfer' ? t.categoryId : null;
+    _isReimbursement =
+        t.type == 'income' && t.movementType == 'reimbursement';
     _status = t.status;
     _isUsdPayment = t.isCrossCurrencyPayment;
 
@@ -272,6 +275,9 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
       transactionData['category_id'] = _savingsContributionCategoryId;
       transactionData['movement_type'] =
           _savingsContributionCategoryId != null ? 'savings' : null;
+    }
+    if (_selectedType == 'income' && _isReimbursement) {
+      transactionData['movement_type'] = 'reimbursement';
     }
 
     try {
@@ -734,7 +740,12 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                           DropdownMenuItem(value: 'expense', child: Text('Expense')),
                           DropdownMenuItem(value: 'transfer', child: Text('Transfer')),
                         ],
-                        onChanged: (value) => setState(() => _selectedType = value!),
+                        onChanged: (value) => setState(() {
+                          _selectedType = value!;
+                          if (_selectedType != 'income') {
+                            _isReimbursement = false;
+                          }
+                        }),
                       ),
                       const SizedBox(height: 10),
 
@@ -773,11 +784,31 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                       ),
                       const SizedBox(height: 10),
 
+                      // Reimbursement toggle (income only).
+                      if (_selectedType == 'income') ...[
+                        SwitchListTile(
+                          title: const Text('Is a reimbursement?'),
+                          subtitle: const Text(
+                              'Offsets the original expense category instead of counting as income'),
+                          value: _isReimbursement,
+                          onChanged: (v) => setState(() {
+                            _isReimbursement = v;
+                            _selectedCategoryId = null;
+                          }),
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+
                       // Category
                       if (_selectedType != 'transfer')
                         categoriesAsync.when(
                           data: (categories) {
-                            final filteredCategories = categories.where((cat) => cat.type == _selectedType).toList();
+                            final categoryTypeForFilter =
+                                (_selectedType == 'income' && _isReimbursement)
+                                    ? 'expense'
+                                    : _selectedType;
+                            final filteredCategories = categories.where((cat) => cat.type == categoryTypeForFilter).toList();
                             
                             final List<DropdownMenuItem<String>> dropdownItems = [];
                             for (final cat in filteredCategories) {

@@ -511,6 +511,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             'fixed' => 'Fixed',
                             'variable' => 'Variable',
                             'savings' => 'Savings',
+                            'reimbursement' => 'Reimbursement',
                             _ => null,
                           };
                         }

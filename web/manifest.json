@@ -1,11 +1,11 @@
 {
-    "name": "Budgett Finances",
+    "name": "Budgett",
     "short_name": "Budgett",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "Budgett Finances - Personal Finance App",
+    "description": "Budgett - Personal Finance App",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
