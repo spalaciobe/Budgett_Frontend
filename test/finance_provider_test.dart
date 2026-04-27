@@ -18,7 +18,6 @@ import 'package:budgett_frontend/data/models/budget_model.dart';
 import 'package:budgett_frontend/data/models/goal_model.dart';
 import 'package:budgett_frontend/data/models/expense_group_model.dart';
 import 'package:budgett_frontend/data/models/recurring_transaction_model.dart';
-import 'package:budgett_frontend/data/models/category_spending.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 
 // ─── Fake client (never called, just satisfies the constructor) ───────────────
