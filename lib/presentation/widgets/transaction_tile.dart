@@ -124,16 +124,16 @@ class TransactionTile extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
+          Wrap(
+            spacing: 6,
+            runSpacing: 2,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Text(
                 DateFormat('d MMM', 'en').format(t.date),
                 style: const TextStyle(fontSize: 11),
               ),
-              if (isPending) ...[
-                const SizedBox(width: 6),
-                const _PendingBadge(),
-              ],
+              if (isPending) const _PendingBadge(),
             ],
           ),
           ...extraLines,

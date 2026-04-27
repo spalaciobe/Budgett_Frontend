@@ -42,6 +42,8 @@
     <!-- image_picker: read storage on Android < 13 -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32"/>
+    <!-- ota_update: download and prompt install of new APK builds -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
 
     <queries>
         <intent>

@@ -8,6 +8,9 @@ import 'package:budgett_frontend/core/app_theme.dart';
 import 'package:budgett_frontend/presentation/providers/settings_provider.dart';
 import 'package:budgett_frontend/core/services/notification_service.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
+import 'package:budgett_frontend/core/services/update_checker_service.dart';
+import 'package:budgett_frontend/presentation/providers/update_provider.dart';
+import 'package:budgett_frontend/presentation/widgets/update_available_dialog.dart';
 import 'package:budgett_frontend/data/repositories/bank_repository.dart';
 
 /// Emits the current session whenever auth state changes.
@@ -98,6 +101,22 @@ class BudgettApp extends ConsumerWidget {
 
     // Watch the scheduler so it runs whenever dependencies change
     ref.watch(ccAlertSchedulerProvider);
+
+    // Show an update modal once a session if a newer APK is available on
+    // GitHub Releases. Resolves to null on non-Android, when up-to-date, or
+    // when the user already dismissed this build.
+    ref.listen<AsyncValue<UpdateInfo?>>(pendingUpdateProvider, (_, next) {
+      final info = next.valueOrNull;
+      if (info == null) return;
+      final navContext = appRouter.routerDelegate.navigatorKey.currentContext;
+      if (navContext == null) return;
+      showDialog(
+        context: navContext,
+        barrierDismissible: false,
+        builder: (_) => UpdateAvailableDialog(info: info),
+      );
+    });
+    ref.watch(pendingUpdateProvider);
 
     return MaterialApp.router(
       debugShowCheckedModeBanner: false,

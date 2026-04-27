@@ -81,3 +81,36 @@ The only exceptions are:
 - Core data layer: `finance_repository_test.dart`, `finance_provider_test.dart`
 - Credit card engine: `cc_payment_alerts_test.dart`, `credit_card_rules_ui_test.dart`
 - Formatting / seed data: `currency_formatter_test.dart`, `colombian_categories_test.dart`
+
+### UI / golden tests with screenshots
+
+`flutter test test/ui_smoke_test.dart` renders every parametrised widget and full screen at multiple breakpoints (mobile + desktop) and dumps a PNG to `test/screenshots/`. Provider-backed screens use a `_FakeFinanceRepository` that overrides `financeRepositoryProvider`. The harness uses `tester.runAsync` for real I/O — without it, awaiting `RenderRepaintBoundary.toImage` or `File.writeAsBytes` deadlocks because `testWidgets` runs in a fake-time zone.
+
+When adding a new widget or screen: add a `_Target` entry to `test/ui_smoke_test.dart` so the next run captures it. For screens, supply `overrides:` with the providers it consumes. The CI job uploads `test/screenshots/**` as an artifact on every run, so you can review the PNGs in the GitHub Actions UI.
+
+**Always inspect the generated PNGs** before claiming a UI change works — analyzer green is not enough. The smoke test has already caught real overflow bugs in `UpdateAvailableDialog`, `TransactionTile`, `GoalsScreen`, and `ExpenseGroupsScreen` that unit tests missed.
+
+**`flutter_tester` on Windows requires firewall rules** for the engine binary at `C:\flutter\bin\cache\artifacts\engine\windows-x64\flutter_tester.exe`. Without inbound + outbound `Allow` rules the binary hangs at 0% CPU waiting for a localhost socket. Set up once with admin: `New-NetFirewallRule -DisplayName 'flutter_tester (in)' -Direction Inbound -Program <path> -Action Allow -Profile Any` (and same for Outbound).
+
+## Release flow (signed APK + in-app update modal)
+
+This project ships APKs via GitHub Releases and the app shows an "Update available" modal at startup if a newer build exists.
+
+**Components:**
+- [.github/workflows/release.yml](.github/workflows/release.yml) — on push to `main`: bumps `+build`, signs, compiles, tags, publishes APK to a Release.
+- [lib/core/services/update_checker_service.dart](lib/core/services/update_checker_service.dart) — polls `releases/latest` of `spalaciobe/Budgett_Frontend`.
+- [lib/presentation/providers/update_provider.dart](lib/presentation/providers/update_provider.dart) — `pendingUpdateProvider` resolves to `UpdateInfo` if a newer build exists and isn't dismissed.
+- [lib/presentation/widgets/update_available_dialog.dart](lib/presentation/widgets/update_available_dialog.dart) — modal with progress + "Later" / "Download" buttons. Uses `ota_update`.
+- Manual trigger lives in `settings_screen.dart` → "Check for updates".
+
+**Standing instruction for the agent: always commit and push when work is shippable.**
+
+After making changes that pass `flutter analyze`, the default behavior is:
+1. `git add -A` (or specific paths).
+2. Bump `version:` in `pubspec.yaml` only if the workflow's auto-bump is disabled — by default the workflow bumps it.
+3. `git commit -m "<conventional commit subject>"`.
+4. `git push origin main`.
+
+The push is what releases — **do not skip it after non-trivial changes** unless the user explicitly says "don't push" or the change is purely WIP/exploratory. Treat each merged-to-main change as a release candidate; the workflow handles versioning, signing, and APK publication.
+
+**Signing:** the keystore lives at `android/app/upload-keystore.jks` (gitignored) with credentials in `android/key.properties` (gitignored). CI reconstructs both from secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`. **Never commit the keystore or key.properties.**

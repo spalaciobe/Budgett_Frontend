@@ -133,20 +133,24 @@ class GoalsScreen extends ConsumerWidget {
                                 overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  Text(
-                                    CurrencyFormatter.format(goal.currentAmount, decimalDigits: 0),
-                                    style: TextStyle(
-                                      color: Theme.of(context).colorScheme.primary,
-                                      fontWeight: FontWeight.bold,
+                              Text.rich(
+                                TextSpan(
+                                  children: [
+                                    TextSpan(
+                                      text: CurrencyFormatter.format(goal.currentAmount, decimalDigits: 0),
+                                      style: TextStyle(
+                                        color: Theme.of(context).colorScheme.primary,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
-                                  ),
-                                  Text(
-                                    ' / ${CurrencyFormatter.format(goal.targetAmount, decimalDigits: 0)}',
-                                    style: TextStyle(color: Colors.grey[600], fontSize: 13),
-                                  ),
-                                ],
+                                    TextSpan(
+                                      text: ' / ${CurrencyFormatter.format(goal.targetAmount, decimalDigits: 0)}',
+                                      style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                                    ),
+                                  ],
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 8),
                               Stack(

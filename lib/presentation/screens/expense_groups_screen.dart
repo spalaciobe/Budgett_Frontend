@@ -268,12 +268,21 @@ class _ExpenseGroupCard extends ConsumerWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        Icon(IconHelper.getIcon(group.icon)),
-                        const SizedBox(width: 8),
-                        Text(group.name, style: Theme.of(context).textTheme.titleMedium),
-                      ],
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Icon(IconHelper.getIcon(group.icon)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              group.name,
+                              style: Theme.of(context).textTheme.titleMedium,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     PopupMenuButton(
                       itemBuilder: (context) => [
@@ -304,8 +313,22 @@ class _ExpenseGroupCard extends ConsumerWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('${CurrencyFormatter.format(spent)} spent'),
-                      Text('of ${CurrencyFormatter.format(group.budgetAmount)}'),
+                      Flexible(
+                        child: Text(
+                          '${CurrencyFormatter.format(spent)} spent',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          'of ${CurrencyFormatter.format(group.budgetAmount)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.end,
+                        ),
+                      ),
                     ],
                   ),
                 ] else

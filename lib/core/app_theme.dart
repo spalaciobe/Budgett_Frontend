@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   // User provided palette
@@ -14,7 +13,11 @@ class AppTheme {
   static const Color _darkSurface = Color(0xFF1E2229);
   static const Color _darkSurfaceVariant = Color(0xFF2A2F3A);
 
-  static final TextTheme _textTheme = GoogleFonts.openSansTextTheme();
+  // Open Sans is bundled in assets/fonts/ — no runtime fetching, fast cold start,
+  // works offline, and widget tests don't hang on network calls.
+  static const String _fontFamily = 'OpenSans';
+  static final TextTheme _textTheme =
+      Typography.material2021().black.apply(fontFamily: _fontFamily);
 
   static ThemeData get lightTheme {
     return ThemeData(

@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:budgett_frontend/core/services/update_checker_service.dart';
 import 'package:budgett_frontend/presentation/providers/settings_provider.dart';
 import 'package:budgett_frontend/presentation/providers/logout_action.dart';
 import 'package:budgett_frontend/presentation/providers/fx_rate_provider.dart';
+import 'package:budgett_frontend/presentation/providers/update_provider.dart';
+import 'package:budgett_frontend/presentation/widgets/update_available_dialog.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -175,6 +178,12 @@ class SettingsScreen extends ConsumerWidget {
                   onTap: () => context.push('/profile'),
                 ),
                 ListTile(
+                  leading: const Icon(Icons.system_update),
+                  title: const Text('Check for updates'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _checkForUpdates(context, ref),
+                ),
+                ListTile(
                   leading: const Icon(Icons.logout),
                   title: const Text('Log out'),
                   onTap: () => performLogout(ref, context),
@@ -189,6 +198,47 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
     );
+  }
+
+  Future<void> _checkForUpdates(BuildContext context, WidgetRef ref) async {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(
+      const SnackBar(
+        content: Text('Checking for updates…'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+    try {
+      final info = await ref.read(updateCheckerServiceProvider).checkForUpdate();
+      if (!context.mounted) return;
+      if (info == null) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Updates only available on Android.')),
+        );
+        return;
+      }
+      if (!info.isNewer) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              'You are on the latest version (${info.currentVersionName}+${info.currentBuildNumber}).',
+            ),
+          ),
+        );
+        return;
+      }
+      ref.invalidate(pendingUpdateProvider);
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => UpdateAvailableDialog(info: info),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text('Update check failed: $e')),
+      );
+    }
   }
 
   void _showDaysBeforeDialog(

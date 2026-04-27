@@ -1,0 +1,97 @@
+name: Release APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Bump build number
+        id: bump
+        run: |
+          set -e
+          CURRENT_LINE=$(grep -E '^version:\s' pubspec.yaml)
+          # version: 1.2.3+45  →  name=1.2.3, build=45
+          NAME=$(echo "$CURRENT_LINE" | sed -E 's/^version:\s*([^+]+)\+([0-9]+).*/\1/')
+          BUILD=$(echo "$CURRENT_LINE" | sed -E 's/^version:\s*([^+]+)\+([0-9]+).*/\2/')
+          NEW_BUILD=$((BUILD + 1))
+          NEW_VERSION="${NAME}+${NEW_BUILD}"
+          sed -i -E "s/^version:\s.*/version: ${NEW_VERSION}/" pubspec.yaml
+          echo "version_name=${NAME}" >> "$GITHUB_OUTPUT"
+          echo "build_number=${NEW_BUILD}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${NAME}+${NEW_BUILD}" >> "$GITHUB_OUTPUT"
+
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/upload-keystore.jks
+
+      - name: Write key.properties
+        run: |
+          cat > android/key.properties <<EOF
+          storeFile=upload-keystore.jks
+          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          EOF
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Static analysis
+        run: flutter analyze --no-fatal-infos
+
+      - name: Run tests (incl. UI smoke screenshots)
+        run: flutter test --reporter compact
+
+      - name: Upload smoke screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-smoke-screenshots
+          path: test/screenshots/**
+          if-no-files-found: ignore
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Commit version bump
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pubspec.yaml
+          git commit -m "chore: bump version to ${{ steps.bump.outputs.tag }} [skip ci]"
+          git tag "${{ steps.bump.outputs.tag }}"
+          git push origin HEAD:main
+          git push origin "${{ steps.bump.outputs.tag }}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.bump.outputs.tag }}
+          name: ${{ steps.bump.outputs.tag }}
+          generate_release_notes: true
+          files: build/app/outputs/flutter-apk/app-release.apk
