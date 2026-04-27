@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
-    <!-- ota_update writes downloaded APKs to the app's external files dir;
-         this entry exposes that directory through the FileProvider so the
-         OS package installer can read the APK. -->
-    <external-path name="ota_update" path="."/>
+    <!-- ota_update saves the APK under <internal>/files/ota_update/<name>.apk
+         on most devices. Expose multiple roots so the FileProvider can
+         resolve whichever path the plugin actually used. -->
+    <files-path           name="ota_update_internal"          path="ota_update/"/>
+    <files-path           name="ota_update_internal_root"     path="."/>
+    <external-files-path  name="ota_update_external_files"    path="."/>
+    <external-path        name="ota_update_external_root"     path="."/>
+    <cache-path           name="ota_update_cache"             path="."/>
 </paths>
