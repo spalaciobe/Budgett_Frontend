@@ -46,8 +46,13 @@ jobs:
           echo "tag=v${NAME}+${NEW_BUILD}" >> "$GITHUB_OUTPUT"
 
       - name: Decode keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/upload-keystore.jks
+          # Strip any whitespace (CR/LF/spaces) before decoding — secret values
+          # passed through different shells sometimes pick up CRLF.
+          printf '%s' "$KEYSTORE_B64" | tr -d ' \t\r\n' | base64 -d > android/app/upload-keystore.jks
+          ls -la android/app/upload-keystore.jks
 
       - name: Write key.properties
         run: |
