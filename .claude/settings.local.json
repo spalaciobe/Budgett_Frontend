@@ -12,7 +12,8 @@
       "Bash(flutter --version)",
       "Bash(cd /d D:\\\\Proyectos\\\\Budgett\\\\Budgett_Frontend)",
       "Bash(find . -name \"*.dart\" -type f -exec grep -l \"Row\\(\" {} \\\\;)",
-      "Bash(xargs grep:*)"
+      "Bash(xargs grep:*)",
+      "Bash(git push *)"
     ]
   }
 }
