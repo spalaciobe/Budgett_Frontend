@@ -5,6 +5,7 @@ import '../../data/models/account_model.dart';
 import '../../data/models/bank_model.dart';
 import '../../data/repositories/bank_repository.dart';
 import '../../core/utils/credit_card_calculator.dart';
+import '../providers/finance_provider.dart';
 
 class CreditCardBillingSubtitle extends ConsumerWidget {
   final Account account;
@@ -24,6 +25,12 @@ class CreditCardBillingSubtitle extends ConsumerWidget {
 
     final banksAsync = ref.watch(banksFutureProvider);
 
+    // Override-aware: use the user's edited cutoff for the transaction month
+    // if one exists, so the displayed cycle matches the Billing Cycles section.
+    final calendarThisYear = ref
+        .watch(billingCalendarProvider((accountId: account.id, year: transactionDate.year)))
+        .valueOrNull ?? const {};
+
     return banksAsync.when(
       data: (banks) {
         final bank = banks.firstWhere(
@@ -31,14 +38,20 @@ class CreditCardBillingSubtitle extends ConsumerWidget {
           orElse: () => Bank(id: '0', name: 'Unknown', code: 'UNK'),
         );
 
-        final billingPeriod = CreditCardCalculator.determineBillingPeriod(
-          transactionDate,
-          account.creditCardRules!,
-          bank,
-        );
-        final parts = billingPeriod.split('-');
-        final year = int.parse(parts[0]);
-        final month = int.parse(parts[1]);
+        final cutoffThisMonth = calendarThisYear[transactionDate.month]?.cutoff ??
+            CreditCardCalculator.calculateCutoffDate(
+                account.creditCardRules!, bank, transactionDate.year, transactionDate.month);
+
+        int year;
+        int month;
+        if (!transactionDate.isAfter(cutoffThisMonth)) {
+          year = transactionDate.year;
+          month = transactionDate.month;
+        } else {
+          month = transactionDate.month + 1;
+          year = transactionDate.year;
+          if (month > 12) { month = 1; year++; }
+        }
         final label = DateFormat('MMMM yyyy', 'es_CO')
             .format(DateTime(year, month));
 
@@ -78,6 +91,27 @@ class CreditCardBillingSimulator extends ConsumerWidget {
 
     final banksAsync = ref.watch(banksFutureProvider);
 
+    // Override-aware: pick up user-edited cycle dates from bank_billing_calendar
+    // so the timeline reflects edits made in the Billing Cycles section.
+    final calendarThisYear = ref
+        .watch(billingCalendarProvider((accountId: account.id, year: transactionDate.year)))
+        .valueOrNull ?? const {};
+    final calendarPrevYear = ref
+        .watch(billingCalendarProvider((accountId: account.id, year: transactionDate.year - 1)))
+        .valueOrNull ?? const {};
+    final calendarNextYear = ref
+        .watch(billingCalendarProvider((accountId: account.id, year: transactionDate.year + 1)))
+        .valueOrNull ?? const {};
+
+    ({DateTime cutoff, DateTime payment})? overrideFor(int y, int m) {
+      final cal = y < transactionDate.year
+          ? calendarPrevYear
+          : y > transactionDate.year
+              ? calendarNextYear
+              : calendarThisYear;
+      return cal[m];
+    }
+
     return banksAsync.when(
       data: (banks) {
         final bank = banks.firstWhere(
@@ -85,7 +119,15 @@ class CreditCardBillingSimulator extends ConsumerWidget {
           orElse: () => Bank(id: '0', name: 'Unknown', code: 'UNK'),
         );
 
-        return _buildSimulation(context, bank);
+        DateTime effectiveCutoff(int y, int m) =>
+            overrideFor(y, m)?.cutoff ??
+            CreditCardCalculator.calculateCutoffDate(account.creditCardRules!, bank, y, m);
+
+        DateTime effectivePayment(int y, int m, DateTime cutoff) =>
+            overrideFor(y, m)?.payment ??
+            CreditCardCalculator.calculatePaymentDate(account.creditCardRules!, bank, cutoff);
+
+        return _buildSimulation(context, bank, effectiveCutoff, effectivePayment);
       },
       loading: () => const Center(child: Padding(
         padding: EdgeInsets.all(8.0),
@@ -95,46 +137,40 @@ class CreditCardBillingSimulator extends ConsumerWidget {
     );
   }
 
-  Widget _buildSimulation(BuildContext context, Bank bank) {
-    // 1. Calculate Periods
-    final billingPeriod = CreditCardCalculator.determineBillingPeriod(
-      transactionDate,
-      account.creditCardRules!,
-      bank,
-    );
-    
-    final parts = billingPeriod.split('-');
-    final year = int.parse(parts[0]);
-    final month = int.parse(parts[1]);
+  Widget _buildSimulation(
+    BuildContext context,
+    Bank bank,
+    DateTime Function(int, int) effectiveCutoff,
+    DateTime Function(int, int, DateTime) effectivePayment,
+  ) {
+    // 1. Determine billing period using override-aware cutoff for the
+    // transaction month (mirrors CreditCardCalculator.determineBillingPeriod).
+    final cutoffThisMonth = effectiveCutoff(transactionDate.year, transactionDate.month);
+    int year;
+    int month;
+    if (!transactionDate.isAfter(cutoffThisMonth)) {
+      year = transactionDate.year;
+      month = transactionDate.month;
+    } else {
+      month = transactionDate.month + 1;
+      year = transactionDate.year;
+      if (month > 12) { month = 1; year++; }
+    }
+    final billingPeriod = "$year-${month.toString().padLeft(2, '0')}";
 
-    // 2. Calculate Actual Dates
-    final cutoffDate = CreditCardCalculator.calculateCutoffDate(
-      account.creditCardRules!,
-      bank,
-      year,
-      month,
-    );
+    // 2. Cycle dates (override-aware)
+    final cutoffDate = effectiveCutoff(year, month);
 
-    // Start of this cycle = day after previous month's cutoff
     int prevMonth = month - 1;
     int prevYear = year;
     if (prevMonth < 1) {
       prevMonth = 12;
       prevYear = year - 1;
     }
-    final prevCutoff = CreditCardCalculator.calculateCutoffDate(
-      account.creditCardRules!,
-      bank,
-      prevYear,
-      prevMonth,
-    );
+    final prevCutoff = effectiveCutoff(prevYear, prevMonth);
     final cycleStart = prevCutoff.add(const Duration(days: 1));
 
-    final paymentDate = CreditCardCalculator.calculatePaymentDate(
-      account.creditCardRules!,
-      bank,
-      cutoffDate,
-    );
+    final paymentDate = effectivePayment(year, month, cutoffDate);
 
     // 3. Determine status
     final isAfterCutoff = transactionDate.isAfter(cutoffDate);

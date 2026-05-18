@@ -244,6 +244,9 @@ class CreditCardDetailsBody extends ConsumerWidget {
     final banksAsync = ref.watch(banksFutureProvider);
 
     final now = DateTime.now();
+    final calendarPrevYear = ref
+        .watch(billingCalendarProvider((accountId: acc.id, year: now.year - 1)))
+        .valueOrNull ?? {};
     final calendarThisYear = ref
         .watch(billingCalendarProvider((accountId: acc.id, year: now.year)))
         .valueOrNull ?? {};
@@ -285,17 +288,21 @@ class CreditCardDetailsBody extends ConsumerWidget {
         final bank = banks.where((b) => b.id == rules.bankId).firstOrNull;
         final bankName = bank?.name ?? 'Unknown bank';
 
-        final upcomingDates = <_CutoffPaymentPair>[];
+        final cycleDates = <_CutoffPaymentPair>[];
         if (bank != null) {
-          for (int i = 0; i < 3; i++) {
+          for (int i = -1; i <= 1; i++) {
             final targetDate = DateTime(now.year, now.month + i);
-            final overrides = targetDate.year == now.year ? calendarThisYear : calendarNextYear;
+            final overrides = targetDate.year < now.year
+                ? calendarPrevYear
+                : targetDate.year > now.year
+                    ? calendarNextYear
+                    : calendarThisYear;
             final override = overrides[targetDate.month];
             final cutoff = override?.cutoff ??
                 CreditCardCalculator.calculateCutoffDate(rules, bank, targetDate.year, targetDate.month);
             final payment = override?.payment ??
                 CreditCardCalculator.calculatePaymentDate(rules, bank, cutoff);
-            upcomingDates.add(_CutoffPaymentPair(cutoff, payment));
+            cycleDates.add(_CutoffPaymentPair(cutoff, payment));
           }
         }
 
@@ -326,14 +333,14 @@ class CreditCardDetailsBody extends ConsumerWidget {
                 const SizedBox(height: 6),
                 _buildRuleRow(context, Icons.payment, 'Payment', _describePaymentRule(rules),
                     color: Colors.green),
-                if (upcomingDates.isNotEmpty) ...[
+                if (cycleDates.isNotEmpty) ...[
                   kGapXl,
                   const Divider(),
                   kGapLg,
-                  Text('Upcoming Dates',
+                  Text('Billing Cycles',
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
-                  ...upcomingDates.map((pair) => _buildDateRow(context, pair)),
+                  ...cycleDates.map((pair) => _buildDateRow(context, pair)),
                 ],
               ],
             ),
@@ -1000,14 +1007,24 @@ class _BillingCalendarSheetState extends ConsumerState<_BillingCalendarSheet> {
     try {
       await ref.read(financeRepositoryProvider).upsertBillingCalendarEntry(
             widget.account.id, _year, month, newCutoff!, newPayment!);
-      ref.invalidate(billingCalendarProvider(
-          (accountId: widget.account.id, year: _year)));
+      _invalidateAfterOverrideChange();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
+  }
+
+  // The DB trigger on bank_billing_calendar recomputes periodo_facturacion /
+  // fecha_corte_calculada / fecha_pago_calculada for every transaction of the
+  // affected account, so we invalidate the read-side providers to pull fresh
+  // values into the UI.
+  void _invalidateAfterOverrideChange() {
+    ref.invalidate(billingCalendarProvider(
+        (accountId: widget.account.id, year: _year)));
+    ref.invalidate(accountDetailTransactionsProvider(widget.account.id));
+    ref.invalidate(recentTransactionsProvider);
   }
 
   Future<void> _resetMonth(int month) async {
@@ -1032,8 +1049,7 @@ class _BillingCalendarSheetState extends ConsumerState<_BillingCalendarSheet> {
     try {
       await ref.read(financeRepositoryProvider).deleteBillingCalendarEntry(
             widget.account.id, _year, month);
-      ref.invalidate(billingCalendarProvider(
-          (accountId: widget.account.id, year: _year)));
+      _invalidateAfterOverrideChange();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)

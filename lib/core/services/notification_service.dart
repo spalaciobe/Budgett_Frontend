@@ -65,8 +65,11 @@ class CreditCardPaymentNotificationService {
   Future<void> schedulePaymentAlerts(
     List<Account> accounts,
     List<Bank> banks,
-    int daysBeforeNotify,
-  ) async {
+    int daysBeforeNotify, {
+    ({DateTime cutoff, DateTime payment})? Function(
+            String accountId, int year, int month)?
+        overrideLookup,
+  }) async {
     await cancelAll();
 
     final now = DateTime.now();
@@ -81,19 +84,23 @@ class CreditCardPaymentNotificationService {
       final bank = bankMap[rules.bankId];
       if (bank == null) continue;
 
-      // Calculate cutoff for current month, then payment date
-      final cutoffDate = CreditCardCalculator.calculateCutoffDate(
-          rules, bank, now.year, now.month);
-      var paymentDate =
-          CreditCardCalculator.calculatePaymentDate(rules, bank, cutoffDate);
+      DateTime effectiveCutoff(int y, int m) =>
+          overrideLookup?.call(account.id, y, m)?.cutoff ??
+          CreditCardCalculator.calculateCutoffDate(rules, bank, y, m);
+      DateTime effectivePayment(int y, int m, DateTime cutoff) =>
+          overrideLookup?.call(account.id, y, m)?.payment ??
+          CreditCardCalculator.calculatePaymentDate(rules, bank, cutoff);
+
+      final cutoffDate = effectiveCutoff(now.year, now.month);
+      var paymentDate = effectivePayment(now.year, now.month, cutoffDate);
 
       // If payment date is in the past, try next month
       if (paymentDate.isBefore(now)) {
-        final nextMonth = DateTime(now.year, now.month + 1);
-        final nextCutoff = CreditCardCalculator.calculateCutoffDate(
-            rules, bank, nextMonth.year, nextMonth.month);
-        paymentDate =
-            CreditCardCalculator.calculatePaymentDate(rules, bank, nextCutoff);
+        var ny = now.year;
+        var nm = now.month + 1;
+        if (nm > 12) { nm = 1; ny++; }
+        final nextCutoff = effectiveCutoff(ny, nm);
+        paymentDate = effectivePayment(ny, nm, nextCutoff);
       }
 
       final notificationDate =

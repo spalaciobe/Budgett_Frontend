@@ -48,7 +48,36 @@ final ccAlertSchedulerProvider = FutureProvider<void>((ref) async {
   final banks = banksAsync.valueOrNull;
   if (banks == null) return;
 
-  await service.schedulePaymentAlerts(accounts, banks, daysBefore);
+  // Pull billing-calendar overrides for every credit-card account so payment
+  // reminders fire on the user-edited date when one exists. Watching these
+  // providers also makes the scheduler re-run automatically whenever an
+  // override is added, edited, or removed.
+  final now = DateTime.now();
+  final ccAccountIds = accounts
+      .where((a) => a.type == 'credit_card' && a.creditCardRules != null)
+      .map((a) => a.id)
+      .toList();
+  final Map<String, Map<({int year, int month}),
+      ({DateTime cutoff, DateTime payment})>> overrides = {};
+  for (final id in ccAccountIds) {
+    for (final year in [now.year, now.year + 1]) {
+      final cal = ref
+          .watch(billingCalendarProvider((accountId: id, year: year)))
+          .valueOrNull;
+      if (cal == null) continue;
+      final acctMap = overrides.putIfAbsent(id, () => {});
+      for (final entry in cal.entries) {
+        acctMap[(year: year, month: entry.key)] = entry.value;
+      }
+    }
+  }
+
+  await service.schedulePaymentAlerts(
+    accounts,
+    banks,
+    daysBefore,
+    overrideLookup: (id, y, m) => overrides[id]?[(year: y, month: m)],
+  );
 });
 
 Future<void> main() async {
