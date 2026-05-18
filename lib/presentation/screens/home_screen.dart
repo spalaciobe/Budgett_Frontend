@@ -481,9 +481,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 .colorScheme
                                 .onSurface
                                 .withOpacity(0.4)
-                            : isExpense
-                                ? Theme.of(context).colorScheme.error
-                                : Theme.of(context).colorScheme.secondary;
+                            : isTransfer
+                                ? Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant
+                                : isExpense
+                                    ? Theme.of(context).colorScheme.error
+                                    : Theme.of(context).colorScheme.secondary;
 
                         final icon = isTransfer
                             ? Icons.sync_alt
@@ -569,7 +573,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
-                                    '${isExpense ? '−' : '+'}${CurrencyFormatter.format(t.amount, decimalDigits: 0)}',
+                                    '${isTransfer ? '' : (isExpense ? '−' : '+')}${CurrencyFormatter.format(t.amount, decimalDigits: 0)}',
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
