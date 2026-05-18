@@ -146,7 +146,12 @@ class CreditCardDetailsBody extends ConsumerWidget {
               if (transactions.isEmpty) return const Text('No transactions.');
               final Map<String, List<Transaction>> grouped = {};
               for (var t in transactions) {
-                final period = t.billingPeriod ?? 'Unassigned';
+                final String period;
+                if (t.type == 'transfer') {
+                  period = 'Payments';
+                } else {
+                  period = t.billingPeriod ?? 'Unassigned';
+                }
                 final key = '$period::${t.currency}';
                 grouped.putIfAbsent(key, () => []).add(t);
               }
@@ -154,6 +159,9 @@ class CreditCardDetailsBody extends ConsumerWidget {
                 ..sort((a, b) {
                   final aParts = a.split('::');
                   final bParts = b.split('::');
+                  // Pin "Payments" group to the top regardless of currency.
+                  if (aParts[0] == 'Payments' && bParts[0] != 'Payments') return -1;
+                  if (bParts[0] == 'Payments' && aParts[0] != 'Payments') return 1;
                   final periodCmp = bParts[0].compareTo(aParts[0]);
                   if (periodCmp != 0) return periodCmp;
                   return aParts[1].compareTo(bParts[1]);
@@ -421,7 +429,7 @@ class CreditCardDetailsBody extends ConsumerWidget {
   }
 
   String _formatPeriod(String period) {
-    if (period == 'Unassigned') return period;
+    if (period == 'Unassigned' || period == 'Payments') return period;
     try {
       final parts = period.split('-');
       if (parts.length == 2) {

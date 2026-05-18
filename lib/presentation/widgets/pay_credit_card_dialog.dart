@@ -3,13 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/app_spacing.dart';
+import '../../core/utils/credit_card_calculator.dart';
 import '../../data/models/account_model.dart';
+import '../../data/models/bank_model.dart';
 import '../../data/models/transaction_model.dart';
+import '../../data/repositories/bank_repository.dart';
 import '../providers/finance_provider.dart';
 import '../providers/fx_rate_provider.dart';
 import '../utils/currency_formatter.dart';
 
-enum _PaymentPreset { minimum, currentBalance, custom }
+enum _PaymentPreset { minimum, statementMonth, currentBalance, custom }
 
 class PayCreditCardDialog extends ConsumerStatefulWidget {
   final Account card;
@@ -96,12 +99,45 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
       if (preset == _PaymentPreset.minimum) {
         _closedInstallments.clear();
         _setSettle(_cardMinimum);
+      } else if (preset == _PaymentPreset.statementMonth) {
+        _closedInstallments.clear();
+        _setSettle(_statementMonthTotal());
       } else if (preset == _PaymentPreset.currentBalance) {
         _setSettle(_cardDebt + _closedInstallmentsTotal());
       } else {
         // custom — leave whatever is in the field
       }
     });
+  }
+
+  /// Sum of expenses in the credit card's current (open) billing period,
+  /// in the active [_debtCurrency]. Returns 0 if the card has no rules
+  /// or the banks catalog hasn't loaded yet.
+  double _statementMonthTotal() {
+    final rules = widget.card.creditCardRules;
+    if (rules == null) return 0.0;
+    final banks = ref.read(banksFutureProvider).valueOrNull;
+    if (banks == null) return 0.0;
+    Bank bank;
+    try {
+      bank = banks.firstWhere((b) => b.id == rules.bankId);
+    } catch (_) {
+      return 0.0;
+    }
+    final currentPeriod = CreditCardCalculator.determineBillingPeriod(
+        DateTime.now(), rules, bank);
+    final txs = ref
+            .read(accountDetailTransactionsProvider(widget.card.id))
+            .valueOrNull ??
+        const <Transaction>[];
+    return txs
+        .where((t) =>
+            t.accountId == widget.card.id &&
+            t.type == 'expense' &&
+            !t.isInstallmentParent &&
+            t.currency == _debtCurrency &&
+            t.billingPeriod == currentPeriod)
+        .fold<double>(0.0, (s, t) => s + t.amount);
   }
 
   void _setSettle(double amount) {
@@ -246,6 +282,11 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
         ? <Transaction>[]
         : _pendingInstallments(installmentsAsync.value!);
 
+    // Watch banks so the "Statement month" chip rebuilds with the right total
+    // once the catalog loads.
+    ref.watch(banksFutureProvider);
+    final statementTotal = _statementMonthTotal();
+
     return AlertDialog(
       title: Text('Pay ${widget.card.name}'),
       content: ConstrainedBox(
@@ -308,6 +349,15 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
                       onSelected: _cardMinimum <= 0
                           ? null
                           : (_) => _applyPreset(_PaymentPreset.minimum),
+                    ),
+                    ChoiceChip(
+                      label: Text(statementTotal > 0
+                          ? 'Statement month (${CurrencyFormatter.format(statementTotal, currency: _debtCurrency)})'
+                          : 'Statement month (no charges)'),
+                      selected: _preset == _PaymentPreset.statementMonth,
+                      onSelected: statementTotal <= 0
+                          ? null
+                          : (_) => _applyPreset(_PaymentPreset.statementMonth),
                     ),
                     ChoiceChip(
                       label: const Text('Current balance'),

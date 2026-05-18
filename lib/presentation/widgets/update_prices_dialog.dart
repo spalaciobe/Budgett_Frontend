@@ -21,13 +21,18 @@ class UpdatePricesDialog extends ConsumerStatefulWidget {
 }
 
 class _UpdatePricesDialogState extends ConsumerState<UpdatePricesDialog> {
+  late final List<InvestmentHolding> _priceable;
   late final List<TextEditingController> _controllers;
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _controllers = widget.holdings.map((h) {
+    // Cash-equivalents (stablecoins) don't have a meaningful market price to
+    // edit — they're pegged 1:1 to their currency. Exclude them here.
+    _priceable =
+        widget.holdings.where((h) => !h.isCashEquivalent).toList();
+    _controllers = _priceable.map((h) {
       return TextEditingController(
         text: CurrencyFormatter.format(
           h.currentPrice,
@@ -50,12 +55,12 @@ class _UpdatePricesDialogState extends ConsumerState<UpdatePricesDialog> {
     setState(() => _isLoading = true);
 
     final updates = <({String id, double price})>[];
-    for (int i = 0; i < widget.holdings.length; i++) {
+    for (int i = 0; i < _priceable.length; i++) {
       final price = CurrencyFormatter.parse(
         _controllers[i].text,
-        currency: widget.holdings[i].currency,
+        currency: _priceable[i].currency,
       );
-      updates.add((id: widget.holdings[i].id, price: price));
+      updates.add((id: _priceable[i].id, price: price));
     }
 
     try {
@@ -112,46 +117,60 @@ class _UpdatePricesDialogState extends ConsumerState<UpdatePricesDialog> {
             ),
             const SizedBox(height: 10),
             Flexible(
-              child: ListView.separated(
-                shrinkWrap: true,
-                itemCount: widget.holdings.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
-                itemBuilder: (context, i) {
-                  final h = widget.holdings[i];
-                  return Row(
-                    children: [
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          h.symbol,
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodyMedium
-                              ?.copyWith(fontWeight: FontWeight.w600),
-                        ),
+              child: _priceable.isEmpty
+                  ? Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      child: Text(
+                        'No priceable holdings — cash-equivalents are pegged to their currency.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withOpacity(0.6),
+                            ),
                       ),
-                      Expanded(
-                        flex: 3,
-                        child: TextFormField(
-                          controller: _controllers[i],
-                          decoration: InputDecoration(
-                            labelText: h.currency,
-                            prefixText:
-                                CurrencyFormatter.prefixFor(h.currency),
-                            border: const OutlineInputBorder(),
-                            isDense: true,
-                          ),
-                          keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true),
-                          inputFormatters: [
-                            CurrencyInputFormatter(currency: h.currency),
+                    )
+                  : ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: _priceable.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      itemBuilder: (context, i) {
+                        final h = _priceable[i];
+                        return Row(
+                          children: [
+                            Expanded(
+                              flex: 2,
+                              child: Text(
+                                h.symbol,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                            Expanded(
+                              flex: 3,
+                              child: TextFormField(
+                                controller: _controllers[i],
+                                decoration: InputDecoration(
+                                  labelText: h.currency,
+                                  prefixText:
+                                      CurrencyFormatter.prefixFor(h.currency),
+                                  border: const OutlineInputBorder(),
+                                  isDense: true,
+                                ),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                        decimal: true),
+                                inputFormatters: [
+                                  CurrencyInputFormatter(currency: h.currency),
+                                ],
+                              ),
+                            ),
                           ],
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
+                        );
+                      },
+                    ),
             ),
             const SizedBox(height: 20),
             SizedBox(

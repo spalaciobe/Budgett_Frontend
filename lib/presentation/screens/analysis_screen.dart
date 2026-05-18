@@ -4,6 +4,7 @@ import 'package:budgett_frontend/core/responsive.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
+import 'package:budgett_frontend/data/models/investment_details_model.dart';
 import 'package:budgett_frontend/presentation/providers/portfolio_provider.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:budgett_frontend/presentation/widgets/portfolio_donut_chart.dart';
@@ -388,6 +389,8 @@ class _PortfolioContent extends StatelessWidget {
                 ),
               ),
             ],
+            const Spacer(),
+            const _PortfolioFetchButton(),
           ],
         ),
         const SizedBox(height: 12),
@@ -568,6 +571,126 @@ class _PortfolioContent extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Portfolio-wide "Fetch from market" action
+// ──────────────────────────────────────────────────────────────────────────────
+
+/// Compact text button that fans out [FinanceRepository.fetchMarketPrices]
+/// across every multi-holding investment account, aggregates the results,
+/// and shows a single summary snackbar.
+class _PortfolioFetchButton extends ConsumerStatefulWidget {
+  const _PortfolioFetchButton();
+
+  @override
+  ConsumerState<_PortfolioFetchButton> createState() =>
+      _PortfolioFetchButtonState();
+}
+
+class _PortfolioFetchButtonState extends ConsumerState<_PortfolioFetchButton> {
+  bool _isLoading = false;
+
+  Future<void> _fetchAll() async {
+    final accounts = ref.read(accountsProvider).valueOrNull ?? [];
+    final targets = accounts.where((a) {
+      if (a.type != 'investment') return false;
+      final d = a.investmentDetails;
+      if (d == null) return false;
+      return d.investmentType.isMultiHolding;
+    }).toList();
+
+    if (targets.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No investment accounts to update')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    final repo = ref.read(financeRepositoryProvider);
+    int totalUpdated = 0;
+    final allSkipped = <String>[];
+    final accountErrors = <String>[];
+
+    for (final a in targets) {
+      try {
+        final r = await repo.fetchMarketPrices(a.id);
+        totalUpdated += r.updatedCount;
+        allSkipped.addAll(r.skipped.map((s) => s.symbol));
+      } catch (e) {
+        accountErrors.add('${a.name}: $e');
+      }
+      ref.invalidate(accountHoldingsProvider(a.id));
+    }
+    ref.invalidate(consolidatedPortfolioProvider);
+    ref.invalidate(accountsProvider);
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+
+    if (accountErrors.isNotEmpty && totalUpdated == 0 && allSkipped.isEmpty) {
+      messenger.showSnackBar(
+        SnackBar(
+          showCloseIcon: true,
+          duration: const Duration(seconds: 6),
+          content: Text('Fetch failed: ${accountErrors.join('; ')}'),
+        ),
+      );
+      return;
+    }
+
+    final parts = <String>[];
+    parts.add(
+        'Updated $totalUpdated holding${totalUpdated == 1 ? '' : 's'} across ${targets.length} account${targets.length == 1 ? '' : 's'}');
+    if (allSkipped.isNotEmpty) {
+      parts.add('skipped: ${allSkipped.join(', ')}');
+    }
+    if (accountErrors.isNotEmpty) {
+      parts.add('errors: ${accountErrors.length}');
+    }
+
+    messenger.showSnackBar(
+      SnackBar(
+        showCloseIcon: true,
+        duration: const Duration(seconds: 4),
+        content: Text(parts.join(' · ')),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final hasAny = ref.watch(hasAnyPortfolioAccountProvider);
+    if (!hasAny) return const SizedBox.shrink();
+
+    return TextButton.icon(
+      onPressed: _isLoading ? null : _fetchAll,
+      icon: _isLoading
+          ? const SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : Icon(Icons.cloud_download_outlined,
+              size: 16, color: theme.colorScheme.primary),
+      label: Text(
+        _isLoading ? 'Fetching…' : 'Fetch from market',
+        style: theme.textTheme.labelLarge?.copyWith(
+          color: theme.colorScheme.primary,
+        ),
+      ),
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
     );
   }
