@@ -174,7 +174,10 @@ class CreditCardDetailsBody extends ConsumerWidget {
                   final period = parts[0];
                   final currency = parts.length > 1 ? parts[1] : 'COP';
                   final periodTransactions = grouped[key]!;
-                  final total = periodTransactions.fold(0.0, (sum, t) => sum + t.amount);
+                  // Refunds and other income rows on a credit card offset what
+                  // was spent in the cycle, so subtract them instead of adding.
+                  final total = periodTransactions.fold(0.0,
+                      (sum, t) => sum + (t.type == 'income' ? -t.amount : t.amount));
                   return Card(
                     margin: const EdgeInsets.only(bottom: kSpaceLg),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
