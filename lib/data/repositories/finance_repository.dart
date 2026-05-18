@@ -1571,6 +1571,72 @@ class FinanceRepository {
     await _client.from('recurring_transactions').delete().eq('id', id);
   }
 
+  /// Advances a date by the given recurring-transaction frequency.
+  /// Mirrors the switch used in [generateTransactionFromRecurring].
+  static DateTime advanceRecurringDate(DateTime date, String frequency) {
+    switch (frequency) {
+      case 'daily':    return date.add(const Duration(days: 1));
+      case 'weekly':   return date.add(const Duration(days: 7));
+      case 'biweekly': return date.add(const Duration(days: 14));
+      case 'monthly':  return DateTime(date.year, date.month + 1, date.day);
+      case 'yearly':   return DateTime(date.year + 1, date.month, date.day);
+      default:         return date;
+    }
+  }
+
+  /// Catches up every active recurring transaction whose [nextRunDate] has
+  /// passed: emits a pending transaction stamped with each missed scheduled
+  /// date, then advances [nextRunDate] until it is in the future. Returns the
+  /// number of transactions inserted so callers can decide whether to refresh
+  /// dependent providers.
+  Future<int> processRecurringDue() async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return 0;
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final todayStr = today.toIso8601String().split('T')[0];
+
+    final List<dynamic> due = await _client
+        .from('recurring_transactions')
+        .select()
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .lte('next_run_date', todayStr);
+
+    int generated = 0;
+    for (final json in due) {
+      final r = RecurringTransaction.fromJson(json);
+      DateTime cursor = r.nextRunDate;
+      DateTime? lastGenerated;
+
+      while (!cursor.isAfter(today)) {
+        await addTransaction({
+          'description': r.description,
+          'amount': r.amount,
+          'category_id': r.categoryId,
+          'account_id': r.accountId,
+          'type': r.type,
+          'currency': r.currency,
+          'date': cursor.toIso8601String().split('T')[0],
+          'status': 'pending',
+          'notes': 'Auto-generated from recurring: ${r.description}',
+        });
+        lastGenerated = cursor;
+        generated++;
+        cursor = advanceRecurringDate(cursor, r.frequency);
+      }
+
+      if (lastGenerated != null) {
+        await updateRecurringTransaction(r.id, {
+          'last_run_date': lastGenerated.toIso8601String().split('T')[0],
+          'next_run_date': cursor.toIso8601String().split('T')[0],
+        });
+      }
+    }
+    return generated;
+  }
+
   // Helper to generate transaction from recurring
   Future<void> generateTransactionFromRecurring(RecurringTransaction recurring) async {
     // 1. Create the real transaction

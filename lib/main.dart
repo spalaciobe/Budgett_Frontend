@@ -20,6 +20,24 @@ final _supabaseSessionProvider = StreamProvider<Session?>((ref) {
       .map((event) => event.session);
 });
 
+/// Runs once per signed-in session: every recurring transaction whose
+/// `next_run_date` has passed emits one pending transaction per missed cycle
+/// (stamped with the scheduled date), then advances `next_run_date` past today.
+/// On generation, finance providers are invalidated so the UI shows the new
+/// rows without a manual refresh.
+final recurringAutoGenProvider = FutureProvider<void>((ref) async {
+  final session = ref.watch(_supabaseSessionProvider).valueOrNull;
+  if (session == null) return;
+
+  final repo = ref.read(financeRepositoryProvider);
+  final count = await repo.processRecurringDue();
+  if (count > 0) {
+    ref.invalidate(recurringTransactionsProvider);
+    ref.invalidate(recentTransactionsProvider);
+    ref.invalidate(accountsProvider);
+  }
+});
+
 final ccAlertSchedulerProvider = FutureProvider<void>((ref) async {
   // Do not touch finance providers until the session is confirmed.
   // This prevents a race condition at startup on Flutter web where
@@ -130,6 +148,8 @@ class BudgettApp extends ConsumerWidget {
 
     // Watch the scheduler so it runs whenever dependencies change
     ref.watch(ccAlertSchedulerProvider);
+    // Catch-up overdue recurring transactions once per session.
+    ref.watch(recurringAutoGenProvider);
 
     // Show an update modal once a session if a newer APK is available on
     // GitHub Releases. Resolves to null on non-Android, when up-to-date, or
