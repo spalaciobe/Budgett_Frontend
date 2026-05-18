@@ -1582,7 +1582,7 @@ class FinanceRepository {
       'type': recurring.type,
       // 'movement_type': recurring.movementType, // If we added this to model
       'date': DateTime.now().toIso8601String().split('T')[0],
-      'status': 'paid', // Or pending based on preference
+      'status': 'pending',
       'notes': 'Generated from recurring: ${recurring.description}',
     });
 
