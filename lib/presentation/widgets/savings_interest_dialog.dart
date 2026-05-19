@@ -59,6 +59,7 @@ class _SavingsInterestDialogState
       currentBalance: widget.account.balance,
       currentApyRate: widget.details.apyRate ?? 0,
       lastInterestDate: fromDate,
+      asOfDate: _recordDate,
     );
   }
 
@@ -94,7 +95,10 @@ class _SavingsInterestDialogState
     final fromDate = widget.details.lastInterestDate;
     final apy = (widget.details.apyRate ?? 0) * 100;
     final days = fromDate != null
-        ? DateTime.now().difference(fromDate).inDays
+        ? DateTime(_recordDate.year, _recordDate.month, _recordDate.day)
+            .difference(
+                DateTime(fromDate.year, fromDate.month, fromDate.day))
+            .inDays
         : null;
     final segments = widget.details.periodSegments;
     final hasSegments = segments.isNotEmpty;
@@ -187,6 +191,7 @@ class _SavingsInterestDialogState
                     currentBalance: widget.account.balance,
                     currentApyRate: widget.details.apyRate ?? 0,
                     lastInterestDate: fromDate!,
+                    asOfDate: _recordDate,
                   ),
                 ],
               ],
@@ -223,6 +228,7 @@ class _SavingsInterestDialogState
                           currentBalance: widget.account.balance,
                           currentApyRate: widget.details.apyRate ?? 0,
                           lastInterestDate: fromDate,
+                          asOfDate: picked,
                         );
                         _amountCtrl.text = CurrencyFormatter.format(updated,
                             includeSymbol: false);
@@ -297,12 +303,14 @@ class _SegmentBreakdown extends StatelessWidget {
   final double currentBalance;
   final double currentApyRate;
   final DateTime lastInterestDate;
+  final DateTime asOfDate;
 
   const _SegmentBreakdown({
     required this.segments,
     required this.currentBalance,
     required this.currentApyRate,
     required this.lastInterestDate,
+    required this.asOfDate,
   });
 
   @override
@@ -314,42 +322,54 @@ class _SegmentBreakdown extends StatelessWidget {
     final valueStyle =
         theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600);
 
+    final asOfNorm =
+        DateTime(asOfDate.year, asOfDate.month, asOfDate.day);
+    final isToday = !asOfNorm.isBefore(
+        DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day));
     final rows = <_SegmentRow>[];
+    DateTime? lastClosedTo;
 
     for (final seg in segments) {
+      final fromNorm =
+          DateTime(seg.from.year, seg.from.month, seg.from.day);
+      if (!fromNorm.isBefore(asOfNorm)) continue;
+      final segToNorm = DateTime(seg.to.year, seg.to.month, seg.to.day);
+      final toNorm =
+          segToNorm.isAfter(asOfNorm) ? asOfNorm : segToNorm;
+      final days = toNorm.difference(fromNorm).inDays;
+      if (days <= 0) continue;
       final interest = InvestmentCalculator.savingsAccruedInterest(
-          seg.balance, seg.apyRate, seg.from,
-          toDate: seg.to);
-      final days = seg.to
-          .difference(
-              DateTime(seg.from.year, seg.from.month, seg.from.day))
-          .inDays;
+          seg.balance, seg.apyRate, fromNorm,
+          toDate: toNorm);
       rows.add(_SegmentRow(
         label:
-            '${DateFormat('MMM d').format(seg.from)} – ${DateFormat('MMM d').format(seg.to)}',
+            '${DateFormat('MMM d').format(fromNorm)} – ${DateFormat('MMM d').format(toNorm)}',
         balance: seg.balance,
         days: days,
         interest: interest,
         isOpen: false,
       ));
+      lastClosedTo = toNorm;
     }
 
-    final openFrom =
-        segments.isNotEmpty ? segments.last.to : lastInterestDate;
-    final today = DateTime.now();
-    final openDays = DateTime(today.year, today.month, today.day)
-        .difference(
-            DateTime(openFrom.year, openFrom.month, openFrom.day))
-        .inDays;
-    final openInterest = InvestmentCalculator.savingsAccruedInterest(
-        currentBalance, currentApyRate, openFrom);
-    rows.add(_SegmentRow(
-      label: '${DateFormat('MMM d').format(openFrom)} – today',
-      balance: currentBalance,
-      days: openDays,
-      interest: openInterest,
-      isOpen: true,
-    ));
+    final openFrom = lastClosedTo ??
+        (segments.isNotEmpty ? segments.last.to : lastInterestDate);
+    final openFromNorm =
+        DateTime(openFrom.year, openFrom.month, openFrom.day);
+    final openDays = asOfNorm.difference(openFromNorm).inDays;
+    if (openDays > 0) {
+      final openInterest = InvestmentCalculator.savingsAccruedInterest(
+          currentBalance, currentApyRate, openFromNorm,
+          toDate: asOfNorm);
+      rows.add(_SegmentRow(
+        label:
+            '${DateFormat('MMM d').format(openFromNorm)} – ${isToday ? 'today' : DateFormat('MMM d').format(asOfNorm)}',
+        balance: currentBalance,
+        days: openDays,
+        interest: openInterest,
+        isOpen: true,
+      ));
+    }
 
     return Card(
       elevation: 0,

@@ -36,6 +36,11 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
   final Set<String> _closedInstallments = {};
   bool _saving = false;
 
+  /// Billing cycle the "Statement" preset targets. Lazily initialised to the
+  /// card's current cycle once banks + rules have loaded; user can switch it
+  /// to any other cycle present on the card via the cycle picker.
+  String? _selectedBillingPeriod;
+
   late String _debtCurrency = _pickInitialDebtCurrency();
 
   String _pickInitialDebtCurrency() {
@@ -110,22 +115,26 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
     });
   }
 
-  /// Sum of expenses in the credit card's current (open) billing period,
-  /// in the active [_debtCurrency]. Returns 0 if the card has no rules
-  /// or the banks catalog hasn't loaded yet.
-  double _statementMonthTotal() {
+  /// Card's current open billing period (or null when rules / banks
+  /// catalog haven't loaded). Cached per build via [_currentBillingPeriod].
+  String? _currentBillingPeriod() {
     final rules = widget.card.creditCardRules;
-    if (rules == null) return 0.0;
+    if (rules == null) return null;
     final banks = ref.read(banksFutureProvider).valueOrNull;
-    if (banks == null) return 0.0;
+    if (banks == null) return null;
     Bank bank;
     try {
       bank = banks.firstWhere((b) => b.id == rules.bankId);
     } catch (_) {
-      return 0.0;
+      return null;
     }
-    final currentPeriod = CreditCardCalculator.determineBillingPeriod(
+    return CreditCardCalculator.determineBillingPeriod(
         DateTime.now(), rules, bank);
+  }
+
+  /// Sum of expenses in [period] for the active [_debtCurrency]. Refunds and
+  /// other income rows offset the spend.
+  double _totalForPeriod(String period) {
     final txs = ref
             .read(accountDetailTransactionsProvider(widget.card.id))
             .valueOrNull ??
@@ -133,11 +142,107 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
     return txs
         .where((t) =>
             t.accountId == widget.card.id &&
-            t.type == 'expense' &&
+            t.type != 'transfer' &&
             !t.isInstallmentParent &&
             t.currency == _debtCurrency &&
-            t.billingPeriod == currentPeriod)
-        .fold<double>(0.0, (s, t) => s + t.amount);
+            t.billingPeriod == period)
+        .fold<double>(
+            0.0, (s, t) => s + (t.type == 'income' ? -t.amount : t.amount));
+  }
+
+  /// Sum of expenses in the selected billing period for the active
+  /// [_debtCurrency]. Returns 0 if the catalog hasn't loaded or no period
+  /// is selected.
+  double _statementMonthTotal() {
+    final period = _selectedBillingPeriod ?? _currentBillingPeriod();
+    if (period == null) return 0.0;
+    return _totalForPeriod(period);
+  }
+
+  /// Sorted list (newest first) of all distinct billing periods on this
+  /// card for the active [_debtCurrency], plus the current cycle if it
+  /// isn't already represented in the data.
+  List<String> _availableBillingPeriods() {
+    final txs = ref
+            .read(accountDetailTransactionsProvider(widget.card.id))
+            .valueOrNull ??
+        const <Transaction>[];
+    final periods = <String>{};
+    for (final t in txs) {
+      if (t.type == 'transfer') continue;
+      if (t.isInstallmentParent) continue;
+      if (t.currency != _debtCurrency) continue;
+      final p = t.billingPeriod;
+      if (p == null) continue;
+      periods.add(p);
+    }
+    final current = _currentBillingPeriod();
+    if (current != null) periods.add(current);
+    final list = periods.toList()..sort((a, b) => b.compareTo(a));
+    return list;
+  }
+
+  String _formatPeriod(String period) {
+    try {
+      final parts = period.split('-');
+      if (parts.length == 2) {
+        final date = DateTime(int.parse(parts[0]), int.parse(parts[1]));
+        return DateFormat('MMMM yyyy', 'en').format(date);
+      }
+    } catch (_) {}
+    return period;
+  }
+
+  Future<void> _openCyclePicker() async {
+    final periods = _availableBillingPeriods();
+    if (periods.isEmpty) return;
+    final current = _currentBillingPeriod();
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text(
+                'Pick billing cycle',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+              ),
+            ),
+            const Divider(height: 1),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 360),
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  for (final p in periods)
+                    _CyclePickerTile(
+                      period: p,
+                      label: _formatPeriod(p),
+                      total: _totalForPeriod(p),
+                      currency: _debtCurrency,
+                      isCurrent: p == current,
+                      isSelected: p == _selectedBillingPeriod,
+                      onTap: () => Navigator.of(ctx).pop(p),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (picked != null) {
+      setState(() {
+        _selectedBillingPeriod = picked;
+        _applyPreset(_PaymentPreset.statementMonth);
+      });
+    }
   }
 
   void _setSettle(double amount) {
@@ -282,10 +387,19 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
         ? <Transaction>[]
         : _pendingInstallments(installmentsAsync.value!);
 
-    // Watch banks so the "Statement month" chip rebuilds with the right total
+    // Watch banks so the "Statement" chip rebuilds with the right total
     // once the catalog loads.
     ref.watch(banksFutureProvider);
+
+    // Lazy default: first time we have rules + banks available, pin the
+    // selected cycle to the card's current cycle. The user can switch via
+    // the picker afterwards.
+    _selectedBillingPeriod ??= _currentBillingPeriod();
     final statementTotal = _statementMonthTotal();
+    final availablePeriods = _availableBillingPeriods();
+    final statementChipLabel = _selectedBillingPeriod == null
+        ? 'Statement month (no charges)'
+        : 'Statement ${_formatPeriod(_selectedBillingPeriod!)} · ${CurrencyFormatter.format(statementTotal, currency: _debtCurrency)}';
 
     return AlertDialog(
       title: Text('Pay ${widget.card.name}'),
@@ -311,6 +425,10 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
                     onChanged: (value) => setState(() {
                       _debtCurrency = value;
                       _closedInstallments.clear();
+                      // Available cycles depend on currency — drop the
+                      // pinned cycle so it re-defaults to the card's
+                      // current cycle for the new currency.
+                      _selectedBillingPeriod = null;
                       _applyPreset(_preset);
                     }),
                   ),
@@ -351,13 +469,35 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
                           : (_) => _applyPreset(_PaymentPreset.minimum),
                     ),
                     ChoiceChip(
-                      label: Text(statementTotal > 0
-                          ? 'Statement month (${CurrencyFormatter.format(statementTotal, currency: _debtCurrency)})'
-                          : 'Statement month (no charges)'),
+                      label: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              statementChipLabel,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (availablePeriods.length > 1) ...[
+                            const SizedBox(width: 2),
+                            const Icon(Icons.arrow_drop_down, size: 18),
+                          ],
+                        ],
+                      ),
                       selected: _preset == _PaymentPreset.statementMonth,
-                      onSelected: statementTotal <= 0
+                      onSelected: availablePeriods.isEmpty
                           ? null
-                          : (_) => _applyPreset(_PaymentPreset.statementMonth),
+                          : (_) {
+                              // Single cycle available → just apply the
+                              // preset (no point opening a picker with one
+                              // option). Multiple cycles → open picker so
+                              // the user can pick or confirm the current.
+                              if (availablePeriods.length == 1) {
+                                _applyPreset(_PaymentPreset.statementMonth);
+                              } else {
+                                _openCyclePicker();
+                              }
+                            },
                     ),
                     ChoiceChip(
                       label: const Text('Current balance'),
@@ -520,6 +660,78 @@ class _DebtCurrencySelector extends StatelessWidget {
       showSelectedIcon: false,
       selected: {selected},
       onSelectionChanged: (sel) => onChanged(sel.first),
+    );
+  }
+}
+
+/// Row in the cycle picker bottom sheet. Highlights the card's current
+/// cycle with a green dot and shows the per-cycle settle total so the user
+/// can compare cycles at a glance before picking one.
+class _CyclePickerTile extends StatelessWidget {
+  final String period;
+  final String label;
+  final double total;
+  final String currency;
+  final bool isCurrent;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _CyclePickerTile({
+    required this.period,
+    required this.label,
+    required this.total,
+    required this.currency,
+    required this.isCurrent,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return ListTile(
+      onTap: onTap,
+      selected: isSelected,
+      leading: SizedBox(
+        width: 18,
+        child: isCurrent
+            ? const Icon(Icons.fiber_manual_record,
+                size: 10, color: Colors.green)
+            : const SizedBox.shrink(),
+      ),
+      title: Row(
+        children: [
+          Flexible(
+            child: Text(
+              label,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontWeight:
+                    isSelected ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+          ),
+          if (isCurrent) ...[
+            const SizedBox(width: 6),
+            Text(
+              '(current)',
+              style: TextStyle(
+                fontSize: 11,
+                color: theme.colorScheme.onSurface.withOpacity(0.55),
+              ),
+            ),
+          ],
+        ],
+      ),
+      trailing: Text(
+        CurrencyFormatter.format(total, currency: currency),
+        style: TextStyle(
+          fontWeight: FontWeight.w600,
+          color: total > 0
+              ? theme.colorScheme.error
+              : theme.colorScheme.onSurface.withOpacity(0.55),
+        ),
+      ),
     );
   }
 }

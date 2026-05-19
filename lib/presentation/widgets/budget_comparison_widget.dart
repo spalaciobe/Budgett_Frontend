@@ -48,7 +48,26 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
   @override
   Widget build(BuildContext context) {
     if (widget.budgetAmount <= 0) {
-      // No budget set case — always show, no collapse needed
+      // No budget set — still surface actual activity (spent / earned /
+      // contributed) so the user can see where money is going even before
+      // setting a target.
+      final hasActivity = widget.spentAmount > 0;
+      final activityLabel = widget.isIncome
+          ? 'Earned'
+          : widget.isSavings
+              ? 'Contributed'
+              : 'Spent';
+      final emptyLabel = widget.isIncome
+          ? 'No expected income set'
+          : widget.isSavings
+              ? 'No monthly target set'
+              : 'No budget set';
+      final activityColor = widget.isIncome
+          ? Colors.green.shade600
+          : widget.isSavings
+              ? Theme.of(context).colorScheme.primary
+              : Theme.of(context).colorScheme.error;
+
       return Card(
         margin: const EdgeInsets.only(bottom: kSpaceLg),
         child: InkWell(
@@ -76,17 +95,34 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        widget.isIncome
-                            ? 'No expected income set'
-                            : widget.isSavings
-                                ? 'No monthly target set'
-                                : 'No budget set',
+                        emptyLabel,
                         style: TextStyle(fontSize: 12, color: Colors.grey[400]),
                       ),
                     ],
                   ),
                 ),
-                Icon(Icons.add_circle_outline, color: Colors.grey[400]),
+                if (hasActivity)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        activityLabel,
+                        style: TextStyle(
+                            fontSize: 11, color: Colors.grey[400]),
+                      ),
+                      Text(
+                        CurrencyFormatter.format(widget.spentAmount,
+                            decimalDigits: 2),
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: activityColor,
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  Icon(Icons.add_circle_outline, color: Colors.grey[400]),
               ],
             ),
           ),

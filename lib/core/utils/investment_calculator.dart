@@ -253,34 +253,44 @@ class InvestmentCalculator {
 
   /// Accrued interest that correctly accounts for intra-period balance and
   /// rate changes using a list of closed [InterestPeriodSegment]s plus an open
-  /// segment from the last known point to today.
+  /// segment from the last known point to [asOfDate] (defaults to today).
+  ///
+  /// When [asOfDate] falls inside a closed segment, that segment is truncated
+  /// to [asOfDate] and any later segments are ignored. When [asOfDate] is
+  /// before the last segment's `to`, the open segment is omitted entirely.
   static double savingsAccruedInterestWithSegments({
     required List<InterestPeriodSegment> segments,
     required double currentBalance,
     required double currentApyRate,
     required DateTime lastInterestDate,
+    DateTime? asOfDate,
   }) {
+    final endDate = asOfDate ?? DateTime.now();
+    final endNorm = DateTime(endDate.year, endDate.month, endDate.day);
+
     double total = 0.0;
+    DateTime? lastClosedTo;
 
     for (final seg in segments) {
       if (seg.balance <= 0 || seg.apyRate <= 0) continue;
       final from = DateTime(seg.from.year, seg.from.month, seg.from.day);
-      final to = DateTime(seg.to.year, seg.to.month, seg.to.day);
+      if (!from.isBefore(endNorm)) continue;
+      final segTo = DateTime(seg.to.year, seg.to.month, seg.to.day);
+      final to = segTo.isAfter(endNorm) ? endNorm : segTo;
       final days = to.difference(from).inDays;
       if (days <= 0) continue;
       total +=
           seg.balance * (math.pow(1 + seg.apyRate, days / 365).toDouble() - 1);
+      lastClosedTo = to;
     }
 
     if (currentBalance <= 0 || currentApyRate <= 0) return total;
 
-    final openFrom =
-        segments.isNotEmpty ? segments.last.to : lastInterestDate;
+    final openFrom = lastClosedTo ??
+        (segments.isNotEmpty ? segments.last.to : lastInterestDate);
     final openFromNorm =
         DateTime(openFrom.year, openFrom.month, openFrom.day);
-    final today = DateTime.now();
-    final todayNorm = DateTime(today.year, today.month, today.day);
-    final openDays = todayNorm.difference(openFromNorm).inDays;
+    final openDays = endNorm.difference(openFromNorm).inDays;
     if (openDays <= 0) return total;
 
     total += currentBalance *

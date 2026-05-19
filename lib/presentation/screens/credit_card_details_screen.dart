@@ -48,6 +48,21 @@ class CreditCardDetailsBody extends ConsumerWidget {
 
     final transactionsAsync = ref.watch(accountDetailTransactionsProvider(freshAccount.id));
     final fxRate = ref.watch(fxRateProvider).valueOrNull;
+    final banksAsync = ref.watch(banksFutureProvider);
+
+    // Compute the current billing period for this card so future cycles
+    // (mostly populated by scheduled installment cuotas) can be tucked into
+    // a single collapsed "Upcoming installments" group.
+    String? currentPeriod;
+    final rules = freshAccount.creditCardRules;
+    final banks = banksAsync.valueOrNull;
+    if (rules != null && banks != null) {
+      final bank = banks.where((b) => b.id == rules.bankId).firstOrNull;
+      if (bank != null) {
+        currentPeriod = CreditCardCalculator.determineBillingPeriod(
+            DateTime.now(), rules, bank);
+      }
+    }
 
     final hasNoUsdSubLimit = freshAccount.creditLimitUsd == 0 && freshAccount.balanceUsd < 0;
     final usdDebtInCop = (hasNoUsdSubLimit && fxRate != null)
@@ -166,73 +181,117 @@ class CreditCardDetailsBody extends ConsumerWidget {
                   if (periodCmp != 0) return periodCmp;
                   return aParts[1].compareTo(bParts[1]);
                 });
-              return Column(
-                children: sortedKeys.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final key = entry.value;
-                  final parts = key.split('::');
-                  final period = parts[0];
-                  final currency = parts.length > 1 ? parts[1] : 'COP';
-                  final periodTransactions = grouped[key]!;
-                  // Refunds and other income rows on a credit card offset what
-                  // was spent in the cycle, so subtract them instead of adding.
-                  final total = periodTransactions.fold(0.0,
-                      (sum, t) => sum + (t.type == 'income' ? -t.amount : t.amount));
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: kSpaceLg),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    elevation: 1,
-                    child: ExpansionTile(
-                      initiallyExpanded: index == 0,
-                      shape: const Border(),
-                      title: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              _formatPeriod(period),
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                            ),
+
+              final cp = currentPeriod;
+              bool isFutureKey(String key) {
+                if (cp == null) return false;
+                final period = key.split('::')[0];
+                if (period == 'Payments' || period == 'Unassigned') return false;
+                return period.compareTo(cp) > 0;
+              }
+
+              final futureKeys =
+                  sortedKeys.where(isFutureKey).toList();
+              final regularKeys =
+                  sortedKeys.where((k) => !isFutureKey(k)).toList();
+
+              Widget buildPeriodCard(String key, {bool initiallyExpanded = false}) {
+                final parts = key.split('::');
+                final period = parts[0];
+                final currency = parts.length > 1 ? parts[1] : 'COP';
+                final periodTransactions = grouped[key]!;
+                // Refunds and other income rows on a credit card offset what
+                // was spent in the cycle, so subtract them instead of adding.
+                final total = periodTransactions.fold(0.0,
+                    (sum, t) => sum + (t.type == 'income' ? -t.amount : t.amount));
+                return Card(
+                  margin: const EdgeInsets.only(bottom: kSpaceLg),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 1,
+                  child: ExpansionTile(
+                    initiallyExpanded: initiallyExpanded,
+                    shape: const Border(),
+                    title: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _formatPeriod(period),
+                            style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: currency == 'USD'
-                                  ? Colors.blue.withOpacity(0.12)
-                                  : Theme.of(context).colorScheme.primaryContainer,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              currency,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: currency == 'USD'
-                                    ? Colors.blue.shade700
-                                    : Theme.of(context).colorScheme.primary,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      subtitle: Text(
-                        'Total: ${CurrencyFormatter.format(total, currency: currency)}',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.primary,
-                          fontWeight: FontWeight.w600,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      children: periodTransactions
-                          .map((t) => TransactionTile(
-                                transaction: t,
-                                showSign: false,
-                              ))
-                          .toList(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: currency == 'USD'
+                                ? Colors.blue.withOpacity(0.12)
+                                : Theme.of(context).colorScheme.primaryContainer,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            currency,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: currency == 'USD'
+                                  ? Colors.blue.shade700
+                                  : Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  );
-                }).toList(),
-              );
+                    subtitle: Text(
+                      'Total: ${CurrencyFormatter.format(total, currency: currency)}',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    children: periodTransactions
+                        .map((t) => TransactionTile(
+                              transaction: t,
+                              showSign: false,
+                            ))
+                        .toList(),
+                  ),
+                );
+              }
+
+              // Mark the current cycle (if present) so it's expanded by
+              // default; otherwise expand the first non-Payments card so the
+              // section isn't fully collapsed.
+              String? autoExpandKey;
+              for (final k in regularKeys) {
+                final period = k.split('::')[0];
+                if (period == currentPeriod) {
+                  autoExpandKey = k;
+                  break;
+                }
+              }
+              if (autoExpandKey == null) {
+                autoExpandKey = regularKeys
+                    .where((k) {
+                      final p = k.split('::')[0];
+                      return p != 'Payments' && p != 'Unassigned';
+                    })
+                    .firstOrNull;
+              }
+
+              final children = <Widget>[
+                for (final k in regularKeys)
+                  buildPeriodCard(k, initiallyExpanded: k == autoExpandKey),
+                if (futureKeys.isNotEmpty)
+                  _UpcomingInstallmentsCard(
+                    keys: futureKeys,
+                    grouped: grouped,
+                    buildPeriodCard: buildPeriodCard,
+                    formatPeriod: _formatPeriod,
+                  ),
+              ];
+
+              return Column(children: children);
             },
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, s) => Text('Error: $e'),
@@ -535,6 +594,81 @@ class _CutoffPaymentPair {
   final DateTime cutoff;
   final DateTime payment;
   _CutoffPaymentPair(this.cutoff, this.payment);
+}
+
+/// Wraps all billing periods after the current cycle in a single collapsed
+/// card so scheduled installment cuotas don't dominate the recent
+/// transactions panel. Tapping it reveals each future cycle as its own
+/// ExpansionTile (using the same renderer as the regular cycles).
+class _UpcomingInstallmentsCard extends StatelessWidget {
+  final List<String> keys;
+  final Map<String, List<Transaction>> grouped;
+  final Widget Function(String key, {bool initiallyExpanded}) buildPeriodCard;
+  final String Function(String period) formatPeriod;
+
+  const _UpcomingInstallmentsCard({
+    required this.keys,
+    required this.grouped,
+    required this.buildPeriodCard,
+    required this.formatPeriod,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Aggregate totals per currency so the header shows useful at-a-glance
+    // info ("Upcoming installments — 5 cycles · 683.166 $").
+    final Map<String, double> totalsByCurrency = {};
+    for (final k in keys) {
+      final currency = k.split('::').length > 1 ? k.split('::')[1] : 'COP';
+      final txns = grouped[k]!;
+      final total = txns.fold(0.0,
+          (sum, t) => sum + (t.type == 'income' ? -t.amount : t.amount));
+      totalsByCurrency.update(currency, (v) => v + total,
+          ifAbsent: () => total);
+    }
+    final cycleCount = keys.length;
+    final firstPeriod = keys.first.split('::')[0];
+    final lastPeriod = keys.last.split('::')[0];
+    final rangeLabel = firstPeriod == lastPeriod
+        ? formatPeriod(firstPeriod)
+        : '${formatPeriod(lastPeriod)} → ${formatPeriod(firstPeriod)}';
+    final totalsLabel = totalsByCurrency.entries
+        .map((e) => CurrencyFormatter.format(e.value, currency: e.key))
+        .join(' · ');
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: kSpaceLg),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 1,
+      child: ExpansionTile(
+        shape: const Border(),
+        initiallyExpanded: false,
+        leading: Icon(
+          Icons.schedule_outlined,
+          color: Theme.of(context).colorScheme.primary,
+        ),
+        title: Text(
+          'Upcoming installments',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        subtitle: Text(
+          '$cycleCount cycle${cycleCount == 1 ? '' : 's'} · $rangeLabel · $totalsLabel',
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.primary,
+            fontWeight: FontWeight.w500,
+            fontSize: 12,
+          ),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        childrenPadding: const EdgeInsets.symmetric(horizontal: 8),
+        children: [
+          for (final k in keys)
+            buildPeriodCard(k, initiallyExpanded: false),
+        ],
+      ),
+    );
+  }
 }
 
 class _CreditCardRulesBottomSheet extends ConsumerStatefulWidget {

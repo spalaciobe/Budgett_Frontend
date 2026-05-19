@@ -458,6 +458,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                     );
                   }
+                  final rows = _buildRows(filtered);
                   return Card(
                     elevation: 2,
                     shadowColor: Colors.black12,
@@ -467,212 +468,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       padding: EdgeInsets.zero,
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
-                      itemCount: filtered.length,
+                      itemCount: rows.length,
                       separatorBuilder: (_, __) => const Divider(
                           height: 1, indent: 72, endIndent: 16),
                       itemBuilder: (context, index) {
-                        final t = filtered[index];
-                        final isPending = t.status == 'pending';
-                        final isExpense = t.type == 'expense';
-                        final isTransfer = t.type == 'transfer';
-
-                        final typeColor = isPending
-                            ? Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withOpacity(0.4)
-                            : isTransfer
-                                ? Theme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant
-                                : isExpense
-                                    ? Theme.of(context).colorScheme.error
-                                    : Theme.of(context).colorScheme.secondary;
-
-                        final icon = isTransfer
-                            ? Icons.sync_alt
-                            : isExpense
-                                ? Icons.arrow_downward
-                                : Icons.arrow_upward;
-
-                        final details =
-                            _buildDetails(t, accountMap, categoryMap);
-                        final accountIcon = accountIconMap[t.accountId];
-                        final targetAccountIcon = isTransfer &&
-                                t.targetAccountId != null
-                            ? accountIconMap[t.targetAccountId!]
-                            : null;
-                        final sourceAccountName =
-                            accountMap[t.accountId] ?? '';
-                        final targetAccountName = isTransfer &&
-                                t.targetAccountId != null
-                            ? (accountMap[t.targetAccountId!] ?? '')
-                            : '';
-
-                        String? movementLabel;
-                        if (!isTransfer && t.movementType != null) {
-                          movementLabel = switch (t.movementType) {
-                            'fixed' => 'Fixed',
-                            'variable' => 'Variable',
-                            'savings' => 'Savings',
-                            'reimbursement' => 'Reimbursement',
-                            _ => null,
-                          };
+                        final row = rows[index];
+                        if (row is _HomeRowGroup) {
+                          return _InstallmentGroupTile(
+                            children: row.children,
+                            accountMap: accountMap,
+                            accountIconMap: accountIconMap,
+                            categoryMap: categoryMap,
+                          );
                         }
-
-                        return ListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 3),
-                          onTap: () {
-                            // Swap legs are part of a linked pair — editing a
-                            // single leg through the generic dialog would
-                            // corrupt the other leg and mismatch holding
-                            // qty_delta. To change a swap the user should
-                            // delete and re-create it from the investment
-                            // screen.
-                            if (t.type == 'swap') {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Swap transactions can\'t be edited directly — delete and re-create from the investment account.',
-                                  ),
-                                ),
-                              );
-                              return;
-                            }
-                            showDialog(
-                              context: context,
-                              builder: (_) =>
-                                  EditTransactionDialog(transaction: t),
-                            );
-                          },
-                          leading: CircleAvatar(
-                            backgroundColor: typeColor.withOpacity(0.12),
-                            child: Icon(icon, color: typeColor, size: 20),
-                          ),
-                          title: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  t.description,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 14,
-                                    decoration: isPending
-                                        ? TextDecoration.lineThrough
-                                        : null,
-                                    color: isPending ? Colors.grey : null,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    '${isTransfer ? '' : (isExpense ? '−' : '+')}${CurrencyFormatter.format(t.amount, decimalDigits: 0)}',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: typeColor,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  if (t.currency == 'USD')
-                                    Text(
-                                      'USD',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSurface
-                                            .withOpacity(0.5),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (isTransfer && t.targetAccountId != null)
-                                _TransferDetails(
-                                  sourceIcon: accountIcon,
-                                  sourceName: sourceAccountName,
-                                  targetIcon: targetAccountIcon,
-                                  targetName: targetAccountName,
-                                )
-                              else if (details.isNotEmpty)
-                                Row(
-                                  children: [
-                                    if (accountIcon != null) ...[
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(3),
-                                        child: Image.network(
-                                          accountIcon,
-                                          width: 12,
-                                          height: 12,
-                                          fit: BoxFit.cover,
-                                          errorBuilder: (_, __, ___) =>
-                                              const SizedBox.shrink(),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 4),
-                                    ],
-                                    Expanded(
-                                      child: Text(
-                                        details,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .onSurface
-                                              .withOpacity(0.6),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              const SizedBox(height: 1),
-                              Row(
-                                children: [
-                                  Text(
-                                    _formatDate(t.date.toLocal()),
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurface
-                                          .withOpacity(0.45),
-                                    ),
-                                  ),
-                                  if (isPending) ...[
-                                    const SizedBox(width: 6),
-                                    _Badge(
-                                        label: 'Pending',
-                                        color: Colors.orange),
-                                  ],
-                                  if (movementLabel != null) ...[
-                                    const SizedBox(width: 6),
-                                    _Badge(
-                                      label: movementLabel,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .primary,
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ],
-                          ),
-                          isThreeLine: true,
+                        final t = (row as _HomeRowSingle).transaction;
+                        return _TransactionListTile(
+                          transaction: t,
+                          accountMap: accountMap,
+                          accountIconMap: accountIconMap,
+                          categoryMap: categoryMap,
                         );
                       },
                     ),
@@ -694,6 +508,48 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
     );
   }
+
+  /// Folds installment children sharing a [parent_transaction_id] into a
+  /// single [_HomeRowGroup]. If only one cuota survives the active filters,
+  /// it is rendered as a regular [_HomeRowSingle] so the group header
+  /// doesn't look misleading. Group sort date is the earliest cuota date
+  /// (the next due payment) — this keeps the row near today's activity
+  /// instead of pinning it to the latest future cycle.
+  List<_HomeRow> _buildRows(List<Transaction> filtered) {
+    final groups = <String, List<Transaction>>{};
+    final singles = <Transaction>[];
+    for (final t in filtered) {
+      final parentId = t.parentTransactionId;
+      if (parentId != null && t.isInstallmentChild) {
+        groups.putIfAbsent(parentId, () => []).add(t);
+      } else {
+        singles.add(t);
+      }
+    }
+
+    final rows = <_HomeRow>[];
+    for (final t in singles) {
+      rows.add(_HomeRowSingle(t, t.date));
+    }
+    for (final entry in groups.entries) {
+      final children = entry.value;
+      if (children.length <= 1) {
+        for (final c in children) {
+          rows.add(_HomeRowSingle(c, c.date));
+        }
+        continue;
+      }
+      children.sort((a, b) =>
+          (a.installmentNumber ?? 0).compareTo(b.installmentNumber ?? 0));
+      final earliest =
+          children.map((c) => c.date).reduce((a, b) => a.isBefore(b) ? a : b);
+      rows.add(_HomeRowGroup(children, earliest));
+    }
+
+    rows.sort((a, b) => b.sortDate.compareTo(a.sortDate));
+    return rows;
+  }
+
 }
 
 class _SheetHandle extends StatelessWidget {
@@ -796,6 +652,467 @@ class _Badge extends StatelessWidget {
         style: TextStyle(
             fontSize: 10, color: color, fontWeight: FontWeight.w500),
       ),
+    );
+  }
+}
+
+// ─── Row model: a single transaction OR a folded installment group ────────────
+
+sealed class _HomeRow {
+  DateTime get sortDate;
+}
+
+class _HomeRowSingle extends _HomeRow {
+  final Transaction transaction;
+  @override
+  final DateTime sortDate;
+  _HomeRowSingle(this.transaction, this.sortDate);
+}
+
+class _HomeRowGroup extends _HomeRow {
+  final List<Transaction> children; // sorted by installmentNumber asc
+  @override
+  final DateTime sortDate;
+  _HomeRowGroup(this.children, this.sortDate);
+}
+
+// ─── Single-transaction tile (extracted from the old inline itemBuilder) ──────
+
+class _TransactionListTile extends StatelessWidget {
+  final Transaction transaction;
+  final Map<String, String> accountMap;
+  final Map<String, String?> accountIconMap;
+  final Map<String, String> categoryMap;
+
+  const _TransactionListTile({
+    required this.transaction,
+    required this.accountMap,
+    required this.accountIconMap,
+    required this.categoryMap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = transaction;
+    final isPending = t.status == 'pending';
+    final isExpense = t.type == 'expense';
+    final isTransfer = t.type == 'transfer';
+
+    final typeColor = isPending
+        ? Theme.of(context).colorScheme.onSurface.withOpacity(0.4)
+        : isTransfer
+            ? Theme.of(context).colorScheme.onSurfaceVariant
+            : isExpense
+                ? Theme.of(context).colorScheme.error
+                : Theme.of(context).colorScheme.secondary;
+
+    final icon = isTransfer
+        ? Icons.sync_alt
+        : isExpense
+            ? Icons.arrow_downward
+            : Icons.arrow_upward;
+
+    final details = _buildDetails(t, accountMap, categoryMap);
+    final accountIcon = accountIconMap[t.accountId];
+    final targetAccountIcon = isTransfer && t.targetAccountId != null
+        ? accountIconMap[t.targetAccountId!]
+        : null;
+    final sourceAccountName = accountMap[t.accountId] ?? '';
+    final targetAccountName = isTransfer && t.targetAccountId != null
+        ? (accountMap[t.targetAccountId!] ?? '')
+        : '';
+
+    String? movementLabel;
+    if (!isTransfer && t.movementType != null) {
+      movementLabel = switch (t.movementType) {
+        'fixed' => 'Fixed',
+        'variable' => 'Variable',
+        'savings' => 'Savings',
+        'reimbursement' => 'Reimbursement',
+        _ => null,
+      };
+    }
+
+    return ListTile(
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+      onTap: () {
+        if (t.type == 'swap') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Swap transactions can\'t be edited directly — delete and re-create from the investment account.',
+              ),
+            ),
+          );
+          return;
+        }
+        showDialog(
+          context: context,
+          builder: (_) => EditTransactionDialog(transaction: t),
+        );
+      },
+      leading: CircleAvatar(
+        backgroundColor: typeColor.withOpacity(0.12),
+        child: Icon(icon, color: typeColor, size: 20),
+      ),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              t.description,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+                decoration:
+                    isPending ? TextDecoration.lineThrough : null,
+                color: isPending ? Colors.grey : null,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '${isTransfer ? '' : (isExpense ? '−' : '+')}${CurrencyFormatter.format(t.amount, decimalDigits: 0)}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: typeColor,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+              if (t.currency == 'USD')
+                Text(
+                  'USD',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withOpacity(0.5),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (isTransfer && t.targetAccountId != null)
+            _TransferDetails(
+              sourceIcon: accountIcon,
+              sourceName: sourceAccountName,
+              targetIcon: targetAccountIcon,
+              targetName: targetAccountName,
+            )
+          else if (details.isNotEmpty)
+            Row(
+              children: [
+                if (accountIcon != null) ...[
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(3),
+                    child: Image.network(
+                      accountIcon,
+                      width: 12,
+                      height: 12,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) =>
+                          const SizedBox.shrink(),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                ],
+                Expanded(
+                  child: Text(
+                    details,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withOpacity(0.6),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          const SizedBox(height: 1),
+          Row(
+            children: [
+              Text(
+                _formatDate(t.date.toLocal()),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withOpacity(0.45),
+                ),
+              ),
+              if (isPending) ...[
+                const SizedBox(width: 6),
+                _Badge(label: 'Pending', color: Colors.orange),
+              ],
+              if (movementLabel != null) ...[
+                const SizedBox(width: 6),
+                _Badge(
+                  label: movementLabel,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+      isThreeLine: true,
+    );
+  }
+}
+
+// ─── Folded installment group tile ────────────────────────────────────────────
+//
+// Collapsed header summarises the whole purchase (base description, account,
+// category, total cuotas, next-due date, per-cuota amount). Expanded body
+// inlines the same TransactionListTile for each cuota so editing/status
+// behaviour is identical to the ungrouped path.
+
+class _InstallmentGroupTile extends StatefulWidget {
+  final List<Transaction> children; // sorted by installmentNumber asc
+  final Map<String, String> accountMap;
+  final Map<String, String?> accountIconMap;
+  final Map<String, String> categoryMap;
+
+  const _InstallmentGroupTile({
+    required this.children,
+    required this.accountMap,
+    required this.accountIconMap,
+    required this.categoryMap,
+  });
+
+  @override
+  State<_InstallmentGroupTile> createState() =>
+      _InstallmentGroupTileState();
+}
+
+class _InstallmentGroupTileState extends State<_InstallmentGroupTile> {
+  bool _expanded = false;
+
+  static final _suffixRegex = RegExp(r'\s*-\s*Inst\.\s*\d+/\d+\s*$');
+
+  String get _baseDescription {
+    final first = widget.children.first.description;
+    return first.replaceAll(_suffixRegex, '');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final sample = widget.children.first;
+    final numCuotas = sample.numCuotas ?? widget.children.length;
+    final accountName = widget.accountMap[sample.accountId] ?? '';
+    final categoryName = sample.subCategoryId != null
+        ? widget.categoryMap[sample.subCategoryId!]
+        : (sample.categoryId != null
+            ? widget.categoryMap[sample.categoryId!]
+            : null);
+    final accountIcon = widget.accountIconMap[sample.accountId];
+    final cleared = widget.children
+        .where((c) => c.status == 'paid' || c.status == 'cleared')
+        .length;
+    final pending = widget.children
+        .where((c) => c.status == 'pending')
+        .toList();
+    final nextDue = pending.isNotEmpty
+        ? pending.map((c) => c.date).reduce((a, b) => a.isBefore(b) ? a : b)
+        : widget.children
+            .map((c) => c.date)
+            .reduce((a, b) => a.isBefore(b) ? a : b);
+    final perCuota = sample.amount;
+    final total = widget.children.fold<double>(0, (s, c) => s + c.amount);
+    final isUsd = sample.currency == 'USD';
+    final color = theme.colorScheme.error;
+
+    final detailLine = [
+      accountName,
+      if (categoryName != null && categoryName.isNotEmpty) categoryName,
+    ].join('  ·  ');
+
+    return Column(
+      children: [
+        ListTile(
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+          onTap: () => setState(() => _expanded = !_expanded),
+          leading: Stack(
+            alignment: Alignment.bottomRight,
+            clipBehavior: Clip.none,
+            children: [
+              CircleAvatar(
+                backgroundColor: color.withOpacity(0.12),
+                child: Icon(Icons.layers_outlined, color: color, size: 20),
+              ),
+              Positioned(
+                right: -4,
+                bottom: -2,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: color.withOpacity(0.4),
+                      width: 0.8,
+                    ),
+                  ),
+                  child: Text(
+                    '$cleared/$numCuotas',
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      color: color,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  _baseDescription,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w600, fontSize: 14),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '−${CurrencyFormatter.format(perCuota, decimalDigits: 0)}',
+                    style: TextStyle(
+                      color: color,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  Text(
+                    '× $numCuotas · ${CurrencyFormatter.format(total, decimalDigits: 0)}',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: theme.colorScheme.onSurface.withOpacity(0.5),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (detailLine.isNotEmpty)
+                Row(
+                  children: [
+                    if (accountIcon != null) ...[
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(3),
+                        child: Image.network(
+                          accountIcon,
+                          width: 12,
+                          height: 12,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) =>
+                              const SizedBox.shrink(),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                    Expanded(
+                      child: Text(
+                        detailLine,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: theme.colorScheme.onSurface.withOpacity(0.6),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              const SizedBox(height: 1),
+              Row(
+                children: [
+                  Icon(
+                    Icons.event_outlined,
+                    size: 11,
+                    color: theme.colorScheme.onSurface.withOpacity(0.45),
+                  ),
+                  const SizedBox(width: 3),
+                  Text(
+                    pending.isNotEmpty
+                        ? 'Next ${_formatDate(nextDue.toLocal())}'
+                        : 'Paid · ${_formatDate(nextDue.toLocal())}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: theme.colorScheme.onSurface.withOpacity(0.45),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  _Badge(
+                    label: 'Installments',
+                    color: theme.colorScheme.primary,
+                  ),
+                  if (isUsd) ...[
+                    const SizedBox(width: 6),
+                    _Badge(label: 'USD', color: Colors.blue.shade400),
+                  ],
+                  const Spacer(),
+                  Icon(
+                    _expanded ? Icons.expand_less : Icons.expand_more,
+                    size: 16,
+                    color: theme.colorScheme.onSurface.withOpacity(0.5),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          isThreeLine: true,
+        ),
+        if (_expanded)
+          Container(
+            color: theme.colorScheme.onSurface.withOpacity(0.025),
+            padding: const EdgeInsets.only(left: 20),
+            child: Column(
+              children: [
+                for (final c in widget.children) ...[
+                  _TransactionListTile(
+                    transaction: c,
+                    accountMap: widget.accountMap,
+                    accountIconMap: widget.accountIconMap,
+                    categoryMap: widget.categoryMap,
+                  ),
+                  if (c != widget.children.last)
+                    const Divider(height: 1, indent: 72, endIndent: 16),
+                ],
+              ],
+            ),
+          ),
+      ],
     );
   }
 }
