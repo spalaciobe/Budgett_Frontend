@@ -75,54 +75,113 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
           borderRadius: BorderRadius.circular(12),
           child: Padding(
             padding: kCardPadding,
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _CategoryIconButton(
-                  color: widget.color,
-                  iconName: widget.iconName,
-                  onTap: widget.onEditCategory,
+                Row(
+                  children: [
+                    _CategoryIconButton(
+                      color: widget.color,
+                      iconName: widget.iconName,
+                      onTap: widget.onEditCategory,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.categoryName,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            emptyLabel,
+                            style: TextStyle(
+                                fontSize: 12, color: Colors.grey[400]),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (hasActivity)
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            activityLabel,
+                            style: TextStyle(
+                                fontSize: 11, color: Colors.grey[400]),
+                          ),
+                          Text(
+                            CurrencyFormatter.format(widget.spentAmount,
+                                decimalDigits: 2),
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: activityColor,
+                            ),
+                          ),
+                        ],
+                      )
+                    else
+                      Icon(Icons.add_circle_outline, color: Colors.grey[400]),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.categoryName,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        emptyLabel,
-                        style: TextStyle(fontSize: 12, color: Colors.grey[400]),
-                      ),
-                    ],
+                if (hasActivity) ...[
+                  kGapMd,
+                  // Full-width bar in activity color so it's visually
+                  // consistent with the with-budget card. Saturated solid
+                  // colour (no budget reference to scale against).
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: 1.0,
+                      backgroundColor: Colors.grey.shade200,
+                      color: activityColor,
+                      minHeight: 6,
+                    ),
                   ),
-                ),
-                if (hasActivity)
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        activityLabel,
-                        style: TextStyle(
-                            fontSize: 11, color: Colors.grey[400]),
-                      ),
-                      Text(
-                        CurrencyFormatter.format(widget.spentAmount,
-                            decimalDigits: 2),
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
+                  kGapXs,
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: activityColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          widget.isIncome
+                              ? Icons.trending_up
+                              : widget.isSavings
+                                  ? Icons.savings_outlined
+                                  : Icons.warning_amber_rounded,
+                          size: 12,
                           color: activityColor,
                         ),
-                      ),
-                    ],
-                  )
-                else
-                  Icon(Icons.add_circle_outline, color: Colors.grey[400]),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            widget.isIncome
+                                ? '${CurrencyFormatter.format(widget.spentAmount, decimalDigits: 2)} earned — set a target to track progress'
+                                : widget.isSavings
+                                    ? '${CurrencyFormatter.format(widget.spentAmount, decimalDigits: 2)} contributed — set a monthly target to track progress'
+                                    : 'Spent without a budget — tap to set one',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: activityColor,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
