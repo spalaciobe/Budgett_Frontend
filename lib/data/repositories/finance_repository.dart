@@ -305,6 +305,7 @@ class FinanceRepository {
     required DateTime date,
     String? notes,
     List<String> closedInstallmentIds = const [],
+    String? billingPeriod,
   }) async {
     final userId = _client.auth.currentUser!.id;
     final dateStr =
@@ -334,6 +335,10 @@ class FinanceRepository {
       if (notes != null && notes.isNotEmpty) 'notes': notes,
       if (crossCurrency) 'target_currency': debtCurrency,
       if (crossCurrency) 'fx_rate': debitAmount / settleAmount,
+      // When the user opted for the Statement preset, tag the payment with
+      // the cycle it covers so the CC details view can render it under
+      // that billing period instead of the generic "Payments" bucket.
+      if (billingPeriod != null) 'periodo_facturacion': billingPeriod,
     };
 
     await _client.from('transactions').insert(payload);

@@ -342,6 +342,13 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
     setState(() => _saving = true);
     try {
       final repo = ref.read(financeRepositoryProvider);
+      // Only tag the payment with a billing cycle when the user explicitly
+      // selected the Statement preset — other presets (Minimum, Current
+      // balance, Custom) may span multiple cycles or be open-ended, so we
+      // leave billing_period null and they stay in the "Payments" bucket.
+      final billingPeriod = _preset == _PaymentPreset.statementMonth
+          ? _selectedBillingPeriod
+          : null;
       await repo.payCreditCard(
         sourceAccountId: _sourceAccountId!,
         cardAccountId: widget.card.id,
@@ -354,6 +361,7 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
             ? null
             : _notesController.text.trim(),
         closedInstallmentIds: _closedInstallments.toList(),
+        billingPeriod: billingPeriod,
       );
 
       ref.invalidate(accountsProvider);

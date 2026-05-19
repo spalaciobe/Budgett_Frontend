@@ -163,7 +163,10 @@ class CreditCardDetailsBody extends ConsumerWidget {
               for (var t in transactions) {
                 final String period;
                 if (t.type == 'transfer') {
-                  period = 'Payments';
+                  // Payments tagged with a billing cycle render inside that
+                  // cycle (e.g. the user paid via the "Statement" preset);
+                  // untagged payments fall back to the dedicated bucket.
+                  period = t.billingPeriod ?? 'Payments';
                 } else {
                   period = t.billingPeriod ?? 'Unassigned';
                 }
@@ -202,8 +205,32 @@ class CreditCardDetailsBody extends ConsumerWidget {
                 final periodTransactions = grouped[key]!;
                 // Refunds and other income rows on a credit card offset what
                 // was spent in the cycle, so subtract them instead of adding.
-                final total = periodTransactions.fold(0.0,
-                    (sum, t) => sum + (t.type == 'income' ? -t.amount : t.amount));
+                // Payments (transfers) are tracked separately so the cycle
+                // header can show "Charged X · Paid Y".
+                double chargesTotal = 0;
+                double paymentsTotal = 0;
+                for (final t in periodTransactions) {
+                  if (t.type == 'transfer') {
+                    paymentsTotal += t.amount;
+                  } else if (t.type == 'income') {
+                    chargesTotal -= t.amount;
+                  } else {
+                    chargesTotal += t.amount;
+                  }
+                }
+                final hasPayments = paymentsTotal > 0;
+                final isPaymentsBucket = period == 'Payments';
+                final String subtitleText;
+                if (isPaymentsBucket) {
+                  subtitleText =
+                      'Total: ${CurrencyFormatter.format(paymentsTotal, currency: currency)}';
+                } else if (hasPayments) {
+                  subtitleText =
+                      'Charged: ${CurrencyFormatter.format(chargesTotal, currency: currency)} · Paid: ${CurrencyFormatter.format(paymentsTotal, currency: currency)}';
+                } else {
+                  subtitleText =
+                      'Total: ${CurrencyFormatter.format(chargesTotal, currency: currency)}';
+                }
                 return Card(
                   margin: const EdgeInsets.only(bottom: kSpaceLg),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -241,7 +268,7 @@ class CreditCardDetailsBody extends ConsumerWidget {
                       ],
                     ),
                     subtitle: Text(
-                      'Total: ${CurrencyFormatter.format(total, currency: currency)}',
+                      subtitleText,
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.primary,
                         fontWeight: FontWeight.w600,
