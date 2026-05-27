@@ -87,6 +87,20 @@ class CurrencyFormatter {
   static String formatApprox(double amount, {required String currency}) {
     return '≈ ${format(amount, currency: currency)}';
   }
+
+  static String compact(double amount, {String currency = 'COP'}) {
+    final abs = amount.abs();
+    if (abs >= 1000000000) {
+      return '${prefixFor(currency)}${(amount / 1000000000).toStringAsFixed(1)}B';
+    }
+    if (abs >= 1000000) {
+      return '${prefixFor(currency)}${(amount / 1000000).toStringAsFixed(1)}M';
+    }
+    if (abs >= 1000) {
+      return '${prefixFor(currency)}${(amount / 1000).toStringAsFixed(0)}K';
+    }
+    return format(amount, currency: currency, decimalDigits: 0);
+  }
 }
 
 class CurrencyInputFormatter extends TextInputFormatter {

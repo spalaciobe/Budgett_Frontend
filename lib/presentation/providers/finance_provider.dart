@@ -10,6 +10,8 @@ import 'package:budgett_frontend/data/models/goal_model.dart';
 import 'package:budgett_frontend/data/models/recurring_transaction_model.dart';
 import 'package:budgett_frontend/data/models/expense_group_model.dart';
 import 'package:budgett_frontend/data/models/investment_holding_model.dart';
+import 'package:budgett_frontend/data/models/investment_price_history_model.dart';
+import 'package:budgett_frontend/data/models/investment_purchase_event_model.dart';
 
 final financeRepositoryProvider = Provider<FinanceRepository>((ref) {
   return FinanceRepository(Supabase.instance.client);
@@ -116,6 +118,19 @@ final accountHoldingsProvider =
         (ref, accountId) async {
   final repository = ref.watch(financeRepositoryProvider);
   return repository.getHoldings(accountId);
+});
+
+final investmentPriceHistoryProvider = FutureProvider.family
+    .autoDispose<List<InvestmentPriceHistory>, String>((ref, accountId) async {
+  final repository = ref.watch(financeRepositoryProvider);
+  return repository.getInvestmentPriceHistory(accountId);
+});
+
+final investmentPurchaseEventsProvider = FutureProvider.family
+    .autoDispose<List<InvestmentPurchaseEvent>, String>((ref, accountId) async {
+  final repository = ref.watch(financeRepositoryProvider);
+  final holdings = await ref.watch(accountHoldingsProvider(accountId).future);
+  return repository.getInvestmentPurchaseEvents(accountId, holdings);
 });
 
 /// Sum of cash transfers INTO this account — the "funded" headline shown on
