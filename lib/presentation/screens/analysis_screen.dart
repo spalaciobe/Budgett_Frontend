@@ -7,6 +7,7 @@ import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/presentation/providers/portfolio_provider.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:budgett_frontend/presentation/widgets/portfolio_donut_chart.dart';
+import 'package:budgett_frontend/presentation/widgets/portfolio_value_chart.dart';
 
 class AnalysisScreen extends ConsumerStatefulWidget {
   const AnalysisScreen({super.key});
@@ -465,6 +466,51 @@ class _PortfolioContent extends StatelessWidget {
               ],
             ),
           ),
+        ),
+        const SizedBox(height: 12),
+
+        // Total value over time
+        Consumer(
+          builder: (context, ref, _) {
+            final historyAsync =
+                ref.watch(consolidatedPortfolioHistoryProvider);
+            return historyAsync.when(
+              loading: () => const SizedBox(
+                height: 260,
+                child: Center(child: CircularProgressIndicator()),
+              ),
+              error: (_, __) => const SizedBox.shrink(),
+              data: (h) {
+                if (h.isEmpty) return const SizedBox.shrink();
+                return Card(
+                  elevation: 1,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.show_chart, size: 18),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Value over time',
+                              style: theme.textTheme.titleSmall
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        PortfolioValueChart(points: h.points),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            );
+          },
         ),
         const SizedBox(height: 12),
 

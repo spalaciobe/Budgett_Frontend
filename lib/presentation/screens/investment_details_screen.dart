@@ -14,6 +14,7 @@ import '../../data/models/fx_rate_model.dart';
 import '../../data/models/transaction_model.dart';
 import '../providers/finance_provider.dart';
 import '../providers/fx_rate_provider.dart';
+import '../providers/portfolio_provider.dart';
 import '../utils/currency_formatter.dart';
 import '../widgets/edit_account_dialog.dart';
 import '../widgets/edit_holding_dialog.dart';
@@ -22,6 +23,7 @@ import '../widgets/update_prices_dialog.dart';
 import '../widgets/cdt_collect_dialog.dart';
 import '../widgets/investment_holding_card.dart';
 import '../widgets/portfolio_donut_chart.dart';
+import '../widgets/portfolio_value_chart.dart';
 import '../widgets/swap_holding_dialog.dart';
 import '../widgets/transaction_tile.dart';
 
@@ -942,6 +944,8 @@ class _InvestmentHistoryChart extends ConsumerStatefulWidget {
 
 class _InvestmentHistoryChartState
     extends ConsumerState<_InvestmentHistoryChart> {
+  static const _allAssetsId = '__all__';
+
   String? _selectedHoldingId;
   _HistoryMetric _metric = _HistoryMetric.value;
 
@@ -964,15 +968,21 @@ class _InvestmentHistoryChartState
       );
     }
 
-    final selectedExists =
-        chartableHoldings.any((h) => h.id == _selectedHoldingId);
-    final selectedHoldingId =
-        selectedExists ? _selectedHoldingId! : chartableHoldings.first.id;
+    final fxRate = ref.watch(fxRateProvider).valueOrNull;
+    final validIds = {
+      _allAssetsId,
+      for (final h in chartableHoldings) h.id,
+    };
+    final selectedHoldingId = validIds.contains(_selectedHoldingId)
+        ? _selectedHoldingId!
+        : chartableHoldings.first.id;
     if (_selectedHoldingId != selectedHoldingId) {
       _selectedHoldingId = selectedHoldingId;
     }
-    final selectedHolding =
-        chartableHoldings.firstWhere((h) => h.id == selectedHoldingId);
+    final isAll = selectedHoldingId == _allAssetsId;
+    final selectedHolding = isAll
+        ? null
+        : chartableHoldings.firstWhere((h) => h.id == selectedHoldingId);
 
     return Card(
       elevation: 1,
@@ -991,43 +1001,56 @@ class _InvestmentHistoryChartState
                   width: context.formFactor == FormFactor.mobile ? 220 : 280,
                   child: DropdownButtonFormField<String>(
                     value: selectedHoldingId,
+                    isExpanded: true,
                     decoration: const InputDecoration(
                       labelText: 'Asset',
                       isDense: true,
                     ),
-                    items: chartableHoldings
-                        .map((h) => DropdownMenuItem(
-                              value: h.id,
-                              child: Text(h.displayName),
-                            ))
-                        .toList(),
+                    items: [
+                      const DropdownMenuItem(
+                        value: _allAssetsId,
+                        child: Text(
+                          'All assets (total)',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      ...chartableHoldings.map((h) => DropdownMenuItem(
+                            value: h.id,
+                            child: Text(
+                              h.displayName,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          )),
+                    ],
                     onChanged: (value) {
                       if (value == null) return;
                       setState(() => _selectedHoldingId = value);
                     },
                   ),
                 ),
-                SegmentedButton<_HistoryMetric>(
-                  style: SegmentedButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    textStyle: const TextStyle(fontSize: 12),
+                if (!isAll)
+                  SegmentedButton<_HistoryMetric>(
+                    style: SegmentedButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      textStyle: const TextStyle(fontSize: 12),
+                    ),
+                    segments: const [
+                      ButtonSegment(
+                        value: _HistoryMetric.value,
+                        label: Text('Value'),
+                        icon: Icon(Icons.account_balance_wallet_outlined,
+                            size: 16),
+                      ),
+                      ButtonSegment(
+                        value: _HistoryMetric.price,
+                        label: Text('Price'),
+                        icon: Icon(Icons.sell_outlined, size: 16),
+                      ),
+                    ],
+                    selected: {_metric},
+                    onSelectionChanged: (s) =>
+                        setState(() => _metric = s.first),
                   ),
-                  segments: const [
-                    ButtonSegment(
-                      value: _HistoryMetric.value,
-                      label: Text('Value'),
-                      icon:
-                          Icon(Icons.account_balance_wallet_outlined, size: 16),
-                    ),
-                    ButtonSegment(
-                      value: _HistoryMetric.price,
-                      label: Text('Price'),
-                      icon: Icon(Icons.sell_outlined, size: 16),
-                    ),
-                  ],
-                  selected: {_metric},
-                  onSelectionChanged: (s) => setState(() => _metric = s.first),
-                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -1038,6 +1061,45 @@ class _InvestmentHistoryChartState
               ),
               error: (e, _) => Text('Error loading history: $e'),
               data: (history) {
+                if (isAll) {
+                  final currencies =
+                      chartableHoldings.map((h) => h.currency).toSet();
+                  final totalCurrency =
+                      currencies.length == 1 ? currencies.first : 'COP';
+                  double toTotal(double value, String currency) {
+                    if (currency == totalCurrency) return value;
+                    if (totalCurrency == 'COP' &&
+                        currency == 'USD' &&
+                        fxRate != null) {
+                      return value * fxRate.rate;
+                    }
+                    return value;
+                  }
+
+                  final holdingIds =
+                      chartableHoldings.map((h) => h.id).toSet();
+                  final series = buildTotalValueSeries(
+                    history
+                        .where((h) => holdingIds.contains(h.holdingId))
+                        .toList(),
+                    toTotal,
+                  );
+                  if (series.isEmpty) {
+                    return const SizedBox(
+                      height: 180,
+                      child: Center(
+                        child: Text(
+                          'No daily history yet. It will appear after the next market fetch.',
+                        ),
+                      ),
+                    );
+                  }
+                  return PortfolioValueChart(
+                    points: series,
+                    currency: totalCurrency,
+                  );
+                }
+
                 final rows = history
                     .where((h) => h.holdingId == selectedHoldingId)
                     .toList()
@@ -1058,13 +1120,13 @@ class _InvestmentHistoryChartState
                     rows: rows,
                     events: const [],
                     metric: _metric,
-                    holding: selectedHolding,
+                    holding: selectedHolding!,
                   ),
                   error: (_, __) => _HistoryLineChart(
                     rows: rows,
                     events: const [],
                     metric: _metric,
-                    holding: selectedHolding,
+                    holding: selectedHolding!,
                   ),
                   data: (events) => _HistoryLineChart(
                     rows: rows,
@@ -1072,22 +1134,25 @@ class _InvestmentHistoryChartState
                         .where((e) => e.holdingId == selectedHoldingId)
                         .toList(),
                     metric: _metric,
-                    holding: selectedHolding,
+                    holding: selectedHolding!,
                   ),
                 );
               },
             ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(Icons.circle, size: 8, color: theme.colorScheme.tertiary),
-                const SizedBox(width: 6),
-                Text(
-                  'Vertical marks indicate buy dates.',
-                  style: theme.textTheme.bodySmall,
-                ),
-              ],
-            ),
+            if (!isAll) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(Icons.circle,
+                      size: 8, color: theme.colorScheme.tertiary),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Vertical marks indicate buy dates.',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),

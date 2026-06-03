@@ -1,5 +1,8 @@
+import 'dart:collection';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/models/investment_price_history_model.dart';
 import 'finance_provider.dart';
 import 'fx_rate_provider.dart';
 
@@ -148,6 +151,102 @@ final consolidatedPortfolioProvider =
     totalCostBasisCop: totalCb,
     hasFxConversion: anyFxApplied,
   );
+});
+
+/// A single point in a total-value-over-time series.
+class PortfolioValuePoint {
+  final DateTime date;
+  final double value;
+  const PortfolioValuePoint({required this.date, required this.value});
+}
+
+/// Builds a daily total-value series from per-holding price history.
+///
+/// Each holding's value is forward-filled across the union of all dates so the
+/// total stays continuous on days where only some holdings have a data point
+/// (crypto trades on weekends, stocks/FICs don't). [convert] maps a holding's
+/// `(value, currency)` into the target/base currency.
+List<PortfolioValuePoint> buildTotalValueSeries(
+  List<InvestmentPriceHistory> rows,
+  double Function(double value, String currency) convert,
+) {
+  if (rows.isEmpty) return const [];
+
+  final byHolding = <String, SplayTreeMap<DateTime, double>>{};
+  final allDates = SplayTreeSet<DateTime>();
+  for (final r in rows) {
+    final d = DateTime(r.marketDate.year, r.marketDate.month, r.marketDate.day);
+    allDates.add(d);
+    final series = byHolding.putIfAbsent(r.holdingId, () => SplayTreeMap());
+    // Last write wins if several sources exist for the same day.
+    series[d] = convert(r.positionValue, r.currency);
+  }
+
+  final result = <PortfolioValuePoint>[];
+  for (final date in allDates) {
+    final next = date.add(const Duration(days: 1));
+    var sum = 0.0;
+    for (final series in byHolding.values) {
+      final key = series.lastKeyBefore(next); // greatest key <= date
+      if (key != null) sum += series[key]!;
+    }
+    result.add(PortfolioValuePoint(date: date, value: sum));
+  }
+  return result;
+}
+
+/// Total value over time for every multi-holding investment account, in COP.
+class ConsolidatedPortfolioHistory {
+  final List<PortfolioValuePoint> points;
+  final bool hasFxConversion;
+
+  const ConsolidatedPortfolioHistory({
+    required this.points,
+    required this.hasFxConversion,
+  });
+
+  bool get isEmpty => points.isEmpty;
+}
+
+/// All `investment_price_history` rows for the current user (RLS-scoped),
+/// across every account, for the last year.
+final allInvestmentPriceHistoryProvider =
+    FutureProvider.autoDispose<List<InvestmentPriceHistory>>((ref) async {
+  final repository = ref.watch(financeRepositoryProvider);
+  return repository.getAllInvestmentPriceHistory();
+});
+
+/// Daily consolidated portfolio value (COP) across all multi-holding accounts.
+/// USD holdings are converted at the current TRM (same rule as
+/// [consolidatedPortfolioProvider]).
+final consolidatedPortfolioHistoryProvider =
+    FutureProvider.autoDispose<ConsolidatedPortfolioHistory>((ref) async {
+  final accounts = await ref.watch(accountsProvider.future);
+  final fxRate = await ref.watch(fxRateProvider.future);
+  final history = await ref.watch(allInvestmentPriceHistoryProvider.future);
+
+  final accountIds = accounts
+      .where((a) =>
+          a.type == 'investment' &&
+          (a.investmentDetails?.investmentType.isMultiHolding ?? false))
+      .map((a) => a.id)
+      .toSet();
+
+  final rows =
+      history.where((r) => accountIds.contains(r.accountId)).toList();
+
+  var anyFx = false;
+  double convert(double value, String currency) {
+    if (currency == 'COP') return value;
+    if (currency == 'USD' && fxRate != null) {
+      anyFx = true;
+      return value * fxRate.rate;
+    }
+    return value;
+  }
+
+  final points = buildTotalValueSeries(rows, convert);
+  return ConsolidatedPortfolioHistory(points: points, hasFxConversion: anyFx);
 });
 
 /// Convenience: is there any non-high-yield investment account at all?

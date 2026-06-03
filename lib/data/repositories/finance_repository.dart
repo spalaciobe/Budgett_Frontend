@@ -1000,7 +1000,7 @@ class FinanceRepository {
 
   Future<List<InvestmentPriceHistory>> getInvestmentPriceHistory(
     String accountId, {
-    int days = 90,
+    int days = 365,
   }) async {
     final since = DateTime.now()
         .subtract(Duration(days: days))
@@ -1011,6 +1011,27 @@ class FinanceRepository {
         .from('investment_price_history')
         .select()
         .eq('account_id', accountId)
+        .gte('market_date', since)
+        .order('market_date')
+        .order('symbol');
+    return data
+        .map((json) => InvestmentPriceHistory.fromJson(json))
+        .toList();
+  }
+
+  /// Price history across *all* of the user's investment accounts (RLS scopes
+  /// to the current user). Used for the consolidated portfolio value chart.
+  Future<List<InvestmentPriceHistory>> getAllInvestmentPriceHistory({
+    int days = 365,
+  }) async {
+    final since = DateTime.now()
+        .subtract(Duration(days: days))
+        .toIso8601String()
+        .split('T')
+        .first;
+    final List<dynamic> data = await _client
+        .from('investment_price_history')
+        .select()
         .gte('market_date', since)
         .order('market_date')
         .order('symbol');
