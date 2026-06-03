@@ -12,16 +12,16 @@ class PortfolioValueChart extends StatelessWidget {
   final String currency;
   final double height;
 
-  /// Dates to mark with a vertical line + chip (e.g. buy dates across every
-  /// position). Mapped to the nearest point on the series.
-  final List<DateTime> eventDates;
+  /// Buy-date markers (date + what was bought) shown as vertical lines + chips.
+  /// Mapped to the nearest point on the series.
+  final List<PortfolioValueMarker> markers;
 
   const PortfolioValueChart({
     super.key,
     required this.points,
     this.currency = 'COP',
     this.height = 260,
-    this.eventDates = const [],
+    this.markers = const [],
   });
 
   /// Index of the first point on/after [date], clamped to the series bounds.
@@ -56,9 +56,9 @@ class PortfolioValueChart extends StatelessWidget {
       for (var i = 0; i < points.length; i++) FlSpot(i.toDouble(), values[i]),
     ];
 
-    // De-duplicate marker dates and map them to series indices.
+    // One vertical line per unique buy day; chips keep per-purchase detail.
     final markerDays = <DateTime>{
-      for (final d in eventDates) DateTime(d.year, d.month, d.day),
+      for (final m in markers) DateTime(m.date.year, m.date.month, m.date.day),
     }.toList()
       ..sort();
     final verticalLines = <VerticalLine>[
@@ -71,6 +71,8 @@ class PortfolioValueChart extends StatelessWidget {
             dashArray: const [5, 4],
           ),
     ];
+    final sortedMarkers = [...markers]
+      ..sort((a, b) => a.date.compareTo(b.date));
 
     final chartBox = SizedBox(
       height: height,
@@ -167,7 +169,7 @@ class PortfolioValueChart extends StatelessWidget {
       ),
     );
 
-    if (markerDays.isEmpty) return chartBox;
+    if (sortedMarkers.isEmpty) return chartBox;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -177,13 +179,15 @@ class PortfolioValueChart extends StatelessWidget {
         Wrap(
           spacing: 8,
           runSpacing: 6,
-          children: markerDays.map((d) {
+          children: sortedMarkers.map((m) {
+            final d = m.date;
+            final dateStr =
+                '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+            final text = m.label.isEmpty ? dateStr : '${m.label} · $dateStr';
             return Chip(
               visualDensity: VisualDensity.compact,
               avatar: const Icon(Icons.add_shopping_cart, size: 16),
-              label: Text(
-                '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}',
-              ),
+              label: Text(text),
             );
           }).toList(),
         ),

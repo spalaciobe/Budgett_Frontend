@@ -160,6 +160,13 @@ class PortfolioValuePoint {
   const PortfolioValuePoint({required this.date, required this.value});
 }
 
+/// A buy-date marker for a value chart: the date and what was bought.
+class PortfolioValueMarker {
+  final DateTime date;
+  final String label;
+  const PortfolioValueMarker({required this.date, required this.label});
+}
+
 /// Builds a daily total-value series from per-holding price history.
 ///
 /// Each holding's value is forward-filled across the union of all dates so the
@@ -247,6 +254,31 @@ final consolidatedPortfolioHistoryProvider =
 
   final points = buildTotalValueSeries(rows, convert);
   return ConsolidatedPortfolioHistory(points: points, hasFxConversion: anyFx);
+});
+
+/// Buy-date markers (date + symbol) across every multi-holding investment
+/// account, for the consolidated value chart.
+final consolidatedPortfolioMarkersProvider =
+    FutureProvider.autoDispose<List<PortfolioValueMarker>>((ref) async {
+  final accounts = await ref.watch(accountsProvider.future);
+  final investmentAccounts = accounts.where((a) =>
+      a.type == 'investment' &&
+      (a.investmentDetails?.investmentType.isMultiHolding ?? false));
+
+  final markers = <PortfolioValueMarker>[];
+  for (final acc in investmentAccounts) {
+    final holdings = await ref.watch(accountHoldingsProvider(acc.id).future);
+    final events =
+        await ref.watch(investmentPurchaseEventsProvider(acc.id).future);
+    final labelById = {for (final h in holdings) h.id: h.displayName};
+    for (final e in events) {
+      markers.add(PortfolioValueMarker(
+        date: e.date,
+        label: labelById[e.holdingId] ?? '',
+      ));
+    }
+  }
+  return markers;
 });
 
 /// Convenience: is there any non-high-yield investment account at all?

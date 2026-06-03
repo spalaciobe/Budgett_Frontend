@@ -482,6 +482,9 @@ class _PortfolioContent extends StatelessWidget {
               error: (_, __) => const SizedBox.shrink(),
               data: (h) {
                 if (h.isEmpty) return const SizedBox.shrink();
+                final markers =
+                    ref.watch(consolidatedPortfolioMarkersProvider).valueOrNull ??
+                        const [];
                 return Card(
                   elevation: 1,
                   shape: RoundedRectangleBorder(
@@ -503,7 +506,7 @@ class _PortfolioContent extends StatelessWidget {
                           ],
                         ),
                         const SizedBox(height: 12),
-                        PortfolioValueChart(points: h.points),
+                        PortfolioValueChart(points: h.points, markers: markers),
                       ],
                     ),
                   ),

@@ -1081,6 +1081,9 @@ class _InvestmentHistoryChartState
 
                   final holdingIds =
                       chartableHoldings.map((h) => h.id).toSet();
+                  final nameById = {
+                    for (final h in chartableHoldings) h.id: h.displayName,
+                  };
                   final series = buildTotalValueSeries(
                     history
                         .where((h) => holdingIds.contains(h.holdingId))
@@ -1109,10 +1112,14 @@ class _InvestmentHistoryChartState
                     data: (events) => PortfolioValueChart(
                       points: series,
                       currency: totalCurrency,
-                      eventDates: events
-                          .where((e) => holdingIds.contains(e.holdingId))
-                          .map((e) => e.date)
-                          .toList(),
+                      markers: [
+                        for (final e in events)
+                          if (holdingIds.contains(e.holdingId))
+                            PortfolioValueMarker(
+                              date: e.date,
+                              label: nameById[e.holdingId] ?? '',
+                            ),
+                      ],
                     ),
                   );
                 }
