@@ -12,12 +12,29 @@ class PortfolioValueChart extends StatelessWidget {
   final String currency;
   final double height;
 
+  /// Dates to mark with a vertical line + chip (e.g. buy dates across every
+  /// position). Mapped to the nearest point on the series.
+  final List<DateTime> eventDates;
+
   const PortfolioValueChart({
     super.key,
     required this.points,
     this.currency = 'COP',
     this.height = 260,
+    this.eventDates = const [],
   });
+
+  /// Index of the first point on/after [date], clamped to the series bounds.
+  int? _eventIndex(DateTime date) {
+    if (points.isEmpty) return null;
+    final target = DateTime(date.year, date.month, date.day);
+    for (var i = 0; i < points.length; i++) {
+      final d = points[i].date;
+      final day = DateTime(d.year, d.month, d.day);
+      if (!day.isBefore(target)) return i;
+    }
+    return points.length - 1;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,7 +56,23 @@ class PortfolioValueChart extends StatelessWidget {
       for (var i = 0; i < points.length; i++) FlSpot(i.toDouble(), values[i]),
     ];
 
-    return SizedBox(
+    // De-duplicate marker dates and map them to series indices.
+    final markerDays = <DateTime>{
+      for (final d in eventDates) DateTime(d.year, d.month, d.day),
+    }.toList()
+      ..sort();
+    final verticalLines = <VerticalLine>[
+      for (final day in markerDays)
+        if (_eventIndex(day) != null)
+          VerticalLine(
+            x: _eventIndex(day)!.toDouble(),
+            color: theme.colorScheme.tertiary,
+            strokeWidth: 1.4,
+            dashArray: const [5, 4],
+          ),
+    ];
+
+    final chartBox = SizedBox(
       height: height,
       child: LineChart(
         LineChartData(
@@ -116,6 +149,7 @@ class PortfolioValueChart extends StatelessWidget {
               }).toList(),
             ),
           ),
+          extraLinesData: ExtraLinesData(verticalLines: verticalLines),
           lineBarsData: [
             LineChartBarData(
               spots: spots,
@@ -131,6 +165,29 @@ class PortfolioValueChart extends StatelessWidget {
           ],
         ),
       ),
+    );
+
+    if (markerDays.isEmpty) return chartBox;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        chartBox,
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          children: markerDays.map((d) {
+            return Chip(
+              visualDensity: VisualDensity.compact,
+              avatar: const Icon(Icons.add_shopping_cart, size: 16),
+              label: Text(
+                '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}',
+              ),
+            );
+          }).toList(),
+        ),
+      ],
     );
   }
 }

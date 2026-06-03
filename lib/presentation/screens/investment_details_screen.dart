@@ -983,6 +983,9 @@ class _InvestmentHistoryChartState
     final selectedHolding = isAll
         ? null
         : chartableHoldings.firstWhere((h) => h.id == selectedHoldingId);
+    final chartableHoldingIds = {for (final h in chartableHoldings) h.id};
+    final hasBuyMarks = (purchaseEventsAsync.valueOrNull ?? const [])
+        .any((e) => chartableHoldingIds.contains(e.holdingId));
 
     return Card(
       elevation: 1,
@@ -1094,9 +1097,23 @@ class _InvestmentHistoryChartState
                       ),
                     );
                   }
-                  return PortfolioValueChart(
-                    points: series,
-                    currency: totalCurrency,
+                  return purchaseEventsAsync.when(
+                    loading: () => PortfolioValueChart(
+                      points: series,
+                      currency: totalCurrency,
+                    ),
+                    error: (_, __) => PortfolioValueChart(
+                      points: series,
+                      currency: totalCurrency,
+                    ),
+                    data: (events) => PortfolioValueChart(
+                      points: series,
+                      currency: totalCurrency,
+                      eventDates: events
+                          .where((e) => holdingIds.contains(e.holdingId))
+                          .map((e) => e.date)
+                          .toList(),
+                    ),
                   );
                 }
 
@@ -1139,7 +1156,7 @@ class _InvestmentHistoryChartState
                 );
               },
             ),
-            if (!isAll) ...[
+            if (!isAll || hasBuyMarks) ...[
               const SizedBox(height: 8),
               Row(
                 children: [
