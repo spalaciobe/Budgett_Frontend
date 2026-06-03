@@ -14,6 +14,8 @@ import 'package:budgett_frontend/data/models/expense_group_model.dart';
 import 'package:budgett_frontend/data/models/recurring_transaction_model.dart';
 import 'package:budgett_frontend/data/models/category_spending.dart';
 import 'package:budgett_frontend/data/models/investment_holding_model.dart';
+import 'package:budgett_frontend/data/models/investment_price_history_model.dart';
+import 'package:budgett_frontend/data/models/investment_purchase_event_model.dart';
 import 'package:budgett_frontend/data/models/savings_interest_details_model.dart';
 import 'package:budgett_frontend/data/models/credit_card_rules_model.dart';
 import 'package:budgett_frontend/data/models/bank_model.dart';
@@ -24,6 +26,13 @@ class FinanceRepository {
   final SupabaseClient _client;
 
   FinanceRepository(this._client);
+
+  String _todayDateString() {
+    final now = DateTime.now();
+    return '${now.year.toString().padLeft(4, '0')}-'
+        '${now.month.toString().padLeft(2, '0')}-'
+        '${now.day.toString().padLeft(2, '0')}';
+  }
 
   /// Returns true for transient network errors (DNS failure, connection reset,
   /// etc.) that are worth retrying once on app first load.
@@ -918,12 +927,43 @@ class FinanceRepository {
   /// Batch-update current_price for multiple holdings.
   Future<void> updateHoldingsPrices(
       List<({String id, double price})> updates) async {
+    final now = DateTime.now().toIso8601String();
     for (final u in updates) {
       await _client.from('investment_holdings').update({
         'current_price': u.price,
-        'price_updated_at': DateTime.now().toIso8601String(),
-        'updated_at': DateTime.now().toIso8601String(),
+        'price_updated_at': now,
+        'updated_at': now,
       }).eq('id', u.id);
+    }
+    if (updates.isEmpty) return;
+
+    final ids = updates.map((u) => u.id).toList();
+    final pricesById = {for (final u in updates) u.id: u.price};
+    final List<dynamic> holdings = await _client
+        .from('investment_holdings')
+        .select('id, user_id, account_id, symbol, asset_class, currency, quantity')
+        .inFilter('id', ids);
+    final rows = holdings.whereType<Map>().map((h) {
+      final id = h['id'].toString();
+      return {
+        'user_id': h['user_id'],
+        'account_id': h['account_id'],
+        'holding_id': id,
+        'symbol': h['symbol'],
+        'asset_class': h['asset_class'],
+        'currency': h['currency'],
+        'price': pricesById[id],
+        'quantity_snapshot': (h['quantity'] as num?)?.toDouble() ?? 0.0,
+        'source': 'manual',
+        'market_date': _todayDateString(),
+        'fetched_at': now,
+      };
+    }).toList();
+    if (rows.isNotEmpty) {
+      await _client.from('investment_price_history').upsert(
+            rows,
+            onConflict: 'holding_id,market_date,source',
+          );
     }
   }
 
@@ -956,6 +996,63 @@ class FinanceRepository {
             ))
         .toList();
     return (updatedCount: updated.length, skipped: skipped);
+  }
+
+  Future<List<InvestmentPriceHistory>> getInvestmentPriceHistory(
+    String accountId, {
+    int days = 90,
+  }) async {
+    final since = DateTime.now()
+        .subtract(Duration(days: days))
+        .toIso8601String()
+        .split('T')
+        .first;
+    final List<dynamic> data = await _client
+        .from('investment_price_history')
+        .select()
+        .eq('account_id', accountId)
+        .gte('market_date', since)
+        .order('market_date')
+        .order('symbol');
+    return data
+        .map((json) => InvestmentPriceHistory.fromJson(json))
+        .toList();
+  }
+
+  Future<List<InvestmentPurchaseEvent>> getInvestmentPurchaseEvents(
+    String accountId,
+    List<InvestmentHolding> holdings,
+  ) async {
+    if (holdings.isEmpty) return const [];
+
+    final holdingIds = holdings.map((h) => h.id).toList();
+    final List<dynamic> rows = await _client
+        .from('transactions')
+        .select('holding_id, date, amount, holding_qty_delta, type')
+        .eq('account_id', accountId)
+        .inFilter('holding_id', holdingIds)
+        .gt('holding_qty_delta', 0)
+        .order('date');
+
+    final events = rows
+        .whereType<Map<String, dynamic>>()
+        .map(InvestmentPurchaseEvent.fromTransactionJson)
+        .toList();
+    final holdingsWithEvents = events.map((e) => e.holdingId).toSet();
+
+    for (final h in holdings) {
+      if (holdingsWithEvents.contains(h.id)) continue;
+      if (h.quantity <= 0) continue;
+      events.add(InvestmentPurchaseEvent.fromHoldingCreatedAt(
+        holdingId: h.id,
+        createdAt: h.createdAt,
+        quantity: h.quantity,
+        amount: h.costBasis,
+      ));
+    }
+
+    events.sort((a, b) => a.date.compareTo(b.date));
+    return events;
   }
 
   /// Records a buy: creates an expense transaction and updates the holding's
@@ -1831,4 +1928,3 @@ class FinanceRepository {
         '${s.substring(12, 16)}-${s.substring(16, 20)}-${s.substring(20)}';
   }
 }
-

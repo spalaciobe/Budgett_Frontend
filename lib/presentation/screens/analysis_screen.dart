@@ -4,7 +4,6 @@ import 'package:budgett_frontend/core/responsive.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
-import 'package:budgett_frontend/data/models/investment_details_model.dart';
 import 'package:budgett_frontend/presentation/providers/portfolio_provider.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:budgett_frontend/presentation/widgets/portfolio_donut_chart.dart';
@@ -625,6 +624,7 @@ class _PortfolioFetchButtonState extends ConsumerState<_PortfolioFetchButton> {
         accountErrors.add('${a.name}: $e');
       }
       ref.invalidate(accountHoldingsProvider(a.id));
+      ref.invalidate(investmentPriceHistoryProvider(a.id));
     }
     ref.invalidate(consolidatedPortfolioProvider);
     ref.invalidate(accountsProvider);

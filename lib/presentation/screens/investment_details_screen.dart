@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 import '../../core/app_spacing.dart';
 import '../../core/responsive.dart';
@@ -7,6 +8,8 @@ import '../../core/utils/investment_calculator.dart';
 import '../../data/models/account_model.dart';
 import '../../data/models/investment_details_model.dart';
 import '../../data/models/investment_holding_model.dart';
+import '../../data/models/investment_price_history_model.dart';
+import '../../data/models/investment_purchase_event_model.dart';
 import '../../data/models/fx_rate_model.dart';
 import '../../data/models/transaction_model.dart';
 import '../providers/finance_provider.dart';
@@ -299,8 +302,7 @@ class _SummaryHeader extends StatelessWidget {
     DateTime? oldestPrice;
     for (final h in holdings) {
       if (h.priceUpdatedAt != null) {
-        if (oldestPrice == null ||
-            h.priceUpdatedAt!.isBefore(oldestPrice)) {
+        if (oldestPrice == null || h.priceUpdatedAt!.isBefore(oldestPrice)) {
           oldestPrice = h.priceUpdatedAt;
         }
       }
@@ -342,8 +344,7 @@ class _SummaryHeader extends StatelessWidget {
                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       backgroundColor: isStale
                           ? Colors.orange.withOpacity(0.2)
-                          : theme.colorScheme.primaryContainer
-                              .withOpacity(0.5),
+                          : theme.colorScheme.primaryContainer.withOpacity(0.5),
                     ),
                   ),
                 ],
@@ -412,8 +413,7 @@ class _SummaryHeader extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    CurrencyFormatter.format(invested,
-                        currency: baseCurrency),
+                    CurrencyFormatter.format(invested, currency: baseCurrency),
                     style: theme.textTheme.bodyMedium
                         ?.copyWith(fontWeight: FontWeight.w600),
                   ),
@@ -424,9 +424,7 @@ class _SummaryHeader extends StatelessWidget {
                 Row(
                   children: [
                     Icon(
-                      pnlPositive
-                          ? Icons.trending_up
-                          : Icons.trending_down,
+                      pnlPositive ? Icons.trending_up : Icons.trending_down,
                       size: 16,
                       color: pnlColor,
                     ),
@@ -434,8 +432,8 @@ class _SummaryHeader extends StatelessWidget {
                     Text(
                       '${pnlPositive ? '+' : ''}${CurrencyFormatter.format(pnl.pnl, currency: baseCurrency)}  '
                       '(${pnlPositive ? '+' : ''}${pnl.pnlPct.toStringAsFixed(2)}%)',
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: pnlColor, fontWeight: FontWeight.w600),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                          color: pnlColor, fontWeight: FontWeight.w600),
                     ),
                   ],
                 ),
@@ -466,7 +464,6 @@ class _SummaryHeader extends StatelessWidget {
     return '${diff.inDays}d ago';
   }
 }
-
 
 // ── CDT section ───────────────────────────────────────────────────────────────
 
@@ -503,8 +500,8 @@ class _CdtSection extends ConsumerWidget {
                     Expanded(
                       child: _StatItem(
                         label: 'Principal',
-                        value: CurrencyFormatter.format(
-                            details!.principal ?? 0),
+                        value:
+                            CurrencyFormatter.format(details!.principal ?? 0),
                       ),
                     ),
                     Expanded(
@@ -584,7 +581,7 @@ class _HoldingsList extends ConsumerStatefulWidget {
 }
 
 class _HoldingsListState extends ConsumerState<_HoldingsList> {
-  int _viewMode = 0; // 0 = positions, 1 = donut
+  int _viewMode = 0; // 0 = positions, 1 = donut, 2 = history
 
   @override
   Widget build(BuildContext context) {
@@ -623,8 +620,7 @@ class _HoldingsListState extends ConsumerState<_HoldingsList> {
                 onPressed: () {
                   showDialog(
                     context: context,
-                    builder: (_) =>
-                        EditHoldingDialog(accountId: account.id),
+                    builder: (_) => EditHoldingDialog(accountId: account.id),
                   );
                 },
                 icon: const Icon(Icons.add, size: 16),
@@ -653,6 +649,11 @@ class _HoldingsListState extends ConsumerState<_HoldingsList> {
                     value: 1,
                     label: Text('Portfolio'),
                     icon: Icon(Icons.donut_large, size: 16),
+                  ),
+                  ButtonSegment(
+                    value: 2,
+                    label: Text('History'),
+                    icon: Icon(Icons.show_chart, size: 16),
                   ),
                 ],
                 selected: {_viewMode},
@@ -689,9 +690,15 @@ class _HoldingsListState extends ConsumerState<_HoldingsList> {
                       label: Text('Portfolio'),
                       icon: Icon(Icons.donut_large, size: 16),
                     ),
+                    ButtonSegment(
+                      value: 2,
+                      label: Text('History'),
+                      icon: Icon(Icons.show_chart, size: 16),
+                    ),
                   ],
                   selected: {_viewMode},
-                  onSelectionChanged: (s) => setState(() => _viewMode = s.first),
+                  onSelectionChanged: (s) =>
+                      setState(() => _viewMode = s.first),
                 )
               else
                 Text('Positions',
@@ -750,6 +757,11 @@ class _HoldingsListState extends ConsumerState<_HoldingsList> {
           )
         else if (_viewMode == 1)
           _buildDonut(context, account, holdings)
+        else if (_viewMode == 2)
+          _InvestmentHistoryChart(
+            accountId: account.id,
+            holdings: holdings,
+          )
         else
           LayoutBuilder(
             builder: (context, constraints) {
@@ -760,71 +772,78 @@ class _HoldingsListState extends ConsumerState<_HoldingsList> {
               return Wrap(
                 spacing: spacing,
                 runSpacing: spacing,
-                children: holdings.map((h) => SizedBox(
-                  width: itemWidth,
-                  child: InvestmentHoldingCard(
-                    holding: h,
-                    onBuy: () {
-                      showDialog(
-                        context: context,
-                        builder: (_) => BuySellHoldingDialog(
-                          accountId: account.id,
-                          holding: h,
-                          isBuy: true,
-                        ),
-                      );
-                    },
-                    onSell: () {
-                      showDialog(
-                        context: context,
-                        builder: (_) => BuySellHoldingDialog(
-                          accountId: account.id,
-                          holding: h,
-                          isBuy: false,
-                        ),
-                      );
-                    },
-                    onEdit: () {
-                      showDialog(
-                        context: context,
-                        builder: (_) => EditHoldingDialog(
-                          accountId: account.id,
-                          holding: h,
-                        ),
-                      );
-                    },
-                    onDelete: () async {
-                      final confirmed = await showDialog<bool>(
-                        context: context,
-                        builder: (dialogContext) => AlertDialog(
-                          title: const Text('Delete Position?'),
-                          content: Text(
-                              'Delete ${h.symbol}? Transaction history will be preserved.'),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.of(dialogContext).pop(false),
-                            child: const Text('Cancel'),
+                children: holdings
+                    .map((h) => SizedBox(
+                          width: itemWidth,
+                          child: InvestmentHoldingCard(
+                            holding: h,
+                            onBuy: () {
+                              showDialog(
+                                context: context,
+                                builder: (_) => BuySellHoldingDialog(
+                                  accountId: account.id,
+                                  holding: h,
+                                  isBuy: true,
+                                ),
+                              );
+                            },
+                            onSell: () {
+                              showDialog(
+                                context: context,
+                                builder: (_) => BuySellHoldingDialog(
+                                  accountId: account.id,
+                                  holding: h,
+                                  isBuy: false,
+                                ),
+                              );
+                            },
+                            onEdit: () {
+                              showDialog(
+                                context: context,
+                                builder: (_) => EditHoldingDialog(
+                                  accountId: account.id,
+                                  holding: h,
+                                ),
+                              );
+                            },
+                            onDelete: () async {
+                              final confirmed = await showDialog<bool>(
+                                context: context,
+                                builder: (dialogContext) => AlertDialog(
+                                  title: const Text('Delete Position?'),
+                                  content: Text(
+                                      'Delete ${h.symbol}? Transaction history will be preserved.'),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.of(dialogContext)
+                                              .pop(false),
+                                      child: const Text('Cancel'),
+                                    ),
+                                    FilledButton(
+                                      style: FilledButton.styleFrom(
+                                        backgroundColor: Theme.of(dialogContext)
+                                            .colorScheme
+                                            .error,
+                                      ),
+                                      onPressed: () =>
+                                          Navigator.of(dialogContext).pop(true),
+                                      child: const Text('Delete'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                              if (confirmed == true) {
+                                await ref
+                                    .read(financeRepositoryProvider)
+                                    .deleteHolding(h.id);
+                                ref.invalidate(
+                                    accountHoldingsProvider(account.id));
+                              }
+                            },
                           ),
-                          FilledButton(
-                            style: FilledButton.styleFrom(
-                              backgroundColor:
-                                  Theme.of(dialogContext).colorScheme.error,
-                            ),
-                            onPressed: () => Navigator.of(dialogContext).pop(true),
-                            child: const Text('Delete'),
-                          ),
-                        ],
-                      ),
-                    );
-                      if (confirmed == true) {
-                        await ref
-                            .read(financeRepositoryProvider)
-                            .deleteHolding(h.id);
-                        ref.invalidate(accountHoldingsProvider(account.id));
-                      }
-                    },
-                  ),
-                )).toList(),
+                        ))
+                    .toList(),
               );
             },
           ),
@@ -888,8 +907,7 @@ class _HoldingsListState extends ConsumerState<_HoldingsList> {
     }
 
     final total = sorted.fold<double>(0, (sum, s) => sum + s.marketValue);
-    final centerValue =
-        CurrencyFormatter.format(total, currency: baseCurrency);
+    final centerValue = CurrencyFormatter.format(total, currency: baseCurrency);
 
     return Card(
       elevation: 1,
@@ -903,6 +921,352 @@ class _HoldingsListState extends ConsumerState<_HoldingsList> {
         ),
       ),
     );
+  }
+}
+
+enum _HistoryMetric { value, price }
+
+class _InvestmentHistoryChart extends ConsumerStatefulWidget {
+  final String accountId;
+  final List<InvestmentHolding> holdings;
+
+  const _InvestmentHistoryChart({
+    required this.accountId,
+    required this.holdings,
+  });
+
+  @override
+  ConsumerState<_InvestmentHistoryChart> createState() =>
+      _InvestmentHistoryChartState();
+}
+
+class _InvestmentHistoryChartState
+    extends ConsumerState<_InvestmentHistoryChart> {
+  String? _selectedHoldingId;
+  _HistoryMetric _metric = _HistoryMetric.value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final priceHistoryAsync =
+        ref.watch(investmentPriceHistoryProvider(widget.accountId));
+    final purchaseEventsAsync =
+        ref.watch(investmentPurchaseEventsProvider(widget.accountId));
+    final chartableHoldings =
+        widget.holdings.where((h) => !h.isCashEquivalent).toList();
+
+    if (chartableHoldings.isEmpty) {
+      return const Card(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: Text('No market-price holdings to chart yet.'),
+        ),
+      );
+    }
+
+    final selectedExists =
+        chartableHoldings.any((h) => h.id == _selectedHoldingId);
+    final selectedHoldingId =
+        selectedExists ? _selectedHoldingId! : chartableHoldings.first.id;
+    if (_selectedHoldingId != selectedHoldingId) {
+      _selectedHoldingId = selectedHoldingId;
+    }
+    final selectedHolding =
+        chartableHoldings.firstWhere((h) => h.id == selectedHoldingId);
+
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                SizedBox(
+                  width: context.formFactor == FormFactor.mobile ? 220 : 280,
+                  child: DropdownButtonFormField<String>(
+                    value: selectedHoldingId,
+                    decoration: const InputDecoration(
+                      labelText: 'Asset',
+                      isDense: true,
+                    ),
+                    items: chartableHoldings
+                        .map((h) => DropdownMenuItem(
+                              value: h.id,
+                              child: Text(h.displayName),
+                            ))
+                        .toList(),
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setState(() => _selectedHoldingId = value);
+                    },
+                  ),
+                ),
+                SegmentedButton<_HistoryMetric>(
+                  style: SegmentedButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    textStyle: const TextStyle(fontSize: 12),
+                  ),
+                  segments: const [
+                    ButtonSegment(
+                      value: _HistoryMetric.value,
+                      label: Text('Value'),
+                      icon:
+                          Icon(Icons.account_balance_wallet_outlined, size: 16),
+                    ),
+                    ButtonSegment(
+                      value: _HistoryMetric.price,
+                      label: Text('Price'),
+                      icon: Icon(Icons.sell_outlined, size: 16),
+                    ),
+                  ],
+                  selected: {_metric},
+                  onSelectionChanged: (s) => setState(() => _metric = s.first),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            priceHistoryAsync.when(
+              loading: () => const SizedBox(
+                height: 220,
+                child: Center(child: CircularProgressIndicator()),
+              ),
+              error: (e, _) => Text('Error loading history: $e'),
+              data: (history) {
+                final rows = history
+                    .where((h) => h.holdingId == selectedHoldingId)
+                    .toList()
+                  ..sort((a, b) => a.marketDate.compareTo(b.marketDate));
+                if (rows.isEmpty) {
+                  return const SizedBox(
+                    height: 180,
+                    child: Center(
+                      child: Text(
+                        'No daily history yet. It will appear after the next market fetch.',
+                      ),
+                    ),
+                  );
+                }
+
+                return purchaseEventsAsync.when(
+                  loading: () => _HistoryLineChart(
+                    rows: rows,
+                    events: const [],
+                    metric: _metric,
+                    holding: selectedHolding,
+                  ),
+                  error: (_, __) => _HistoryLineChart(
+                    rows: rows,
+                    events: const [],
+                    metric: _metric,
+                    holding: selectedHolding,
+                  ),
+                  data: (events) => _HistoryLineChart(
+                    rows: rows,
+                    events: events
+                        .where((e) => e.holdingId == selectedHoldingId)
+                        .toList(),
+                    metric: _metric,
+                    holding: selectedHolding,
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.circle, size: 8, color: theme.colorScheme.tertiary),
+                const SizedBox(width: 6),
+                Text(
+                  'Vertical marks indicate buy dates.',
+                  style: theme.textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HistoryLineChart extends StatelessWidget {
+  final List<InvestmentPriceHistory> rows;
+  final List<InvestmentPurchaseEvent> events;
+  final _HistoryMetric metric;
+  final InvestmentHolding holding;
+
+  const _HistoryLineChart({
+    required this.rows,
+    required this.events,
+    required this.metric,
+    required this.holding,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final values = rows
+        .map((r) => metric == _HistoryMetric.value ? r.positionValue : r.price)
+        .toList();
+    final minValue = values.reduce((a, b) => a < b ? a : b);
+    final maxValue = values.reduce((a, b) => a > b ? a : b);
+    final padding =
+        ((maxValue - minValue).abs() * 0.12).clamp(1.0, double.infinity);
+    final minY = minValue - padding;
+    final maxY = maxValue + padding;
+    final spots = <FlSpot>[
+      for (var i = 0; i < rows.length; i++) FlSpot(i.toDouble(), values[i]),
+    ];
+    final verticalLines = <VerticalLine>[
+      for (final event in events)
+        if (_eventIndex(event.date) != null)
+          VerticalLine(
+            x: _eventIndex(event.date)!.toDouble(),
+            color: theme.colorScheme.tertiary,
+            strokeWidth: 1.4,
+            dashArray: const [5, 4],
+          ),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          height: 260,
+          child: LineChart(
+            LineChartData(
+              minX: 0,
+              maxX: (rows.length - 1).toDouble(),
+              minY: minY,
+              maxY: maxY,
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                getDrawingHorizontalLine: (_) => FlLine(
+                  color: theme.dividerColor.withValues(alpha: 0.4),
+                  strokeWidth: 1,
+                ),
+              ),
+              borderData: FlBorderData(
+                show: true,
+                border: Border.all(color: theme.dividerColor),
+              ),
+              titlesData: FlTitlesData(
+                topTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                rightTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 76,
+                    getTitlesWidget: (value, meta) => Text(
+                      CurrencyFormatter.compact(value,
+                          currency: holding.currency),
+                      style: theme.textTheme.labelSmall,
+                    ),
+                  ),
+                ),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 30,
+                    interval: rows.length <= 2
+                        ? 1
+                        : ((rows.length - 1) / 2).ceilToDouble(),
+                    getTitlesWidget: (value, meta) {
+                      final index = value.round();
+                      if (index < 0 || index >= rows.length) {
+                        return const SizedBox.shrink();
+                      }
+                      final d = rows[index].marketDate;
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text(
+                          '${d.month}/${d.day}',
+                          style: theme.textTheme.labelSmall,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              lineTouchData: LineTouchData(
+                touchTooltipData: LineTouchTooltipData(
+                  getTooltipItems: (spots) => spots.map((spot) {
+                    final index = spot.x.round();
+                    final row = rows[index];
+                    final date =
+                        '${row.marketDate.year}-${row.marketDate.month.toString().padLeft(2, '0')}-${row.marketDate.day.toString().padLeft(2, '0')}';
+                    return LineTooltipItem(
+                      '$date\n${CurrencyFormatter.format(spot.y, currency: holding.currency)}',
+                      theme.textTheme.bodySmall!.copyWith(
+                        color: theme.colorScheme.onInverseSurface,
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              extraLinesData: ExtraLinesData(verticalLines: verticalLines),
+              lineBarsData: [
+                LineChartBarData(
+                  spots: spots,
+                  isCurved: rows.length > 2,
+                  barWidth: 3,
+                  color: theme.colorScheme.primary,
+                  belowBarData: BarAreaData(
+                    show: true,
+                    color: theme.colorScheme.primary.withValues(alpha: 0.08),
+                  ),
+                  dotData: FlDotData(show: rows.length <= 12),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (events.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: events.map((event) {
+              final d = event.date;
+              return Chip(
+                visualDensity: VisualDensity.compact,
+                avatar: Icon(
+                  event.source == 'created_at'
+                      ? Icons.history_toggle_off
+                      : Icons.add_shopping_cart,
+                  size: 16,
+                ),
+                label: Text(
+                  '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}',
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ],
+    );
+  }
+
+  int? _eventIndex(DateTime date) {
+    if (rows.isEmpty) return null;
+    final eventDate = DateTime(date.year, date.month, date.day);
+    for (var i = 0; i < rows.length; i++) {
+      final rowDate = rows[i].marketDate;
+      final day = DateTime(rowDate.year, rowDate.month, rowDate.day);
+      if (!day.isBefore(eventDate)) return i;
+    }
+    return rows.length - 1;
   }
 }
 
@@ -1043,6 +1407,7 @@ class _UpdatePricesButtonState extends ConsumerState<_UpdatePricesButton> {
           .read(financeRepositoryProvider)
           .fetchMarketPrices(widget.accountId);
       ref.invalidate(accountHoldingsProvider(widget.accountId));
+      ref.invalidate(investmentPriceHistoryProvider(widget.accountId));
       if (!mounted) return;
 
       final updated = result.updatedCount;
@@ -1054,7 +1419,9 @@ class _UpdatePricesButtonState extends ConsumerState<_UpdatePricesButton> {
         );
       } else if (skipped.isEmpty) {
         messenger.showSnackBar(
-          SnackBar(content: Text('Updated $updated holding${updated == 1 ? '' : 's'}')),
+          SnackBar(
+              content:
+                  Text('Updated $updated holding${updated == 1 ? '' : 's'}')),
         );
       } else {
         final symbols = skipped.map((s) => s.symbol).join(', ');
