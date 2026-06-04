@@ -39,7 +39,9 @@ import 'package:budgett_frontend/presentation/screens/expense_groups_screen.dart
 import 'package:budgett_frontend/presentation/screens/goals_screen.dart';
 import 'package:budgett_frontend/presentation/screens/home_screen.dart';
 import 'package:budgett_frontend/presentation/screens/recurring_transactions_screen.dart';
+import 'package:budgett_frontend/data/models/sub_category_model.dart';
 import 'package:budgett_frontend/presentation/widgets/account_card.dart';
+import 'package:budgett_frontend/presentation/widgets/budget_comparison_widget.dart';
 import 'package:budgett_frontend/presentation/widgets/investment_holding_card.dart';
 import 'package:budgett_frontend/presentation/widgets/portfolio_donut_chart.dart';
 import 'package:budgett_frontend/presentation/widgets/transaction_tile.dart';
@@ -271,6 +273,25 @@ final _targets = <String, _Target>{
           holding: _holding(symbol: 'AAPL', assetClass: 'stock_etf', avgCost: 200, price: 175, qty: 12),
           onBuy: () {}, onSell: () {}, onEdit: () {}, onDelete: () {},
         ),
+      )),
+  'budget_comparison_over': _Target(() => _wrap(
+        BudgetComparisonWidget(
+          categoryName: 'Leisure',
+          budgetAmount: 500000,
+          spentAmount: 820328,
+          color: const Color(0xFFE91E63),
+          onEditBudget: () {},
+          onEditCategory: () {},
+          onViewTransactions: () {},
+          subCategories: [
+            SubCategory.fromJson(
+                {'id': 's1', 'category_id': 'c1', 'name': 'Eating out'}),
+            SubCategory.fromJson(
+                {'id': 's2', 'category_id': 'c1', 'name': 'Delivery'}),
+          ],
+          subCategorySpending: const {'s1': 525100, 's2': 230000},
+        ),
+        maxWidth: 440,
       )),
   'portfolio_donut_chart': _Target(() => _wrap(
         const PortfolioDonutChart(

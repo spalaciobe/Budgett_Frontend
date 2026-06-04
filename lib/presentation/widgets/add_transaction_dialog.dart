@@ -51,6 +51,11 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
   bool _isRecurring = false;
   String _frequency = 'monthly';
 
+  /// Guards against double submission: a second tap (or a tap while the first
+  /// save is still in flight) would insert the transaction twice and fire a
+  /// second Navigator.pop that closes the screen behind the dialog.
+  bool _isLoading = false;
+
   // Currency fields
   String _currency = 'COP';
   bool _isUsdPayment = false; // cross-currency CC payment
@@ -201,6 +206,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
   }
 
   Future<void> _saveTransaction() async {
+    if (_isLoading) return;
     if (!_formKey.currentState!.validate()) return;
     if (_selectedAccountId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -329,6 +335,8 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
       }
     } catch (_) {}
 
+    setState(() => _isLoading = true);
+
     try {
       final repo = ref.read(financeRepositoryProvider);
 
@@ -406,6 +414,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
           description: _descriptionController.text,
           amount: CurrencyFormatter.parse(_amountController.text, currency: _currency),
           categoryId: finalCategoryId,
+          subCategoryId: finalSubCategoryId,
           accountId: _selectedAccountId,
           type: _selectedType,
           frequency: _frequency,
@@ -436,6 +445,8 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
           SnackBar(content: Text('Error: $e')),
         );
       }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -1118,10 +1129,16 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
-                    onPressed: _saveTransaction,
-                    child: const Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: Text('Save Transaction'),
+                    onPressed: _isLoading ? null : _saveTransaction,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: _isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('Save Transaction'),
                     ),
                   ),
                 ),

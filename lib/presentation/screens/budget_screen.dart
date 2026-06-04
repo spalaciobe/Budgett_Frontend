@@ -7,12 +7,14 @@ import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/presentation/widgets/create_category_dialog.dart';
 import 'package:budgett_frontend/presentation/widgets/edit_budget_dialog.dart';
 import 'package:budgett_frontend/presentation/widgets/budget_comparison_widget.dart';
+import 'package:budgett_frontend/presentation/widgets/category_transactions_dialog.dart';
 import 'package:budgett_frontend/presentation/widgets/edit_category_dialog.dart';
 import 'package:budgett_frontend/data/models/category_model.dart';
 import 'package:budgett_frontend/data/models/category_spending.dart';
 import 'package:fl_chart/fl_chart.dart';
 
-final budgetDateProvider = StateProvider.autoDispose<DateTime>((ref) => DateTime.now());
+final budgetDateProvider =
+    StateProvider.autoDispose<DateTime>((ref) => DateTime.now());
 
 Color _parseColor(String colorStr) {
   try {
@@ -28,16 +30,21 @@ class BudgetScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedDate = ref.watch(budgetDateProvider);
-    final budgetsAsync = ref.watch(budgetsProvider((month: selectedDate.month, year: selectedDate.year)));
+    final budgetsAsync = ref.watch(
+        budgetsProvider((month: selectedDate.month, year: selectedDate.year)));
     final categoriesAsync = ref.watch(categoriesProvider);
-    final accumulatedBalancesAsync = ref.watch(categoryAccumulatedBalancesProvider);
+    final accumulatedBalancesAsync =
+        ref.watch(categoryAccumulatedBalancesProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+            color: Theme.of(context)
+                .colorScheme
+                .surfaceContainerHighest
+                .withOpacity(0.5),
             borderRadius: BorderRadius.circular(20),
           ),
           child: Row(
@@ -57,7 +64,8 @@ class BudgetScreen extends ConsumerWidget {
                 onTap: () async {
                   final picked = await showDialog<DateTime>(
                     context: context,
-                    builder: (context) => _MonthPickerDialog(initialDate: selectedDate),
+                    builder: (context) =>
+                        _MonthPickerDialog(initialDate: selectedDate),
                   );
                   if (picked != null) {
                     ref.read(budgetDateProvider.notifier).state = picked;
@@ -67,7 +75,8 @@ class BudgetScreen extends ConsumerWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 8.0),
                   child: Text(
                     '${_getMonthName(selectedDate.month)} ${selectedDate.year}',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                 ),
               ),
@@ -90,8 +99,11 @@ class BudgetScreen extends ConsumerWidget {
             icon: const Icon(Icons.copy_all_outlined),
             tooltip: 'Copy from previous month',
             onPressed: () async {
-              final prevMonth = selectedDate.month == 1 ? 12 : selectedDate.month - 1;
-              final prevYear = selectedDate.month == 1 ? selectedDate.year - 1 : selectedDate.year;
+              final prevMonth =
+                  selectedDate.month == 1 ? 12 : selectedDate.month - 1;
+              final prevYear = selectedDate.month == 1
+                  ? selectedDate.year - 1
+                  : selectedDate.year;
               final prevMonthName = _getMonthName(prevMonth);
               final currMonthName = _getMonthName(selectedDate.month);
               final hasCurrent = budgetsAsync.valueOrNull?.isNotEmpty ?? false;
@@ -122,16 +134,23 @@ class BudgetScreen extends ConsumerWidget {
 
               final messenger = ScaffoldMessenger.of(context);
               try {
-                final count = await ref.read(financeRepositoryProvider)
-                    .copyBudgetsFromPreviousMonth(selectedDate.month, selectedDate.year);
-                ref.invalidate(budgetsProvider((month: selectedDate.month, year: selectedDate.year)));
+                final count = await ref
+                    .read(financeRepositoryProvider)
+                    .copyBudgetsFromPreviousMonth(
+                        selectedDate.month, selectedDate.year);
+                ref.invalidate(budgetsProvider(
+                    (month: selectedDate.month, year: selectedDate.year)));
                 if (count == 0) {
                   messenger.showSnackBar(
-                    SnackBar(content: Text('No budgets in $prevMonthName $prevYear to copy.')),
+                    SnackBar(
+                        content: Text(
+                            'No budgets in $prevMonthName $prevYear to copy.')),
                   );
                 } else {
                   messenger.showSnackBar(
-                    SnackBar(content: Text('$count budget${count == 1 ? '' : 's'} copied from $prevMonthName $prevYear.')),
+                    SnackBar(
+                        content: Text(
+                            '$count budget${count == 1 ? '' : 's'} copied from $prevMonthName $prevYear.')),
                   );
                 }
               } catch (e) {
@@ -143,10 +162,12 @@ class BudgetScreen extends ConsumerWidget {
       ),
       body: RefreshIndicator(
         onRefresh: () async {
-          ref.invalidate(budgetsProvider((month: selectedDate.month, year: selectedDate.year)));
+          ref.invalidate(budgetsProvider(
+              (month: selectedDate.month, year: selectedDate.year)));
           ref.invalidate(categoriesProvider);
           await Future.wait([
-            ref.read(budgetsProvider((month: selectedDate.month, year: selectedDate.year)).future),
+            ref.read(budgetsProvider(
+                (month: selectedDate.month, year: selectedDate.year)).future),
             ref.read(categoriesProvider.future),
           ]);
         },
@@ -178,174 +199,206 @@ class BudgetScreen extends ConsumerWidget {
                   },
                 );
 
-                return FutureBuilder<double>(
-                  future: ref.read(financeRepositoryProvider).getMonthlyIncome(selectedDate.month, selectedDate.year),
-                  builder: (context, incomeSnapshot) {
-                    final monthlyIncome = incomeSnapshot.data ?? 0.0;
-                    final baseIncome = expectedIncome > 0 ? expectedIncome : monthlyIncome;
+                return FutureBuilder<List<dynamic>>(
+                  // Fetch every month-scoped figure together so the screen
+                  // renders in a single pass. Previously income resolved in one
+                  // FutureBuilder and spending in a nested one, so the summary
+                  // card and per-category amounts popped in separately ("by
+                  // parts") as each future landed.
+                  future: Future.wait([
+                    ref.read(financeRepositoryProvider).getMonthlyIncome(
+                        selectedDate.month, selectedDate.year),
+                    ref.read(financeRepositoryProvider).getSpendingByCategory(
+                        selectedDate.month, selectedDate.year),
+                    ref.read(financeRepositoryProvider).getIncomeByCategory(
+                        selectedDate.month, selectedDate.year),
+                  ]),
+                  builder: (context, snapshot) {
+                    // One spinner on first load instead of a flash of zeros. On
+                    // reload (e.g. switching months) FutureBuilder keeps the
+                    // previous month's data until the new figures arrive, then
+                    // swaps them in a single frame.
+                    if (!snapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    final data = snapshot.data!;
+                    final monthlyIncome = data[0] as double;
+                    final spending = data[1] as Map<String, CategorySpending>;
+                    final incomeFlows =
+                        data[2] as Map<String, CategorySpending>;
+
+                    final baseIncome =
+                        expectedIncome > 0 ? expectedIncome : monthlyIncome;
                     final availableToAllocate = baseIncome - totalBudget;
-                    final allocationPercentage = baseIncome > 0 ? (totalBudget / baseIncome * 100) : 0.0;
+                    final allocationPercentage =
+                        baseIncome > 0 ? (totalBudget / baseIncome * 100) : 0.0;
 
-                    return FutureBuilder<List<Map<String, dynamic>>>(
-                      future: Future.wait([
-                        ref.read(financeRepositoryProvider).getSpendingByCategory(selectedDate.month, selectedDate.year),
-                        ref.read(financeRepositoryProvider).getIncomeByCategory(selectedDate.month, selectedDate.year),
-                      ]),
-                      builder: (context, snapshots) {
-                        final spending = snapshots.data?[0] ?? {};
-                        final incomeFlows = snapshots.data?[1] ?? {};
-                        final totalSpent = spending.values.fold<double>(0.0, (sum, val) => sum + (val as CategorySpending).total);
-                        final budgetAmountsMap = {
-                          for (final b in budgets) b.categoryId: b.amount as double,
-                        };
-                        final sortedCategories = [...categories]..sort((a, b) {
-                          final aBudget = budgetAmountsMap[a.id] ?? 0.0;
-                          final bBudget = budgetAmountsMap[b.id] ?? 0.0;
-                          return bBudget.compareTo(aBudget);
-                        });
+                    final totalSpent = spending.values
+                        .fold<double>(0.0, (sum, val) => sum + val.total);
+                    final budgetAmountsMap = {
+                      for (final b in budgets) b.categoryId: b.amount as double,
+                    };
+                    final sortedCategories = [...categories]..sort((a, b) {
+                        final aBudget = budgetAmountsMap[a.id] ?? 0.0;
+                        final bBudget = budgetAmountsMap[b.id] ?? 0.0;
+                        return bBudget.compareTo(aBudget);
+                      });
 
-                        // Split budget/spent totals into expense vs savings so the
-                        // Financial Health card can show commitments distinctly.
-                        double savingsBudget = 0.0;
-                        double savingsContributed = 0.0;
-                        for (final cat in categories) {
-                          if (cat.type != 'savings') continue;
-                          savingsBudget += budgetAmountsMap[cat.id] ?? 0.0;
-                          final sc = spending[cat.id];
-                          if (sc is CategorySpending) savingsContributed += sc.total;
-                        }
-                        final expenseBudget = (totalBudget - savingsBudget).clamp(0.0, double.infinity);
-                        final expenseSpent = (totalSpent - savingsContributed).clamp(0.0, double.infinity);
+                    // Split budget/spent totals into expense vs savings so the
+                    // Financial Health card can show commitments distinctly.
+                    double savingsBudget = 0.0;
+                    double savingsContributed = 0.0;
+                    for (final cat in categories) {
+                      if (cat.type != 'savings') continue;
+                      savingsBudget += budgetAmountsMap[cat.id] ?? 0.0;
+                      final sc = spending[cat.id];
+                      if (sc is CategorySpending)
+                        savingsContributed += sc.total;
+                    }
+                    final expenseBudget = (totalBudget - savingsBudget)
+                        .clamp(0.0, double.infinity);
+                    final expenseSpent = (totalSpent - savingsContributed)
+                        .clamp(0.0, double.infinity);
 
-                        final savingsCategories = sortedCategories
-                            .where((c) => c.type == 'savings')
-                            .toList();
-                        final nonSavingsCategories = sortedCategories
-                            .where((c) => c.type != 'savings')
-                            .toList();
-                        final accumulated =
-                            accumulatedBalancesAsync.valueOrNull ?? const {};
+                    final savingsCategories = sortedCategories
+                        .where((c) => c.type == 'savings')
+                        .toList();
+                    final nonSavingsCategories = sortedCategories
+                        .where((c) => c.type != 'savings')
+                        .toList();
+                    final accumulated =
+                        accumulatedBalancesAsync.valueOrNull ?? const {};
 
-                        Widget buildRow(Category cat) {
-                          final budget = budgets.cast<dynamic>().firstWhere(
+                    Widget buildRow(Category cat) {
+                      final budget = budgets.cast<dynamic>().firstWhere(
                             (b) => b.categoryId == cat.id,
                             orElse: () => null,
                           );
-                          final actualSpent = cat.type == 'income'
-                              ? (incomeFlows[cat.id]?.total ?? 0.0)
-                              : (spending[cat.id]?.total ?? 0.0);
-                          final budgetAmount = budget?.amount ?? 0.0;
+                      final actualSpent = cat.type == 'income'
+                          ? (incomeFlows[cat.id]?.total ?? 0.0)
+                          : (spending[cat.id]?.total ?? 0.0);
+                      final budgetAmount = budget?.amount ?? 0.0;
 
-                          final subSpending = cat.type == 'income'
-                              ? incomeFlows[cat.id]?.subCategories
-                              : spending[cat.id]?.subCategories;
+                      final subSpending = cat.type == 'income'
+                          ? incomeFlows[cat.id]?.subCategories
+                          : spending[cat.id]?.subCategories;
 
-                          return BudgetComparisonWidget(
-                            categoryName: cat.name,
-                            budgetAmount: budgetAmount,
-                            spentAmount: actualSpent,
-                            color: cat.color != null
-                                ? _parseColor(cat.color!)
-                                : null,
-                            iconName: cat.icon,
-                            isIncome: cat.type == 'income',
-                            isSavings: cat.type == 'savings',
-                            accumulatedBalance: cat.type == 'savings'
-                                ? (accumulated[cat.id] ?? 0.0)
-                                : null,
-                            subCategories: cat.subCategories,
-                            subCategorySpending: subSpending,
-                            onEditBudget: () {
-                              showDialog(
-                                context: context,
-                                builder: (context) => EditBudgetDialog(
-                                  categoryId: cat.id,
-                                  categoryName: cat.name,
-                                  month: selectedDate.month,
-                                  year: selectedDate.year,
-                                  currentAmount: budget?.amount,
-                                  categoryType: cat.type,
-                                  categoryIcon: cat.icon,
-                                  categoryColor: cat.color,
-                                ),
-                              );
-                            },
-                            onEditCategory: () {
-                              showDialog(
-                                context: context,
-                                builder: (context) =>
-                                    EditCategoryDialog(category: cat),
-                              );
-                            },
+                      return BudgetComparisonWidget(
+                        categoryName: cat.name,
+                        budgetAmount: budgetAmount,
+                        spentAmount: actualSpent,
+                        color:
+                            cat.color != null ? _parseColor(cat.color!) : null,
+                        iconName: cat.icon,
+                        isIncome: cat.type == 'income',
+                        isSavings: cat.type == 'savings',
+                        accumulatedBalance: cat.type == 'savings'
+                            ? (accumulated[cat.id] ?? 0.0)
+                            : null,
+                        subCategories: cat.subCategories,
+                        subCategorySpending: subSpending,
+                        onEditBudget: () {
+                          showDialog(
+                            context: context,
+                            builder: (context) => EditBudgetDialog(
+                              categoryId: cat.id,
+                              categoryName: cat.name,
+                              month: selectedDate.month,
+                              year: selectedDate.year,
+                              currentAmount: budget?.amount,
+                              categoryType: cat.type,
+                              categoryIcon: cat.icon,
+                              categoryColor: cat.color,
+                            ),
                           );
-                        }
-
-                        return Column(
-                          children: [
-                            _BudgetTopCard(
-                              monthlyIncome: monthlyIncome,
-                              expectedIncome: expectedIncome,
-                              totalBudget: totalBudget,
-                              totalSpent: totalSpent,
-                              expenseBudget: expenseBudget,
-                              expenseSpent: expenseSpent,
-                              savingsBudget: savingsBudget,
-                              savingsContributed: savingsContributed,
-                              allocationPercentage: allocationPercentage,
-                              availableToAllocate: availableToAllocate,
-                              categories: sortedCategories,
-                              spending: spending,
-                              budgetAmounts: budgetAmountsMap,
+                        },
+                        onEditCategory: () {
+                          showDialog(
+                            context: context,
+                            builder: (context) =>
+                                EditCategoryDialog(category: cat),
+                          );
+                        },
+                        onViewTransactions: () {
+                          showDialog(
+                            context: context,
+                            builder: (_) => CategoryTransactionsDialog(
+                              categoryId: cat.id,
+                              categoryName: cat.name,
+                              categoryType: cat.type,
+                              month: selectedDate.month,
+                              year: selectedDate.year,
                             ),
+                          );
+                        },
+                      );
+                    }
 
-                            // Categories list (expense + income, then savings).
-                            Expanded(
-                              child: ListView(
-                                physics: const AlwaysScrollableScrollPhysics(),
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
-                                children: [
-                                  ...nonSavingsCategories.map(buildRow),
-                                  if (savingsCategories.isNotEmpty) ...[
-                                    Padding(
-                                      padding: const EdgeInsets.only(
-                                          top: 16, bottom: 8, left: 4),
-                                      child: Row(
-                                        children: [
-                                          Icon(Icons.savings_outlined,
-                                              size: 16,
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .onSurface
-                                                  .withOpacity(0.7)),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            'Savings & Sinking Funds',
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w700,
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .onSurface
-                                                  .withOpacity(0.75),
-                                            ),
-                                          ),
-                                        ],
+                    return Column(
+                      children: [
+                        _BudgetTopCard(
+                          monthlyIncome: monthlyIncome,
+                          expectedIncome: expectedIncome,
+                          totalBudget: totalBudget,
+                          totalSpent: totalSpent,
+                          expenseBudget: expenseBudget,
+                          expenseSpent: expenseSpent,
+                          savingsBudget: savingsBudget,
+                          savingsContributed: savingsContributed,
+                          allocationPercentage: allocationPercentage,
+                          availableToAllocate: availableToAllocate,
+                          categories: sortedCategories,
+                          spending: spending,
+                          budgetAmounts: budgetAmountsMap,
+                        ),
+
+                        // Categories list (expense + income, then savings).
+                        Expanded(
+                          child: ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            children: [
+                              ...nonSavingsCategories.map(buildRow),
+                              if (savingsCategories.isNotEmpty) ...[
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                      top: 16, bottom: 8, left: 4),
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.savings_outlined,
+                                          size: 16,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface
+                                              .withOpacity(0.7)),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Savings & Sinking Funds',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface
+                                              .withOpacity(0.75),
+                                        ),
                                       ),
-                                    ),
-                                    ...savingsCategories.map(buildRow),
-                                  ],
-                                ],
-                              ),
-                            ),
-                          ],
-                        );
-                      },
+                                    ],
+                                  ),
+                                ),
+                                ...savingsCategories.map(buildRow),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
                     );
                   },
                 );
               },
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, s) => Center(child: Text('Error loading categories: $e')),
+              error: (e, s) =>
+                  Center(child: Text('Error loading categories: $e')),
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
@@ -366,7 +419,20 @@ class BudgetScreen extends ConsumerWidget {
   }
 
   String _getMonthName(int month) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
     return months[month - 1];
   }
 }
@@ -409,8 +475,8 @@ class _BudgetTopCard extends StatefulWidget {
 }
 
 class _BudgetTopCardState extends State<_BudgetTopCard> {
-  int _view = 0;        // 0 = Financial Health, 1 = Donut
-  int _donutMode = 0;   // 0 = Budget distribution, 1 = Spending distribution
+  int _view = 0; // 0 = Financial Health, 1 = Donut
+  int _donutMode = 0; // 0 = Budget distribution, 1 = Spending distribution
 
   @override
   Widget build(BuildContext context) {
@@ -425,7 +491,8 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
           gradient: LinearGradient(
             colors: [
               Theme.of(context).cardTheme.color ?? Colors.white,
-              Theme.of(context).cardTheme.color?.withOpacity(0.95) ?? Colors.white.withOpacity(0.95),
+              Theme.of(context).cardTheme.color?.withOpacity(0.95) ??
+                  Colors.white.withOpacity(0.95),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -457,7 +524,8 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
                         ),
                       ],
                       selected: {_view},
-                      onSelectionChanged: (s) => setState(() => _view = s.first),
+                      onSelectionChanged: (s) =>
+                          setState(() => _view = s.first),
                     ),
                     const Spacer(),
                     if (_view == 0)
@@ -605,7 +673,8 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
                     ? const Color(0xFFD32F2F)
                     : const Color(0xFFFF6F61),
               ),
-              if (widget.savingsBudget > 0 || widget.savingsContributed > 0) ...[
+              if (widget.savingsBudget > 0 ||
+                  widget.savingsContributed > 0) ...[
                 _buildSummaryColumn(
                   context,
                   label: 'Savings target',
@@ -629,7 +698,8 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
             if (widget.totalSpent > widget.totalBudget)
               Container(
                 margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
                   color: Colors.red.withOpacity(0.05),
                   borderRadius: BorderRadius.circular(8),
@@ -642,28 +712,38 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
                     Expanded(
                       child: Text(
                         'Over budget by ${CurrencyFormatter.format(widget.totalSpent - widget.totalBudget, decimalDigits: 2)}',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.red[200]),
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.red[200]),
                       ),
                     ),
                   ],
                 ),
               ),
-            if (widget.monthlyIncome > 0 && widget.totalSpent > widget.monthlyIncome)
+            if (widget.monthlyIncome > 0 &&
+                widget.totalSpent > widget.monthlyIncome)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
                   color: const Color(0xFFD32F2F).withOpacity(0.25),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFD32F2F).withOpacity(0.7)),
+                  border: Border.all(
+                      color: const Color(0xFFD32F2F).withOpacity(0.7)),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.warning_amber_rounded, color: Color(0xFFD32F2F), size: 16),
+                    const Icon(Icons.warning_amber_rounded,
+                        color: Color(0xFFD32F2F), size: 16),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Spending exceeds actual income by ${CurrencyFormatter.format(widget.totalSpent - widget.monthlyIncome, decimalDigits: 2)}',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.red[200]),
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.red[200]),
                       ),
                     ),
                   ],
@@ -701,9 +781,13 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
 
     // Each mode filters and sizes slices independently
     final visibleCategories = isBudgetMode
-        ? committableCategories.where((c) => (widget.budgetAmounts[c.id] ?? 0.0) > 0).toList()
+        ? committableCategories
+            .where((c) => (widget.budgetAmounts[c.id] ?? 0.0) > 0)
+            .toList()
         : committableCategories
-            .where((c) => ((widget.spending[c.id] as CategorySpending?)?.total ?? 0.0) > 0)
+            .where((c) =>
+                ((widget.spending[c.id] as CategorySpending?)?.total ?? 0.0) >
+                0)
             .toList();
 
     final sections = visibleCategories.map((c) {
@@ -711,13 +795,15 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
           ? (widget.budgetAmounts[c.id] ?? 0.0)
           : (widget.spending[c.id] as CategorySpending).total;
       final color = c.color != null ? _parseColor(c.color!) : Colors.grey;
-      return PieChartSectionData(value: value, color: color, radius: 44, title: '');
+      return PieChartSectionData(
+          value: value, color: color, radius: 44, title: '');
     }).toList();
 
     final totalRef = sections.fold<double>(0.0, (s, sec) => s + sec.value);
     final centerLabel = isBudgetMode ? 'Budget' : 'Spent';
     final centerAmount = isBudgetMode ? widget.totalBudget : widget.totalSpent;
-    final emptyMessage = isBudgetMode ? 'No budgets set yet.' : 'No spending recorded yet.';
+    final emptyMessage =
+        isBudgetMode ? 'No budgets set yet.' : 'No spending recorded yet.';
 
     return Column(
       key: ValueKey(_donutMode),
@@ -729,7 +815,8 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
         if (visibleCategories.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 24),
-            child: Text(emptyMessage, style: const TextStyle(color: Colors.grey)),
+            child:
+                Text(emptyMessage, style: const TextStyle(color: Colors.grey)),
           )
         else ...[
           SizedBox(
@@ -751,12 +838,16 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
                       centerLabel,
                       style: TextStyle(
                         fontSize: 11,
-                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withOpacity(0.6),
                       ),
                     ),
                     Text(
                       CurrencyFormatter.format(centerAmount, decimalDigits: 0),
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 14),
                     ),
                   ],
                 ),
@@ -773,14 +864,16 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
                   ? (widget.budgetAmounts[c.id] ?? 0.0)
                   : (widget.spending[c.id] as CategorySpending).total;
               final pct = totalRef > 0 ? (value / totalRef * 100) : 0.0;
-              final color = c.color != null ? _parseColor(c.color!) : Colors.grey;
+              final color =
+                  c.color != null ? _parseColor(c.color!) : Colors.grey;
               return Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
                     width: 8,
                     height: 8,
-                    decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                    decoration:
+                        BoxDecoration(color: color, shape: BoxShape.circle),
                   ),
                   const SizedBox(width: 4),
                   ConstrainedBox(
@@ -838,7 +931,9 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
                 ),
               ),
             const SizedBox(width: 6),
-            Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500)),
+            Text(label,
+                style:
+                    const TextStyle(fontSize: 11, fontWeight: FontWeight.w500)),
           ],
         ),
         const SizedBox(height: 2),
@@ -860,13 +955,17 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
 class _FinancialHealthBar extends StatelessWidget {
   final double income;
   final double expectedIncome;
+
   /// Expense-only planned; the "Budget" marker lands here.
   final double budget;
+
   /// Expense-only actual; the "Spent" marker lands here.
   final double spent;
+
   /// Savings target for the month; rendered as a hatched teal segment
   /// stacked right after [budget] and as a "Target" marker at [budget]+[savingsBudget].
   final double savingsBudget;
+
   /// Savings contributed this month; rendered as a solid teal segment
   /// stacked right after [spent] and as a "Saved" marker at [spent]+[savingsContributed].
   final double savingsContributed;
@@ -968,8 +1067,8 @@ class _FinancialHealthBar extends StatelessWidget {
             savingsBudget > 0 ? clampLabelLeft(targetWidth) : 0;
 
         final bool bothLabels = budget > 0 && spent > 0;
-        final bool labelsCollide = bothLabels &&
-            (budgetLabelLeft - spentLabelLeft).abs() < labelWidth;
+        final bool labelsCollide =
+            bothLabels && (budgetLabelLeft - spentLabelLeft).abs() < labelWidth;
 
         // When labels collide, stack them: Spent on the upper row, Budget on
         // the lower row (closer to the bar). Otherwise both share one row.
@@ -977,9 +1076,8 @@ class _FinancialHealthBar extends StatelessWidget {
             ? labelRowHeight * 2 + labelGap
             : labelRowHeight + labelGap;
 
-        final double budgetLabelTop = labelsCollide
-            ? labelRowHeight + labelGap
-            : 0;
+        final double budgetLabelTop =
+            labelsCollide ? labelRowHeight + labelGap : 0;
         final double spentLabelTop = 0;
         // Saved label sits on the same row as Spent when they're far apart;
         // drops to the budget row if it would overlap spent.
@@ -1190,7 +1288,8 @@ class _FinancialHealthBar extends StatelessWidget {
                         left: (savedWidth - 1).clamp(0, maxWidth - 2),
                         top: 0,
                         bottom: 0,
-                        child: Container(width: 2, color: effectiveSavingsColor),
+                        child:
+                            Container(width: 2, color: effectiveSavingsColor),
                       ),
                   ],
                 ),
@@ -1256,7 +1355,8 @@ class _MonthPickerDialogState extends State<_MonthPickerDialog> {
             icon: const Icon(Icons.arrow_back_ios, size: 16),
             onPressed: () => setState(() => _selectedYear--),
           ),
-          Text(_selectedYear.toString(), style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text(_selectedYear.toString(),
+              style: const TextStyle(fontWeight: FontWeight.bold)),
           IconButton(
             icon: const Icon(Icons.arrow_forward_ios, size: 16),
             onPressed: () => setState(() => _selectedYear++),
@@ -1276,16 +1376,22 @@ class _MonthPickerDialogState extends State<_MonthPickerDialog> {
           itemCount: 12,
           itemBuilder: (context, index) {
             final month = index + 1;
-            final isSelected = _selectedYear == widget.initialDate.year && month == widget.initialDate.month;
+            final isSelected = _selectedYear == widget.initialDate.year &&
+                month == widget.initialDate.month;
             return InkWell(
-              onTap: () => Navigator.pop(context, DateTime(_selectedYear, month)),
+              onTap: () =>
+                  Navigator.pop(context, DateTime(_selectedYear, month)),
               borderRadius: BorderRadius.circular(8),
               child: Container(
                 decoration: BoxDecoration(
-                  color: isSelected ? Theme.of(context).primaryColor : Colors.transparent,
+                  color: isSelected
+                      ? Theme.of(context).primaryColor
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: isSelected ? Theme.of(context).primaryColor : Colors.grey.withOpacity(0.3),
+                    color: isSelected
+                        ? Theme.of(context).primaryColor
+                        : Colors.grey.withOpacity(0.3),
                   ),
                 ),
                 alignment: Alignment.center,
@@ -1293,7 +1399,9 @@ class _MonthPickerDialogState extends State<_MonthPickerDialog> {
                   _getMonthName(month),
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: isSelected ? Colors.white : Theme.of(context).textTheme.bodyMedium?.color,
+                    color: isSelected
+                        ? Colors.white
+                        : Theme.of(context).textTheme.bodyMedium?.color,
                   ),
                 ),
               ),
@@ -1305,7 +1413,20 @@ class _MonthPickerDialogState extends State<_MonthPickerDialog> {
   }
 
   String _getMonthName(int month) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
     return months[month - 1];
   }
 }

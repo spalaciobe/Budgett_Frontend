@@ -3,6 +3,7 @@ class RecurringTransaction {
   final String description;
   final double amount;
   final String? categoryId;
+  final String? subCategoryId;
   final String? accountId;
   final String type; // 'income', 'expense', 'transfer'
   final String frequency; // 'daily', 'weekly', 'biweekly', 'monthly', 'yearly'
@@ -16,6 +17,7 @@ class RecurringTransaction {
     required this.description,
     required this.amount,
     this.categoryId,
+    this.subCategoryId,
     this.accountId,
     required this.type,
     required this.frequency,
@@ -31,6 +33,7 @@ class RecurringTransaction {
       description: json['description'] ?? '',
       amount: (json['amount'] as num).toDouble(),
       categoryId: json['category_id'],
+      subCategoryId: json['sub_category_id'],
       accountId: json['account_id'],
       type: json['type'],
       frequency: json['frequency'],
@@ -46,6 +49,7 @@ class RecurringTransaction {
       'description': description,
       'amount': amount,
       'category_id': categoryId,
+      'sub_category_id': subCategoryId,
       'account_id': accountId,
       'type': type,
       'frequency': frequency,

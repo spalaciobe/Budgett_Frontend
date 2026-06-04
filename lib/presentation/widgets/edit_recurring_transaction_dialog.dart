@@ -29,7 +29,13 @@ class _EditRecurringTransactionDialogState
   late bool _isActive;
   late DateTime _nextRunDate;
   String? _accountId;
-  String? _categoryId;
+
+  /// Unified category/subcategory selection. Holds a subcategory id when one is
+  /// set (e.g. "Leisure > Events"), otherwise the parent category id. Resolved
+  /// back into category_id + sub_category_id in [_save].
+  String? _selectedCategoryValue;
+
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -43,7 +49,7 @@ class _EditRecurringTransactionDialogState
     _isActive = t.isActive;
     _nextRunDate = t.nextRunDate;
     _accountId = t.accountId;
-    _categoryId = t.categoryId;
+    _selectedCategoryValue = t.subCategoryId ?? t.categoryId;
   }
 
   @override
@@ -111,28 +117,65 @@ class _EditRecurringTransactionDialogState
   }
 
   Future<void> _save() async {
+    if (_isLoading) return;
     if (!_formKey.currentState!.validate()) return;
 
     final amount = double.tryParse(_amountController.text.replaceAll(',', '.'));
     if (amount == null) return;
 
-    final repo = ref.read(financeRepositoryProvider);
-    await repo.updateRecurringTransaction(widget.transaction.id, {
-      'description': _descriptionController.text.trim(),
-      'amount': amount,
-      'category_id': _categoryId,
-      'account_id': _accountId,
-      'type': _type,
-      'frequency': _frequency,
-      'next_run_date': _nextRunDate.toIso8601String().split('T')[0],
-      'is_active': _isActive,
-      'currency': _currency,
-    });
+    // Resolve the unified dropdown value back into category_id + sub_category_id.
+    final categories = ref.read(categoriesProvider).value ?? [];
+    String? finalCategoryId;
+    String? finalSubCategoryId;
+    if (_selectedCategoryValue != null) {
+      try {
+        final cat =
+            categories.firstWhere((c) => c.id == _selectedCategoryValue);
+        finalCategoryId = cat.id;
+      } catch (_) {
+        for (final cat in categories) {
+          if (cat.subCategories != null) {
+            try {
+              final sub = cat.subCategories!
+                  .firstWhere((s) => s.id == _selectedCategoryValue);
+              finalCategoryId = cat.id;
+              finalSubCategoryId = sub.id;
+              break;
+            } catch (_) {}
+          }
+        }
+      }
+    }
 
-    ref.invalidate(recurringTransactionsProvider);
+    setState(() => _isLoading = true);
+    try {
+      final repo = ref.read(financeRepositoryProvider);
+      await repo.updateRecurringTransaction(widget.transaction.id, {
+        'description': _descriptionController.text.trim(),
+        'amount': amount,
+        'category_id': finalCategoryId,
+        'sub_category_id': finalSubCategoryId,
+        'account_id': _accountId,
+        'type': _type,
+        'frequency': _frequency,
+        'next_run_date': _nextRunDate.toIso8601String().split('T')[0],
+        'is_active': _isActive,
+        'currency': _currency,
+      });
 
-    if (mounted) {
-      Navigator.of(context).pop(true);
+      ref.invalidate(recurringTransactionsProvider);
+
+      if (mounted) {
+        Navigator.of(context).pop(true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -158,7 +201,12 @@ class _EditRecurringTransactionDialogState
                     ButtonSegment(value: 'income', label: Text('Income'), icon: Icon(Icons.arrow_downward)),
                   ],
                   selected: {_type},
-                  onSelectionChanged: (s) => setState(() => _type = s.first),
+                  onSelectionChanged: (s) => setState(() {
+                    _type = s.first;
+                    // Categories are type-scoped; the prior selection may no
+                    // longer be valid after switching income/expense.
+                    _selectedCategoryValue = null;
+                  }),
                 ),
                 kGapMd,
                 TextFormField(
@@ -258,32 +306,55 @@ class _EditRecurringTransactionDialogState
                 kGapMd,
                 categoriesAsync.when(
                   data: (categories) {
-                    final filtered = categories
-                        .where((c) => _type == 'income' ? c.isIncome : !c.isIncome)
-                        .toList();
-                    final valid = filtered.any((c) => c.id == _categoryId);
+                    final filtered =
+                        categories.where((c) => c.type == _type).toList();
+
+                    final items = <DropdownMenuItem<String?>>[
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('None'),
+                      ),
+                    ];
+                    final validValues = <String?>{null};
+                    for (final cat in filtered) {
+                      if (cat.subCategories != null &&
+                          cat.subCategories!.isNotEmpty) {
+                        for (final sub in cat.subCategories!) {
+                          validValues.add(sub.id);
+                          items.add(DropdownMenuItem<String?>(
+                            value: sub.id,
+                            child: Text(
+                              '${cat.name} > ${sub.name}',
+                              style: const TextStyle(fontSize: 13),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ));
+                        }
+                      } else {
+                        validValues.add(cat.id);
+                        items.add(DropdownMenuItem<String?>(
+                          value: cat.id,
+                          child: Text(
+                            cat.name,
+                            style: const TextStyle(fontSize: 13),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ));
+                      }
+                    }
+
                     return DropdownButtonFormField<String?>(
-                      value: valid ? _categoryId : null,
+                      value: validValues.contains(_selectedCategoryValue)
+                          ? _selectedCategoryValue
+                          : null,
                       isExpanded: true,
                       decoration: const InputDecoration(
                         labelText: 'Category (optional)',
                         border: OutlineInputBorder(),
                       ),
-                      items: [
-                        const DropdownMenuItem<String?>(
-                          value: null,
-                          child: Text('None'),
-                        ),
-                        ...filtered.map((c) => DropdownMenuItem<String?>(
-                              value: c.id,
-                              child: Text(
-                                c.name,
-                                style: const TextStyle(fontSize: 13),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            )),
-                      ],
-                      onChanged: (v) => setState(() => _categoryId = v),
+                      items: items,
+                      onChanged: (v) =>
+                          setState(() => _selectedCategoryValue = v),
                     );
                   },
                   loading: () => const LinearProgressIndicator(),
@@ -308,8 +379,14 @@ class _EditRecurringTransactionDialogState
           child: const Text('Cancel'),
         ),
         FilledButton(
-          onPressed: _save,
-          child: const Text('Save'),
+          onPressed: _isLoading ? null : _save,
+          child: _isLoading
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Save'),
         ),
       ],
     );

@@ -638,6 +638,57 @@ class FinanceRepository {
     return data.map((json) => Transaction.fromJson(json)).toList();
   }
 
+  /// The individual transactions that make up a category's monthly total on
+  /// the Budget screen, for the given [month]/[year]. Mirrors the filters used
+  /// by [getSpendingByCategory] / [getIncomeByCategory] so the list reconciles
+  /// with the "Spent" / "Earned" / "Contributed" headline shown on the card:
+  ///
+  /// - expense: expense rows tagged with the category (excluding the
+  ///   display-only installment parent and expenses funded out of a sinking
+  ///   fund) plus any reimbursements tagged with it (income rows that offset
+  ///   the spend);
+  /// - income: income rows tagged with the category, excluding reimbursements;
+  /// - savings: transfers tagged with the category (this month's contributions).
+  ///
+  /// Pending rows are excluded everywhere, matching the card. COP-only.
+  Future<List<Transaction>> getCategoryMonthTransactions(
+    String categoryId,
+    int month,
+    int year, {
+    required String categoryType,
+  }) async {
+    final userId = _client.auth.currentUser!.id;
+    final firstDay = '$year-${month.toString().padLeft(2, '0')}-01';
+    final nextMonth = month == 12
+        ? '${year + 1}-01-01'
+        : '$year-${(month + 1).toString().padLeft(2, '0')}-01';
+
+    var query = _client
+        .from('transactions')
+        .select()
+        .eq('user_id', userId)
+        .eq('currency', 'COP')
+        .eq('category_id', categoryId)
+        .neq('status', 'pending')
+        .gte('date', firstDay)
+        .lt('date', nextMonth);
+
+    if (categoryType == 'savings') {
+      query = query.eq('type', 'transfer');
+    } else if (categoryType == 'income') {
+      query = query
+          .eq('type', 'income')
+          .or('movement_type.is.null,movement_type.neq.reimbursement');
+    } else {
+      query = query
+          .eq('is_installment_parent', false)
+          .isFilter('funded_by_category_id', null);
+    }
+
+    final List<dynamic> data = await query.order('date', ascending: false);
+    return data.map((json) => Transaction.fromJson(json)).toList();
+  }
+
   // Monthly Aggregations
   Future<double> getMonthlyIncome(int month, int year) async {
     final userId = _client.auth.currentUser!.id;
@@ -1707,12 +1758,28 @@ class FinanceRepository {
     }
   }
 
+  /// In-flight catch-up run, used to coalesce concurrent calls. See
+  /// [processRecurringDue].
+  Future<int>? _recurringDueInFlight;
+
   /// Catches up every active recurring transaction whose [nextRunDate] has
   /// passed: emits a pending transaction stamped with each missed scheduled
   /// date, then advances [nextRunDate] until it is in the future. Returns the
   /// number of transactions inserted so callers can decide whether to refresh
   /// dependent providers.
-  Future<int> processRecurringDue() async {
+  ///
+  /// Concurrent invocations are coalesced into a single run. At startup the
+  /// Supabase auth stream emits several events back-to-back (INITIAL_SESSION,
+  /// SIGNED_IN, then periodic TOKEN_REFRESHED), each of which re-triggers the
+  /// catch-up provider. Without this guard two overlapping runs would read the
+  /// same due rows and insert the same transactions before [nextRunDate] is
+  /// advanced, producing duplicate auto-generated transactions.
+  Future<int> processRecurringDue() {
+    return _recurringDueInFlight ??= _processRecurringDueImpl()
+        .whenComplete(() => _recurringDueInFlight = null);
+  }
+
+  Future<int> _processRecurringDueImpl() async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) return 0;
 
@@ -1738,6 +1805,7 @@ class FinanceRepository {
           'description': r.description,
           'amount': r.amount,
           'category_id': r.categoryId,
+          'sub_category_id': r.subCategoryId,
           'account_id': r.accountId,
           'type': r.type,
           'currency': r.currency,
@@ -1767,6 +1835,7 @@ class FinanceRepository {
       'description': recurring.description,
       'amount': recurring.amount,
       'category_id': recurring.categoryId,
+      'sub_category_id': recurring.subCategoryId,
       'account_id': recurring.accountId,
       'type': recurring.type,
       // 'movement_type': recurring.movementType, // If we added this to model

@@ -18,6 +18,9 @@ class BudgetComparisonWidget extends StatefulWidget {
   final String? iconName;
   final VoidCallback? onEditBudget;
   final VoidCallback? onEditCategory;
+  /// Opens the list of this category's transactions for the selected month
+  /// (the magnifying-glass button in the header).
+  final VoidCallback? onViewTransactions;
   final List<SubCategory>? subCategories;
   final Map<String, double>? subCategorySpending;
 
@@ -30,6 +33,7 @@ class BudgetComparisonWidget extends StatefulWidget {
     this.iconName,
     this.onEditBudget,
     this.onEditCategory,
+    this.onViewTransactions,
     this.isIncome = false,
     this.isSavings = false,
     this.accumulatedBalance,
@@ -44,6 +48,24 @@ class BudgetComparisonWidget extends StatefulWidget {
 class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
   bool _expanded = true;
   bool _subExpanded = true;
+
+  /// Magnifying-glass button that opens this category's transactions for the
+  /// month. Absorbs its own tap so it doesn't trigger the header's edit-budget
+  /// InkWell.
+  Widget _viewTransactionsButton(BuildContext context) {
+    return IconButton(
+      visualDensity: VisualDensity.compact,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+      iconSize: 18,
+      tooltip: 'View transactions',
+      icon: Icon(
+        Icons.search,
+        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+      ),
+      onPressed: widget.onViewTransactions,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -106,6 +128,10 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                         ],
                       ),
                     ),
+                    if (hasActivity && widget.onViewTransactions != null) ...[
+                      _viewTransactionsButton(context),
+                      const SizedBox(width: 4),
+                    ],
                     if (hasActivity)
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
@@ -253,6 +279,8 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
+                      if (widget.onViewTransactions != null)
+                        _viewTransactionsButton(context),
                       const SizedBox(width: 4),
                       GestureDetector(
                         onTap: () => setState(() => _expanded = !_expanded),
@@ -301,53 +329,66 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Amounts row
+                  // Amounts row. Both columns are Flexible with ellipsis so
+                  // large COP amounts can't overflow on narrow phones.
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.isIncome
-                                ? 'Earned'
-                                : widget.isSavings
-                                    ? 'Contributed'
-                                    : 'Spent',
-                            style: TextStyle(
-                                fontSize: 12, color: Colors.grey[200]),
-                          ),
-                          Text(
-                            CurrencyFormatter.format(widget.spentAmount,
-                                decimalDigits: 2),
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: !widget.isIncome &&
-                                      !widget.isSavings &&
-                                      isOverBudget
-                                  ? Theme.of(context).colorScheme.error
-                                  : null,
+                      Flexible(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.isIncome
+                                  ? 'Earned'
+                                  : widget.isSavings
+                                      ? 'Contributed'
+                                      : 'Spent',
+                              style: TextStyle(
+                                  fontSize: 12, color: Colors.grey[200]),
                             ),
-                          ),
-                        ],
+                            Text(
+                              CurrencyFormatter.format(widget.spentAmount,
+                                  decimalDigits: 2),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: !widget.isIncome &&
+                                        !widget.isSavings &&
+                                        isOverBudget
+                                    ? Theme.of(context).colorScheme.error
+                                    : null,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            widget.isIncome
-                                ? 'Target'
-                                : widget.isSavings
-                                    ? 'Monthly target'
-                                    : 'Budget',
-                            style: TextStyle(
-                                fontSize: 12, color: Colors.grey[200]),
-                          ),
-                          Text(
-                            CurrencyFormatter.format(widget.budgetAmount),
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ],
+                      const SizedBox(width: 12),
+                      Flexible(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              widget.isIncome
+                                  ? 'Target'
+                                  : widget.isSavings
+                                      ? 'Monthly target'
+                                      : 'Budget',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  fontSize: 12, color: Colors.grey[200]),
+                            ),
+                            Text(
+                              CurrencyFormatter.format(widget.budgetAmount),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),

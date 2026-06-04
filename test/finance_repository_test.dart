@@ -489,6 +489,40 @@ void main() {
       expect(json['description'], 'Gym');
       expect(json['frequency'], 'monthly');
     });
+
+    test('round-trips sub_category_id (Leisure > Events)', () {
+      final rt = RecurringTransaction.fromJson({
+        'id': 'rt-5',
+        'description': 'Concert tickets',
+        'amount': 120000.0,
+        'category_id': 'cat-leisure',
+        'sub_category_id': 'sub-events',
+        'type': 'expense',
+        'frequency': 'monthly',
+        'next_run_date': '2026-04-15',
+        'is_active': true,
+      });
+      expect(rt.categoryId, 'cat-leisure');
+      expect(rt.subCategoryId, 'sub-events');
+      // toJson must carry the subcategory so the rule remembers it on insert.
+      expect(rt.toJson()['sub_category_id'], 'sub-events');
+    });
+
+    test('sub_category_id is null when absent', () {
+      final rt = RecurringTransaction.fromJson({
+        'id': 'rt-6',
+        'description': 'Arriendo',
+        'amount': 900000.0,
+        'category_id': 'cat-housing',
+        'type': 'expense',
+        'frequency': 'monthly',
+        'next_run_date': '2026-04-05',
+        'is_active': true,
+      });
+      expect(rt.subCategoryId, isNull);
+      expect(rt.toJson().containsKey('sub_category_id'), isTrue);
+      expect(rt.toJson()['sub_category_id'], isNull);
+    });
   });
 
   // ─── CategorySpending Tests ───────────────────────────────────────────────

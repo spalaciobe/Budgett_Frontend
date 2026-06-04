@@ -72,6 +72,22 @@ final categoriesProvider = FutureProvider<List<Category>>((ref) async {
   return repository.getCategories();
 });
 
+/// Transactions that make up a category's monthly total on the Budget screen.
+/// Mirrors the filters in [FinanceRepository.getCategoryMonthTransactions] so
+/// the list reconciles with the card's "Spent" / "Earned" / "Contributed"
+/// headline. `autoDispose` because it's opened transiently from a dialog.
+final categoryMonthTransactionsProvider = FutureProvider.autoDispose.family<
+    List<Transaction>,
+    ({String categoryId, int month, int year, String type})>((ref, params) async {
+  final repository = ref.watch(financeRepositoryProvider);
+  return repository.getCategoryMonthTransactions(
+    params.categoryId,
+    params.month,
+    params.year,
+    categoryType: params.type,
+  );
+});
+
 /// Lifetime running balance per savings category (sinking fund).
 /// Keyed by category_id. Categories with zero net activity are omitted.
 final categoryAccumulatedBalancesProvider =
