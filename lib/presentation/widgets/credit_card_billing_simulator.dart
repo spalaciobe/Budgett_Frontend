@@ -236,7 +236,7 @@ class CreditCardBillingSimulator extends ConsumerWidget {
                        child: Text(
                          'Payment due in $daysToPayment days',
                          style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 12),
-                         overflow: TextOverflow.ellipsis,
+                         overflow: TextOverflow.fade,
                        ),
                      ),
                    ],

@@ -124,7 +124,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
           child: Text(
             a.name,
             style: const TextStyle(fontSize: 13),
-            overflow: TextOverflow.ellipsis,
+            overflow: TextOverflow.fade,
           ),
         ));
       }
@@ -146,7 +146,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                 child: Text(
                   p.name,
                   style: const TextStyle(fontSize: 13),
-                  overflow: TextOverflow.ellipsis,
+                  overflow: TextOverflow.fade,
                 ),
               ),
             ],
@@ -903,7 +903,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                                       DropdownMenuItem<String?>(
                                         value: c.id,
                                         child: Text(c.name,
-                                            overflow: TextOverflow.ellipsis),
+                                            overflow: TextOverflow.fade),
                                       )),
                                 ],
                                 onChanged: (v) => setState(() {

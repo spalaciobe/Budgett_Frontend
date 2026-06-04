@@ -84,7 +84,7 @@ class TransactionTile extends StatelessWidget {
           color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
         ),
         maxLines: 1,
-        overflow: TextOverflow.ellipsis,
+        overflow: TextOverflow.fade,
       ));
     }
     if (t.isCrossCurrencyPayment && t.fxRate != null) {
@@ -122,7 +122,7 @@ class TransactionTile extends StatelessWidget {
             color: isPending ? Colors.grey : null,
           ),
           maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+          overflow: TextOverflow.fade,
         ),
         trailing: Text(
           amountText,

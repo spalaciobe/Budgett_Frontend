@@ -452,7 +452,7 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
                             value: a.id,
                             child: Text(
                               '${a.name} · ${CurrencyFormatter.format(a.balance > 0 ? a.balance : a.balanceUsd, currency: a.balance > 0 ? 'COP' : 'USD')}',
-                              overflow: TextOverflow.ellipsis,
+                              overflow: TextOverflow.fade,
                             ),
                           ))
                       .toList(),
@@ -484,7 +484,7 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
                           Flexible(
                             child: Text(
                               statementChipLabel,
-                              overflow: TextOverflow.ellipsis,
+                              overflow: TextOverflow.fade,
                             ),
                           ),
                           if (availablePeriods.length > 1) ...[
@@ -713,7 +713,7 @@ class _CyclePickerTile extends StatelessWidget {
           Flexible(
             child: Text(
               label,
-              overflow: TextOverflow.ellipsis,
+              overflow: TextOverflow.fade,
               style: TextStyle(
                 fontWeight:
                     isSelected ? FontWeight.w700 : FontWeight.w500,

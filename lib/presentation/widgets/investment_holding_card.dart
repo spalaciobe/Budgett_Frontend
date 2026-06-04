@@ -154,7 +154,7 @@ class InvestmentHoldingCard extends StatelessWidget {
                         style: theme.textTheme.bodyMedium
                             ?.copyWith(fontWeight: FontWeight.w600),
                         maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        overflow: TextOverflow.fade,
                       ),
                     ],
                   ),
@@ -177,7 +177,7 @@ class InvestmentHoldingCard extends StatelessWidget {
                           color: pnlColor,
                         ),
                         maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        overflow: TextOverflow.fade,
                       ),
                     ],
                   ),

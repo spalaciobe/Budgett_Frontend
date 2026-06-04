@@ -792,7 +792,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                               value: t,
                               child: Text(
                                 t.displayName,
-                                overflow: TextOverflow.ellipsis,
+                                overflow: TextOverflow.fade,
                               ),
                             ))
                         .toList(),
@@ -841,7 +841,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                                   value: b,
                                   child: Text(
                                     b.name,
-                                    overflow: TextOverflow.ellipsis,
+                                    overflow: TextOverflow.fade,
                                   ),
                                 ))
                             .toList(),

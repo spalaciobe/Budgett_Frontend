@@ -118,7 +118,7 @@ class PortfolioDonutChart extends StatelessWidget {
                     child: Text(
                       s.label,
                       style: theme.textTheme.bodySmall,
-                      overflow: TextOverflow.ellipsis,
+                      overflow: TextOverflow.fade,
                     ),
                   ),
                   if (s.trailing != null) ...[

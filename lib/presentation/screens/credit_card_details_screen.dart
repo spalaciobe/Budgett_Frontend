@@ -278,7 +278,7 @@ class CreditCardDetailsBody extends ConsumerWidget {
                         fontWeight: FontWeight.w600,
                       ),
                       maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      overflow: TextOverflow.fade,
                     ),
                     children: periodTransactions
                         .map((t) => TransactionTile(
@@ -459,7 +459,7 @@ class CreditCardDetailsBody extends ConsumerWidget {
           child: Text(
             value,
             style: const TextStyle(fontSize: 13),
-            overflow: TextOverflow.ellipsis,
+            overflow: TextOverflow.fade,
           ),
         ),
       ],
@@ -690,7 +690,7 @@ class _UpcomingInstallmentsCard extends StatelessWidget {
             fontSize: 12,
           ),
           maxLines: 2,
-          overflow: TextOverflow.ellipsis,
+          overflow: TextOverflow.fade,
         ),
         childrenPadding: const EdgeInsets.symmetric(horizontal: 8),
         children: [
@@ -874,7 +874,7 @@ class _CreditCardRulesBottomSheetState extends ConsumerState<_CreditCardRulesBot
                           value: b,
                           child: Text(
                             b.name,
-                            overflow: TextOverflow.ellipsis,
+                            overflow: TextOverflow.fade,
                           ),
                         ))
                     .toList(),
@@ -1275,7 +1275,7 @@ class _MonthRow extends StatelessWidget {
                 Flexible(
                   child: Text(
                     monthName,
-                    overflow: TextOverflow.ellipsis,
+                    overflow: TextOverflow.fade,
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
                       color: isOverridden ? overrideColor : null,

@@ -613,7 +613,7 @@ class _TransferDetails extends StatelessWidget {
           child: Text(
             sourceName,
             maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            overflow: TextOverflow.fade,
             style: textStyle,
           ),
         ),
@@ -626,7 +626,7 @@ class _TransferDetails extends StatelessWidget {
           child: Text(
             targetName,
             maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            overflow: TextOverflow.fade,
             style: textStyle,
           ),
         ),
@@ -764,7 +764,7 @@ class _TransactionListTile extends StatelessWidget {
             child: Text(
               t.description,
               maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+              overflow: TextOverflow.fade,
               style: TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: 14,
@@ -782,7 +782,7 @@ class _TransactionListTile extends StatelessWidget {
               Text(
                 '${isTransfer ? '' : (isExpense ? '−' : '+')}${CurrencyFormatter.format(t.amount, decimalDigits: 0)}',
                 maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                overflow: TextOverflow.fade,
                 style: TextStyle(
                   color: typeColor,
                   fontWeight: FontWeight.bold,
@@ -835,7 +835,7 @@ class _TransactionListTile extends StatelessWidget {
                   child: Text(
                     details,
                     maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    overflow: TextOverflow.fade,
                     style: TextStyle(
                       fontSize: 12,
                       color: Theme.of(context)
@@ -994,7 +994,7 @@ class _InstallmentGroupTileState extends State<_InstallmentGroupTile> {
                 child: Text(
                   _baseDescription,
                   maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  overflow: TextOverflow.fade,
                   style: const TextStyle(
                       fontWeight: FontWeight.w600, fontSize: 14),
                 ),
@@ -1047,7 +1047,7 @@ class _InstallmentGroupTileState extends State<_InstallmentGroupTile> {
                       child: Text(
                         detailLine,
                         maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        overflow: TextOverflow.fade,
                         style: TextStyle(
                           fontSize: 12,
                           color: theme.colorScheme.onSurface.withValues(alpha: 0.6),

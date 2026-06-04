@@ -1015,14 +1015,14 @@ class _InvestmentHistoryChartState
                         value: _allAssetsId,
                         child: Text(
                           'All assets (total)',
-                          overflow: TextOverflow.ellipsis,
+                          overflow: TextOverflow.fade,
                         ),
                       ),
                       ...chartableHoldings.map((h) => DropdownMenuItem(
                             value: h.id,
                             child: Text(
                               h.displayName,
-                              overflow: TextOverflow.ellipsis,
+                              overflow: TextOverflow.fade,
                             ),
                           )),
                     ],

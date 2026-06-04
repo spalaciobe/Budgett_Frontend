@@ -128,7 +128,7 @@ class GoalsScreen extends ConsumerWidget {
                                 goal.name,
                                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                                 maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                                overflow: TextOverflow.fade,
                               ),
                               const SizedBox(height: 4),
                               Text.rich(
@@ -148,7 +148,7 @@ class GoalsScreen extends ConsumerWidget {
                                   ],
                                 ),
                                 maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                                overflow: TextOverflow.fade,
                               ),
                               const SizedBox(height: 8),
                               Stack(

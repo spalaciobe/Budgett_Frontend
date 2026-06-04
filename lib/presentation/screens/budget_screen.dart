@@ -438,7 +438,7 @@ class BudgetScreen extends ConsumerWidget {
                                                   .onSurface
                                                   .withValues(alpha: 0.4),
                                             ),
-                                            overflow: TextOverflow.ellipsis,
+                                            overflow: TextOverflow.fade,
                                           ),
                                         ),
                                       ],
@@ -974,7 +974,7 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
                     child: Text(
                       '${c.name}  ${pct.toStringAsFixed(0)}%',
                       style: const TextStyle(fontSize: 11),
-                      overflow: TextOverflow.ellipsis,
+                      overflow: TextOverflow.fade,
                     ),
                   ),
                 ],

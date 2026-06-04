@@ -77,7 +77,7 @@ class _EditRecurringTransactionDialogState
         child: Text(
           a.name,
           style: const TextStyle(fontSize: 13),
-          overflow: TextOverflow.ellipsis,
+          overflow: TextOverflow.fade,
         ),
       ));
       for (final p in a.pockets) {
@@ -94,7 +94,7 @@ class _EditRecurringTransactionDialogState
                 child: Text(
                   p.name,
                   style: const TextStyle(fontSize: 13),
-                  overflow: TextOverflow.ellipsis,
+                  overflow: TextOverflow.fade,
                 ),
               ),
             ],
@@ -327,7 +327,7 @@ class _EditRecurringTransactionDialogState
                             child: Text(
                               '${cat.name} > ${sub.name}',
                               style: const TextStyle(fontSize: 13),
-                              overflow: TextOverflow.ellipsis,
+                              overflow: TextOverflow.fade,
                             ),
                           ));
                         }
@@ -338,7 +338,7 @@ class _EditRecurringTransactionDialogState
                           child: Text(
                             cat.name,
                             style: const TextStyle(fontSize: 13),
-                            overflow: TextOverflow.ellipsis,
+                            overflow: TextOverflow.fade,
                           ),
                         ));
                       }

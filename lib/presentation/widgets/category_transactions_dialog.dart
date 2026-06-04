@@ -66,7 +66,7 @@ class CategoryTransactionsDialog extends ConsumerWidget {
                         categoryName,
                         style: Theme.of(context).textTheme.titleLarge,
                         maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        overflow: TextOverflow.fade,
                       ),
                       Text(
                         '${_months[month - 1]} $year',

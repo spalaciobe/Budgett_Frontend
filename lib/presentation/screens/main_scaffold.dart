@@ -351,7 +351,7 @@ class _Sidebar extends ConsumerWidget {
                             displayName,
                             style: theme.textTheme.bodySmall?.copyWith(
                                 fontWeight: FontWeight.bold),
-                            overflow: TextOverflow.ellipsis,
+                            overflow: TextOverflow.fade,
                           ),
                         ),
                         IconButton(
@@ -436,7 +436,7 @@ class _SidebarItem extends StatelessWidget {
                             ? FontWeight.bold
                             : FontWeight.normal,
                       ),
-                      overflow: TextOverflow.ellipsis,
+                      overflow: TextOverflow.fade,
                     ),
                   ),
                 ],

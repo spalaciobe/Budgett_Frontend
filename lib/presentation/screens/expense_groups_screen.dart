@@ -273,7 +273,7 @@ class _ExpenseGroupCard extends ConsumerWidget {
                               group.name,
                               style: Theme.of(context).textTheme.titleMedium,
                               maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                              overflow: TextOverflow.fade,
                             ),
                           ),
                         ],
@@ -312,7 +312,7 @@ class _ExpenseGroupCard extends ConsumerWidget {
                         child: Text(
                           '${CurrencyFormatter.format(spent)} spent',
                           maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          overflow: TextOverflow.fade,
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -320,7 +320,7 @@ class _ExpenseGroupCard extends ConsumerWidget {
                         child: Text(
                           'of ${CurrencyFormatter.format(group.budgetAmount)}',
                           maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          overflow: TextOverflow.fade,
                           textAlign: TextAlign.end,
                         ),
                       ),

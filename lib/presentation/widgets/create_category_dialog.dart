@@ -367,7 +367,7 @@ class _SavingsTargetAccountField extends ConsumerWidget {
             const DropdownMenuItem<String?>(value: null, child: Text('None')),
             ...options.map((o) => DropdownMenuItem<String?>(
                   value: o.id,
-                  child: Text(o.label, overflow: TextOverflow.ellipsis),
+                  child: Text(o.label, overflow: TextOverflow.fade),
                 )),
           ],
           onChanged: onChanged,

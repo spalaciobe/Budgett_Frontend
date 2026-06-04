@@ -182,7 +182,7 @@ class _SwapHoldingDialogState extends ConsumerState<SwapHoldingDialog> {
                             value: h.id,
                             child: Text(
                               '${h.symbol}  · ${CurrencyFormatter.formatQuantity(h.quantity)}',
-                              overflow: TextOverflow.ellipsis,
+                              overflow: TextOverflow.fade,
                             ),
                           ))
                       .toList(),
@@ -244,7 +244,7 @@ class _SwapHoldingDialogState extends ConsumerState<SwapHoldingDialog> {
                             value: h.id,
                             child: Text(
                               '${h.symbol}  · ${CurrencyFormatter.formatQuantity(h.quantity)}',
-                              overflow: TextOverflow.ellipsis,
+                              overflow: TextOverflow.fade,
                             ),
                           ))
                       .toList(),
@@ -317,7 +317,7 @@ class _SwapHoldingDialogState extends ConsumerState<SwapHoldingDialog> {
                                   value: c,
                                   child: Text(
                                     c,
-                                    overflow: TextOverflow.ellipsis,
+                                    overflow: TextOverflow.fade,
                                   ),
                                 ))
                             .toList(),

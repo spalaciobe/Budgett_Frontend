@@ -92,7 +92,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
           child: Text(
             a.name,
             style: const TextStyle(fontSize: 13),
-            overflow: TextOverflow.ellipsis,
+            overflow: TextOverflow.fade,
           ),
         ));
       }
@@ -111,7 +111,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                 child: Text(
                   p.name,
                   style: const TextStyle(fontSize: 13),
-                  overflow: TextOverflow.ellipsis,
+                  overflow: TextOverflow.fade,
                 ),
               ),
             ],
@@ -1039,7 +1039,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                             ...savings.map((c) => DropdownMenuItem<String?>(
                                   value: c.id,
                                   child: Text(c.name,
-                                      overflow: TextOverflow.ellipsis),
+                                      overflow: TextOverflow.fade),
                                 )),
                           ],
                           onChanged: (v) =>
@@ -1074,7 +1074,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                             ...savings.map((c) => DropdownMenuItem<String?>(
                                   value: c.id,
                                   child: Text(c.name,
-                                      overflow: TextOverflow.ellipsis),
+                                      overflow: TextOverflow.fade),
                                 )),
                           ],
                           onChanged: (v) =>
@@ -1104,7 +1104,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                                 value: g.id,
                                 child: Text(
                                   g.name,
-                                  overflow: TextOverflow.ellipsis,
+                                  overflow: TextOverflow.fade,
                                 ))),
                       ],
                       onChanged: (v) =>

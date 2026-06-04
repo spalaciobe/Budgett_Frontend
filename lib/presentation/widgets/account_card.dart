@@ -86,7 +86,7 @@ class AccountCard extends StatelessWidget {
                       color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
                     maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    overflow: TextOverflow.fade,
                   )
                 : Text(
                     CurrencyFormatter.format(acc.balanceUsd, currency: 'USD'),
@@ -94,7 +94,7 @@ class AccountCard extends StatelessWidget {
                       color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
                     maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    overflow: TextOverflow.fade,
                   )))
         : const SizedBox.shrink();
 
@@ -107,7 +107,7 @@ class AccountCard extends StatelessWidget {
           style: AppText.cardName.copyWith(
             color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
           ),
-          overflow: TextOverflow.ellipsis,
+          overflow: TextOverflow.fade,
         ),
         const SizedBox(height: 4),
         Text(

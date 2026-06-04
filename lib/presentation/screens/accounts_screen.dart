@@ -457,7 +457,7 @@ class _AccountListItem extends ConsumerWidget {
           color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
         ),
         maxLines: 1,
-        overflow: TextOverflow.ellipsis,
+        overflow: TextOverflow.fade,
       );
     } else {
       balance = CurrencyFormatter.format(account.balance, decimalDigits: 2);
@@ -517,7 +517,7 @@ class _AccountListItem extends ConsumerWidget {
                             ? theme.colorScheme.primary
                             : theme.colorScheme.onSurface,
                       ),
-                      overflow: TextOverflow.ellipsis,
+                      overflow: TextOverflow.fade,
                     ),
                     const SizedBox(height: 1),
                     Text(
@@ -643,7 +643,7 @@ class _AccountDetailPanel extends ConsumerWidget {
                   account.name,
                   style: theme.textTheme.titleMedium
                       ?.copyWith(fontWeight: FontWeight.bold),
-                  overflow: TextOverflow.ellipsis,
+                  overflow: TextOverflow.fade,
                 ),
                 const SizedBox(height: 3),
                 Container(
@@ -706,7 +706,7 @@ class _AccountDetailPanel extends ConsumerWidget {
         style: theme.textTheme.bodySmall
             ?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.55)),
         maxLines: 1,
-        overflow: TextOverflow.ellipsis,
+        overflow: TextOverflow.fade,
       );
     } else {
       balanceText = CurrencyFormatter.format(account.balance, decimalDigits: 2);
@@ -746,7 +746,7 @@ class _AccountDetailPanel extends ConsumerWidget {
                   account.name,
                   style: theme.textTheme.titleLarge
                       ?.copyWith(fontWeight: FontWeight.bold),
-                  overflow: TextOverflow.ellipsis,
+                  overflow: TextOverflow.fade,
                 ),
                 const SizedBox(height: 4),
                 Container(
@@ -1277,7 +1277,7 @@ class AccountDetailsScreen extends ConsumerWidget {
                                 .withValues(alpha: 0.55),
                           ),
                           maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          overflow: TextOverflow.fade,
                         ),
                       ],
                     ],

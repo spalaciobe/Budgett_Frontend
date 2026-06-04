@@ -120,7 +120,7 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                             style: const TextStyle(
                                 fontWeight: FontWeight.bold),
                             maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                            overflow: TextOverflow.fade,
                           ),
                           const SizedBox(height: 4),
                           Text(
@@ -386,7 +386,7 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                               CurrencyFormatter.format(widget.spentAmount,
                                   decimalDigits: 0),
                               maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                              overflow: TextOverflow.fade,
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: !widget.isIncome &&
@@ -411,7 +411,7 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                                       ? 'Monthly target'
                                       : 'Budget',
                               maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                              overflow: TextOverflow.fade,
                               style: TextStyle(
                                   fontSize: 12,
                                   color:
@@ -420,7 +420,7 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                             Text(
                               CurrencyFormatter.format(widget.budgetAmount),
                               maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                              overflow: TextOverflow.fade,
                               style:
                                   const TextStyle(fontWeight: FontWeight.bold),
                             ),
