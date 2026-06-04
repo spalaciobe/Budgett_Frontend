@@ -13,13 +13,15 @@ import '../../data/repositories/finance_repository.dart';
 import '../../data/models/bank_model.dart';
 import '../../data/repositories/bank_repository.dart';
 import 'package:budgett_frontend/presentation/widgets/credit_card_billing_simulator.dart';
+import 'package:budgett_frontend/presentation/widgets/discard_guard.dart';
 import 'package:intl/intl.dart';
 
 class AddTransactionDialog extends ConsumerStatefulWidget {
   const AddTransactionDialog({super.key});
 
   @override
-  ConsumerState<AddTransactionDialog> createState() => _AddTransactionDialogState();
+  ConsumerState<AddTransactionDialog> createState() =>
+      _AddTransactionDialogState();
 }
 
 class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
@@ -39,6 +41,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
   /// Expense paid out of a sinking fund. Subtracts from that fund's
   /// accumulated balance instead of from this month's category budget.
   String? _fundedByCategoryId;
+
   /// Transfer tagged as a contribution to a sinking fund. Becomes the
   /// transaction's [category_id] so the savings category aggregates it.
   String? _savingsContributionCategoryId;
@@ -105,7 +108,10 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
               const SizedBox(width: 16),
               Icon(Icons.subdirectory_arrow_right,
                   size: 12,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.5)),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
@@ -123,8 +129,8 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
   }
 
   Account? get _selectedAccount {
-    final accounts = _flattenAccounts(
-        ref.read(accountsProvider).valueOrNull ?? const []);
+    final accounts =
+        _flattenAccounts(ref.read(accountsProvider).valueOrNull ?? const []);
     if (_selectedAccountId == null) return null;
     try {
       return accounts.firstWhere((a) => a.id == _selectedAccountId);
@@ -134,8 +140,8 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
   }
 
   Account? get _selectedTargetAccount {
-    final accounts = _flattenAccounts(
-        ref.read(accountsProvider).valueOrNull ?? const []);
+    final accounts =
+        _flattenAccounts(ref.read(accountsProvider).valueOrNull ?? const []);
     if (_selectedTargetAccountId == null) return null;
     try {
       return accounts.firstWhere((a) => a.id == _selectedTargetAccountId);
@@ -206,6 +212,12 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
     }
   }
 
+  /// Has the user entered anything worth confirming before discarding?
+  bool get _isDirty =>
+      _amountController.text.isNotEmpty ||
+      _descriptionController.text.isNotEmpty ||
+      _notesController.text.isNotEmpty;
+
   Future<void> _saveTransaction() async {
     if (_isLoading) return;
     if (!_formKey.currentState!.validate()) return;
@@ -235,7 +247,8 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
 
     final transactionData = <String, dynamic>{
       'account_id': _selectedAccountId,
-      'amount': CurrencyFormatter.parse(_amountController.text, currency: _currency),
+      'amount':
+          CurrencyFormatter.parse(_amountController.text, currency: _currency),
       'description': _descriptionController.text,
       'date': _selectedDate.toIso8601String().split('T')[0],
       'type': _selectedType,
@@ -262,7 +275,8 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
         for (final cat in categories) {
           if (cat.subCategories != null) {
             try {
-              final sub = cat.subCategories!.firstWhere((s) => s.id == _selectedCategoryId);
+              final sub = cat.subCategories!
+                  .firstWhere((s) => s.id == _selectedCategoryId);
               finalCategoryId = cat.id;
               finalSubCategoryId = sub.id;
               break;
@@ -279,7 +293,8 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
       }
     }
 
-    if (transactionData['category_id'] != null && _selectedExpenseGroupId != null) {
+    if (transactionData['category_id'] != null &&
+        _selectedExpenseGroupId != null) {
       transactionData['expense_group_id'] = _selectedExpenseGroupId;
     }
     if (_selectedTargetAccountId != null) {
@@ -309,8 +324,10 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
 
       if (account.type == 'credit_card' && account.creditCardRules != null) {
         try {
-          final bank = await ref.read(bankRepositoryProvider).getBanks().then(
-              (banks) => banks.firstWhere(
+          final bank = await ref
+              .read(bankRepositoryProvider)
+              .getBanks()
+              .then((banks) => banks.firstWhere(
                     (b) => b.id == account.creditCardRules!.bankId,
                     orElse: () => Bank(id: '0', name: 'Unknown', code: 'UNK'),
                   ));
@@ -328,8 +345,10 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
               account.creditCardRules!, bank, realCutoffDate);
 
           transactionData['periodo_facturacion'] = billingPeriod;
-          transactionData['fecha_corte_calculada'] = realCutoffDate.toIso8601String();
-          transactionData['fecha_pago_calculada'] = realPaymentDate.toIso8601String();
+          transactionData['fecha_corte_calculada'] =
+              realCutoffDate.toIso8601String();
+          transactionData['fecha_pago_calculada'] =
+              realPaymentDate.toIso8601String();
         } catch (e) {
           debugPrint('Error calculating billing info: $e');
         }
@@ -347,8 +366,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
         if (account?.creditCardRules == null) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-                content: Text(
-                    'This card has no billing rules configured.')),
+                content: Text('This card has no billing rules configured.')),
           );
           return;
         }
@@ -403,17 +421,20 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
             nextDate = nextDate.add(const Duration(days: 14));
             break;
           case 'monthly':
-            nextDate = DateTime(nextDate.year, nextDate.month + 1, nextDate.day);
+            nextDate =
+                DateTime(nextDate.year, nextDate.month + 1, nextDate.day);
             break;
           case 'yearly':
-            nextDate = DateTime(nextDate.year + 1, nextDate.month, nextDate.day);
+            nextDate =
+                DateTime(nextDate.year + 1, nextDate.month, nextDate.day);
             break;
         }
 
         final recurringData = RecurringTransaction(
           id: '',
           description: _descriptionController.text,
-          amount: CurrencyFormatter.parse(_amountController.text, currency: _currency),
+          amount: CurrencyFormatter.parse(_amountController.text,
+              currency: _currency),
           categoryId: finalCategoryId,
           subCategoryId: finalSubCategoryId,
           accountId: _selectedAccountId,
@@ -469,8 +490,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
               if (_payInInstallments &&
                   _interestRateController.text.isEmpty &&
                   defaultRate > 0) {
-                _interestRateController.text =
-                    defaultRate.toStringAsFixed(3);
+                _interestRateController.text = defaultRate.toStringAsFixed(3);
               }
             });
           },
@@ -500,8 +520,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                 if (!_interestFree &&
                     _interestRateController.text.isEmpty &&
                     defaultRate > 0) {
-                  _interestRateController.text =
-                      defaultRate.toStringAsFixed(3);
+                  _interestRateController.text = defaultRate.toStringAsFixed(3);
                 }
               });
             },
@@ -552,8 +571,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
 
     final rate = _interestFree
         ? 0.0
-        : (double.tryParse(
-                    _interestRateController.text.replaceAll(',', '')) ??
+        : (double.tryParse(_interestRateController.text.replaceAll(',', '')) ??
                 0.0) /
             100.0;
 
@@ -591,32 +609,32 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
           },
           children: [
             TableRow(
-              decoration: BoxDecoration(
-                  color: Colors.grey.withValues(alpha: 0.12)),
+              decoration:
+                  BoxDecoration(color: Colors.grey.withValues(alpha: 0.12)),
               children: const [
                 Padding(
                   padding: EdgeInsets.symmetric(vertical: 4, horizontal: 4),
                   child: Text('#',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 11)),
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
                 ),
                 Padding(
                   padding: EdgeInsets.symmetric(vertical: 4),
                   child: Text('Amount',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 11)),
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
                 ),
                 Padding(
                   padding: EdgeInsets.symmetric(vertical: 4),
                   child: Text('Period',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 11)),
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
                 ),
                 Padding(
                   padding: EdgeInsets.symmetric(vertical: 4),
                   child: Text('Payment date',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 11)),
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
                 ),
               ],
             ),
@@ -660,490 +678,520 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
     final categoriesAsync = ref.watch(categoriesProvider);
     final expenseGroupsAsync = ref.watch(expenseGroupsProvider);
 
-    return Dialog(
-      insetPadding: EdgeInsets.symmetric(
-        horizontal: MediaQuery.of(context).size.width * 0.025,
-        vertical: 24,
-      ),
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 500, maxHeight: 700),
-        padding: kDialogPadding,
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text('Add Transaction',
-                          style: Theme.of(context).textTheme.headlineSmall),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // Currency toggle (only for CC expense/income)
-                if (_isCreditCardExpense) ...[
-                  SegmentedButton<String>(
-                    segments: const [
-                      ButtonSegment(
-                          value: 'COP',
-                          label: Text('COP'),
-                          icon: Icon(Icons.monetization_on_outlined, size: 16)),
-                      ButtonSegment(
-                          value: 'USD',
-                          label: Text('USD'),
-                          icon: Icon(Icons.attach_money, size: 16)),
-                    ],
-                    selected: {_currency},
-                    onSelectionChanged: (s) => _onCurrencyChanged(s.first),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-
-                // Amount
-                TextFormField(
-                  controller: _amountController,
-                  decoration: InputDecoration(
-                    labelText: 'Amount',
-                    prefixText: CurrencyFormatter.prefixFor(_currency),
-                    border: const OutlineInputBorder(),
-                  ),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [CurrencyInputFormatter(currency: _currency)],
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return 'Required';
-                    if (CurrencyFormatter.parse(value, currency: _currency) == 0.0 &&
-                        value != '0' &&
-                        value != '0.0') return 'Invalid number';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 10),
-
-                // Description
-                TextFormField(
-                  controller: _descriptionController,
-                  decoration: const InputDecoration(
-                    labelText: 'Description',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
-                ),
-                const SizedBox(height: 10),
-
-                // Date
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Date: ${DateFormat('dd/MM/yyyy').format(_selectedDate)}',
-                        style: const TextStyle(fontSize: 16),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        if (!_isDirty || await confirmDiscard(context)) {
+          if (context.mounted) Navigator.of(context).pop();
+        }
+      },
+      child: Dialog(
+        insetPadding: EdgeInsets.symmetric(
+          horizontal: MediaQuery.of(context).size.width * 0.025,
+          vertical: 24,
+        ),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 500, maxHeight: 700),
+          padding: kDialogPadding,
+          child: Form(
+            key: _formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text('Add Transaction',
+                            style: Theme.of(context).textTheme.headlineSmall),
                       ),
-                    ),
-                    TextButton(
-                      onPressed: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: _selectedDate,
-                          firstDate: DateTime(2000),
-                          lastDate: DateTime(2100),
-                        );
-                        if (picked != null) {
-                          setState(() => _selectedDate = picked);
-                        }
-                      },
-                      child: const Text('Change'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-
-                // Installments section (CC expense only)
-                if (_isCreditCardExpense && _selectedType == 'expense') ...[
-                  _buildInstallmentsSection(),
-                  const SizedBox(height: 10),
-                ],
-
-                // Type
-                DropdownButtonFormField<String>(
-                  value: _selectedType,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Type',
-                    border: OutlineInputBorder(),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.maybePop(context),
+                      ),
+                    ],
                   ),
-                  items: const [
-                    DropdownMenuItem(value: 'income', child: Text('Income')),
-                    DropdownMenuItem(value: 'expense', child: Text('Expense')),
-                    DropdownMenuItem(value: 'transfer', child: Text('Transfer')),
+                  const SizedBox(height: 16),
+
+                  // Currency toggle (only for CC expense/income)
+                  if (_isCreditCardExpense) ...[
+                    SegmentedButton<String>(
+                      segments: const [
+                        ButtonSegment(
+                            value: 'COP',
+                            label: Text('COP'),
+                            icon:
+                                Icon(Icons.monetization_on_outlined, size: 16)),
+                        ButtonSegment(
+                            value: 'USD',
+                            label: Text('USD'),
+                            icon: Icon(Icons.attach_money, size: 16)),
+                      ],
+                      selected: {_currency},
+                      onSelectionChanged: (s) => _onCurrencyChanged(s.first),
+                    ),
+                    const SizedBox(height: 12),
                   ],
-                  onChanged: (value) => setState(() {
-                    _selectedType = value!;
-                    // Reset currency, installments and sinking-fund links when changing type
-                    if (!_isCreditCardExpense) _currency = 'COP';
-                    _isUsdPayment = false;
-                    _payInInstallments = false;
-                    _fundedByCategoryId = null;
-                    _savingsContributionCategoryId = null;
-                    if (_selectedType != 'income') _isReimbursement = false;
-                    _selectedCategoryId = null;
-                  }),
-                ),
-                const SizedBox(height: 10),
 
-                // Status Toggle
-                SegmentedButton<String>(
-                  segments: const [
-                    ButtonSegment(
-                        value: 'paid',
-                        label: Text('Paid'),
-                        icon: Icon(Icons.check_circle_outline)),
-                    ButtonSegment(
-                        value: 'pending',
-                        label: Text('Pending'),
-                        icon: Icon(Icons.pending_outlined)),
+                  // Amount
+                  TextFormField(
+                    controller: _amountController,
+                    decoration: InputDecoration(
+                      labelText: 'Amount',
+                      prefixText: CurrencyFormatter.prefixFor(_currency),
+                      border: const OutlineInputBorder(),
+                    ),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [
+                      CurrencyInputFormatter(currency: _currency)
+                    ],
+                    validator: (value) {
+                      if (value == null || value.isEmpty) return 'Required';
+                      if (CurrencyFormatter.parse(value, currency: _currency) ==
+                              0.0 &&
+                          value != '0' &&
+                          value != '0.0') return 'Invalid number';
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Description
+                  TextFormField(
+                    controller: _descriptionController,
+                    decoration: const InputDecoration(
+                      labelText: 'Description',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) =>
+                        value?.isEmpty ?? true ? 'Required' : null,
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Date
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Date: ${DateFormat('dd/MM/yyyy').format(_selectedDate)}',
+                          style: const TextStyle(fontSize: 16),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: _selectedDate,
+                            firstDate: DateTime(2000),
+                            lastDate: DateTime(2100),
+                          );
+                          if (picked != null) {
+                            setState(() => _selectedDate = picked);
+                          }
+                        },
+                        child: const Text('Change'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Installments section (CC expense only)
+                  if (_isCreditCardExpense && _selectedType == 'expense') ...[
+                    _buildInstallmentsSection(),
+                    const SizedBox(height: 10),
                   ],
-                  selected: {_status},
-                  onSelectionChanged: (s) => setState(() => _status = s.first),
-                ),
-                const SizedBox(height: 10),
 
-                // Recurrence Switch
-                SwitchListTile(
-                  title: const Text('Recurring?'),
-                  subtitle: const Text('Automatically create future transactions'),
-                  value: _isRecurring,
-                  onChanged: (v) => setState(() => _isRecurring = v),
-                  contentPadding: EdgeInsets.zero,
-                ),
-
-                if (_isRecurring) ...[
-                  const SizedBox(height: 8),
+                  // Type
                   DropdownButtonFormField<String>(
-                    value: _frequency,
+                    value: _selectedType,
                     isExpanded: true,
                     decoration: const InputDecoration(
-                      labelText: 'Frequency',
+                      labelText: 'Type',
                       border: OutlineInputBorder(),
                     ),
                     items: const [
-                      DropdownMenuItem(value: 'daily', child: Text('Daily')),
-                      DropdownMenuItem(value: 'weekly', child: Text('Weekly')),
-                      DropdownMenuItem(value: 'biweekly', child: Text('Biweekly')),
-                      DropdownMenuItem(value: 'monthly', child: Text('Monthly')),
-                      DropdownMenuItem(value: 'yearly', child: Text('Yearly')),
+                      DropdownMenuItem(value: 'income', child: Text('Income')),
+                      DropdownMenuItem(
+                          value: 'expense', child: Text('Expense')),
+                      DropdownMenuItem(
+                          value: 'transfer', child: Text('Transfer')),
                     ],
-                    onChanged: (v) => setState(() => _frequency = v!),
-                  ),
-                  const SizedBox(height: 10),
-                ],
-
-                // Account
-                accountsAsync.when(
-                  data: (accounts) => Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      DropdownButtonFormField<String>(
-                        value: _selectedAccountId,
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Account',
-                          border: OutlineInputBorder(),
-                        ),
-                        items: _buildAccountItems(accounts),
-                        onChanged: (value) => setState(() {
-                          _selectedAccountId = value;
-                          // Reset currency and installments when switching accounts
-                          _currency = 'COP';
-                          _isUsdPayment = false;
-                          _payInInstallments = false;
-                        }),
-                      ),
-                      if (_selectedAccount != null &&
-                          _selectedAccount!.type == 'credit_card' &&
-                          _selectedAccount!.creditCardRules != null)
-                        CreditCardBillingSubtitle(
-                          account: _selectedAccount!,
-                          transactionDate: _selectedDate,
-                        ),
-                    ],
-                  ),
-                  loading: () => const CircularProgressIndicator(),
-                  error: (e, s) => Text(friendlyError(e)),
-                ),
-                const SizedBox(height: 10),
-
-                // Reimbursement toggle (income only). Flips category filter
-                // to expense categories so the repayment offsets the original
-                // category's net spend.
-                if (_selectedType == 'income') ...[
-                  SwitchListTile(
-                    title: const Text('Is a reimbursement?'),
-                    subtitle: const Text(
-                        'Offsets the original expense category instead of counting as income'),
-                    value: _isReimbursement,
-                    onChanged: (v) => setState(() {
-                      _isReimbursement = v;
+                    onChanged: (value) => setState(() {
+                      _selectedType = value!;
+                      // Reset currency, installments and sinking-fund links when changing type
+                      if (!_isCreditCardExpense) _currency = 'COP';
+                      _isUsdPayment = false;
+                      _payInInstallments = false;
+                      _fundedByCategoryId = null;
+                      _savingsContributionCategoryId = null;
+                      if (_selectedType != 'income') _isReimbursement = false;
                       _selectedCategoryId = null;
                     }),
-                    contentPadding: EdgeInsets.zero,
                   ),
                   const SizedBox(height: 10),
-                ],
 
-                // Category (only for income/expense)
-                if (_selectedType != 'transfer')
-                  categoriesAsync.when(
-                    data: (categories) {
-                      final categoryTypeForFilter =
-                          (_selectedType == 'income' && _isReimbursement)
-                              ? 'expense'
-                              : _selectedType;
-                      final filteredCategories = categories
-                          .where((cat) => cat.type == categoryTypeForFilter)
-                          .toList();
-
-                      final List<DropdownMenuItem<String>> dropdownItems = [];
-                      for (final cat in filteredCategories) {
-                        if (cat.subCategories != null &&
-                            cat.subCategories!.isNotEmpty) {
-                          for (final sub in cat.subCategories!) {
-                            dropdownItems.add(DropdownMenuItem(
-                              value: sub.id,
-                              child: Text('${cat.name} > ${sub.name}', style: const TextStyle(fontSize: 13)),
-                            ));
-                          }
-                        } else {
-                          dropdownItems.add(DropdownMenuItem(
-                            value: cat.id,
-                            child: Text(cat.name, style: const TextStyle(fontSize: 13)),
-                          ));
-                        }
-                      }
-
-                      return DropdownButtonFormField<String>(
-                        value: _selectedCategoryId,
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Category',
-                          border: OutlineInputBorder(),
-                        ),
-                        items: dropdownItems,
-                        onChanged: (v) => setState(() => _selectedCategoryId = v),
-                      );
-                    },
-                    loading: () => const CircularProgressIndicator(),
-                    error: (e, s) => Text(friendlyError(e)),
+                  // Status Toggle
+                  SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment(
+                          value: 'paid',
+                          label: Text('Paid'),
+                          icon: Icon(Icons.check_circle_outline)),
+                      ButtonSegment(
+                          value: 'pending',
+                          label: Text('Pending'),
+                          icon: Icon(Icons.pending_outlined)),
+                    ],
+                    selected: {_status},
+                    onSelectionChanged: (s) =>
+                        setState(() => _status = s.first),
                   ),
-                if (_selectedType != 'transfer') const SizedBox(height: 10),
+                  const SizedBox(height: 10),
 
-                // Target Account (for transfers)
-                if (_selectedType == 'transfer') ...[
-                  accountsAsync.when(
-                    data: (accounts) => DropdownButtonFormField<String>(
-                      value: _selectedTargetAccountId,
+                  // Recurrence Switch
+                  SwitchListTile(
+                    title: const Text('Recurring?'),
+                    subtitle:
+                        const Text('Automatically create future transactions'),
+                    value: _isRecurring,
+                    onChanged: (v) => setState(() => _isRecurring = v),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+
+                  if (_isRecurring) ...[
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      value: _frequency,
                       isExpanded: true,
                       decoration: const InputDecoration(
-                        labelText: 'Destination Account',
+                        labelText: 'Frequency',
                         border: OutlineInputBorder(),
                       ),
-                      items: _buildAccountItems(accounts,
-                          excludeId: _selectedAccountId),
-                      onChanged: (value) => setState(() {
-                        _selectedTargetAccountId = value;
-                        _isUsdPayment = false;
-                      }),
+                      items: const [
+                        DropdownMenuItem(value: 'daily', child: Text('Daily')),
+                        DropdownMenuItem(
+                            value: 'weekly', child: Text('Weekly')),
+                        DropdownMenuItem(
+                            value: 'biweekly', child: Text('Biweekly')),
+                        DropdownMenuItem(
+                            value: 'monthly', child: Text('Monthly')),
+                        DropdownMenuItem(
+                            value: 'yearly', child: Text('Yearly')),
+                      ],
+                      onChanged: (v) => setState(() => _frequency = v!),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+
+                  // Account
+                  accountsAsync.when(
+                    data: (accounts) => Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        DropdownButtonFormField<String>(
+                          value: _selectedAccountId,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Account',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: _buildAccountItems(accounts),
+                          onChanged: (value) => setState(() {
+                            _selectedAccountId = value;
+                            // Reset currency and installments when switching accounts
+                            _currency = 'COP';
+                            _isUsdPayment = false;
+                            _payInInstallments = false;
+                          }),
+                        ),
+                        if (_selectedAccount != null &&
+                            _selectedAccount!.type == 'credit_card' &&
+                            _selectedAccount!.creditCardRules != null)
+                          CreditCardBillingSubtitle(
+                            account: _selectedAccount!,
+                            transactionDate: _selectedDate,
+                          ),
+                      ],
                     ),
                     loading: () => const CircularProgressIndicator(),
                     error: (e, s) => Text(friendlyError(e)),
                   ),
                   const SizedBox(height: 10),
 
-                  // USD payment section (transfer to CC with USD balance)
-                  if (_showUsdPaymentSection) ...[
-                    CheckboxListTile(
-                      title: const Text('USD Balance Payment'),
-                      subtitle: const Text('Pays down your USD debt'),
-                      value: _isUsdPayment,
+                  // Reimbursement toggle (income only). Flips category filter
+                  // to expense categories so the repayment offsets the original
+                  // category's net spend.
+                  if (_selectedType == 'income') ...[
+                    SwitchListTile(
+                      title: const Text('Is a reimbursement?'),
+                      subtitle: const Text(
+                          'Offsets the original expense category instead of counting as income'),
+                      value: _isReimbursement,
                       onChanged: (v) => setState(() {
-                        _isUsdPayment = v ?? false;
-                        if (!_isUsdPayment) _fxRateController.clear();
+                        _isReimbursement = v;
+                        _selectedCategoryId = null;
                       }),
                       contentPadding: EdgeInsets.zero,
                     ),
-                    if (_isUsdPayment) ...[
-                      TextFormField(
-                        controller: _fxRateController,
-                        decoration: const InputDecoration(
-                          labelText: 'Exchange Rate (COP per 1 USD)',
-                          border: OutlineInputBorder(),
-                          hintText: 'e.g. 4200',
-                        ),
-                        keyboardType:
-                            const TextInputType.numberWithOptions(decimal: true),
-                        onChanged: (_) => setState(() {}),
-                        validator: (v) {
-                          if (!_isUsdPayment) return null;
-                          final rate = double.tryParse(
-                              v?.replaceAll(',', '') ?? '');
-                          if (rate == null || rate <= 0) {
-                            return 'Enter a valid rate greater than 0';
+                    const SizedBox(height: 10),
+                  ],
+
+                  // Category (only for income/expense)
+                  if (_selectedType != 'transfer')
+                    categoriesAsync.when(
+                      data: (categories) {
+                        final categoryTypeForFilter =
+                            (_selectedType == 'income' && _isReimbursement)
+                                ? 'expense'
+                                : _selectedType;
+                        final filteredCategories = categories
+                            .where((cat) => cat.type == categoryTypeForFilter)
+                            .toList();
+
+                        final List<DropdownMenuItem<String>> dropdownItems = [];
+                        for (final cat in filteredCategories) {
+                          if (cat.subCategories != null &&
+                              cat.subCategories!.isNotEmpty) {
+                            for (final sub in cat.subCategories!) {
+                              dropdownItems.add(DropdownMenuItem(
+                                value: sub.id,
+                                child: Text('${cat.name} > ${sub.name}',
+                                    style: const TextStyle(fontSize: 13)),
+                              ));
+                            }
+                          } else {
+                            dropdownItems.add(DropdownMenuItem(
+                              value: cat.id,
+                              child: Text(cat.name,
+                                  style: const TextStyle(fontSize: 13)),
+                            ));
                           }
-                          return null;
-                        },
-                      ),
-                      if (_usdApplied != null) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          'USD applied: ${CurrencyFormatter.format(_usdApplied!, currency: 'USD')}',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.primary,
-                            fontWeight: FontWeight.w600,
+                        }
+
+                        return DropdownButtonFormField<String>(
+                          value: _selectedCategoryId,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Category',
+                            border: OutlineInputBorder(),
                           ),
+                          items: dropdownItems,
+                          onChanged: (v) =>
+                              setState(() => _selectedCategoryId = v),
+                        );
+                      },
+                      loading: () => const CircularProgressIndicator(),
+                      error: (e, s) => Text(friendlyError(e)),
+                    ),
+                  if (_selectedType != 'transfer') const SizedBox(height: 10),
+
+                  // Target Account (for transfers)
+                  if (_selectedType == 'transfer') ...[
+                    accountsAsync.when(
+                      data: (accounts) => DropdownButtonFormField<String>(
+                        value: _selectedTargetAccountId,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Destination Account',
+                          border: OutlineInputBorder(),
                         ),
+                        items: _buildAccountItems(accounts,
+                            excludeId: _selectedAccountId),
+                        onChanged: (value) => setState(() {
+                          _selectedTargetAccountId = value;
+                          _isUsdPayment = false;
+                        }),
+                      ),
+                      loading: () => const CircularProgressIndicator(),
+                      error: (e, s) => Text(friendlyError(e)),
+                    ),
+                    const SizedBox(height: 10),
+
+                    // USD payment section (transfer to CC with USD balance)
+                    if (_showUsdPaymentSection) ...[
+                      CheckboxListTile(
+                        title: const Text('USD Balance Payment'),
+                        subtitle: const Text('Pays down your USD debt'),
+                        value: _isUsdPayment,
+                        onChanged: (v) => setState(() {
+                          _isUsdPayment = v ?? false;
+                          if (!_isUsdPayment) _fxRateController.clear();
+                        }),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      if (_isUsdPayment) ...[
+                        TextFormField(
+                          controller: _fxRateController,
+                          decoration: const InputDecoration(
+                            labelText: 'Exchange Rate (COP per 1 USD)',
+                            border: OutlineInputBorder(),
+                            hintText: 'e.g. 4200',
+                          ),
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          onChanged: (_) => setState(() {}),
+                          validator: (v) {
+                            if (!_isUsdPayment) return null;
+                            final rate =
+                                double.tryParse(v?.replaceAll(',', '') ?? '');
+                            if (rate == null || rate <= 0) {
+                              return 'Enter a valid rate greater than 0';
+                            }
+                            return null;
+                          },
+                        ),
+                        if (_usdApplied != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            'USD applied: ${CurrencyFormatter.format(_usdApplied!, currency: 'USD')}',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 10),
                       ],
-                      const SizedBox(height: 10),
                     ],
                   ],
-                ],
 
-                // Funded-by sinking fund (optional, expenses only)
-                if (_selectedType == 'expense')
-                  categoriesAsync.when(
-                    data: (categories) {
-                      final savings = categories.where((c) => c.isSavings).toList();
-                      if (savings.isEmpty) return const SizedBox();
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: DropdownButtonFormField<String?>(
-                          value: _fundedByCategoryId,
-                          isExpanded: true,
-                          decoration: const InputDecoration(
-                            labelText: 'Funded by sinking fund (optional)',
-                            helperText:
-                                "Won't count against this month's category budget; "
-                                'subtracts from the fund\'s accumulated balance.',
-                            border: OutlineInputBorder(),
+                  // Funded-by sinking fund (optional, expenses only)
+                  if (_selectedType == 'expense')
+                    categoriesAsync.when(
+                      data: (categories) {
+                        final savings =
+                            categories.where((c) => c.isSavings).toList();
+                        if (savings.isEmpty) return const SizedBox();
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: DropdownButtonFormField<String?>(
+                            value: _fundedByCategoryId,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Funded by sinking fund (optional)',
+                              helperText:
+                                  "Won't count against this month's category budget; "
+                                  'subtracts from the fund\'s accumulated balance.',
+                              border: OutlineInputBorder(),
+                            ),
+                            items: [
+                              const DropdownMenuItem<String?>(
+                                  value: null, child: Text('None')),
+                              ...savings.map((c) => DropdownMenuItem<String?>(
+                                    value: c.id,
+                                    child: Text(c.name,
+                                        overflow: TextOverflow.fade),
+                                  )),
+                            ],
+                            onChanged: (v) =>
+                                setState(() => _fundedByCategoryId = v),
                           ),
-                          items: [
-                            const DropdownMenuItem<String?>(
-                                value: null, child: Text('None')),
-                            ...savings.map((c) => DropdownMenuItem<String?>(
-                                  value: c.id,
-                                  child: Text(c.name,
-                                      overflow: TextOverflow.fade),
-                                )),
-                          ],
-                          onChanged: (v) =>
-                              setState(() => _fundedByCategoryId = v),
-                        ),
-                      );
-                    },
-                    loading: () => const SizedBox(),
-                    error: (_, __) => const SizedBox(),
-                  ),
+                        );
+                      },
+                      loading: () => const SizedBox(),
+                      error: (_, __) => const SizedBox(),
+                    ),
 
-                // Sinking-fund contribution tag (optional, transfers only)
-                if (_selectedType == 'transfer')
-                  categoriesAsync.when(
-                    data: (categories) {
-                      final savings = categories.where((c) => c.isSavings).toList();
-                      if (savings.isEmpty) return const SizedBox();
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: DropdownButtonFormField<String?>(
-                          value: _savingsContributionCategoryId,
-                          isExpanded: true,
-                          decoration: const InputDecoration(
-                            labelText: 'Contribute to sinking fund (optional)',
-                            helperText:
-                                "Counts as this month's contribution toward the fund's monthly target.",
-                            border: OutlineInputBorder(),
+                  // Sinking-fund contribution tag (optional, transfers only)
+                  if (_selectedType == 'transfer')
+                    categoriesAsync.when(
+                      data: (categories) {
+                        final savings =
+                            categories.where((c) => c.isSavings).toList();
+                        if (savings.isEmpty) return const SizedBox();
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: DropdownButtonFormField<String?>(
+                            value: _savingsContributionCategoryId,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText:
+                                  'Contribute to sinking fund (optional)',
+                              helperText:
+                                  "Counts as this month's contribution toward the fund's monthly target.",
+                              border: OutlineInputBorder(),
+                            ),
+                            items: [
+                              const DropdownMenuItem<String?>(
+                                  value: null, child: Text('None')),
+                              ...savings.map((c) => DropdownMenuItem<String?>(
+                                    value: c.id,
+                                    child: Text(c.name,
+                                        overflow: TextOverflow.fade),
+                                  )),
+                            ],
+                            onChanged: (v) => setState(
+                                () => _savingsContributionCategoryId = v),
                           ),
-                          items: [
-                            const DropdownMenuItem<String?>(
-                                value: null, child: Text('None')),
-                            ...savings.map((c) => DropdownMenuItem<String?>(
-                                  value: c.id,
-                                  child: Text(c.name,
-                                      overflow: TextOverflow.fade),
-                                )),
-                          ],
-                          onChanged: (v) =>
-                              setState(() => _savingsContributionCategoryId = v),
-                        ),
-                      );
-                    },
-                    loading: () => const SizedBox(),
-                    error: (_, __) => const SizedBox(),
-                  ),
+                        );
+                      },
+                      loading: () => const SizedBox(),
+                      error: (_, __) => const SizedBox(),
+                    ),
 
-                // Expense Group (Optional, only for expenses)
-                if (_selectedType == 'expense')
-                  expenseGroupsAsync.when(
-                    data: (groups) => DropdownButtonFormField<String?>(
-                      value: _selectedExpenseGroupId,
-                      isExpanded: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Expense Group (optional)',
-                        border: OutlineInputBorder(),
+                  // Expense Group (Optional, only for expenses)
+                  if (_selectedType == 'expense')
+                    expenseGroupsAsync.when(
+                      data: (groups) => DropdownButtonFormField<String?>(
+                        value: _selectedExpenseGroupId,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Expense Group (optional)',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: [
+                          const DropdownMenuItem<String?>(
+                              value: null, child: Text('None')),
+                          ...groups.map(
+                              (ExpenseGroup g) => DropdownMenuItem<String?>(
+                                  value: g.id,
+                                  child: Text(
+                                    g.name,
+                                    overflow: TextOverflow.fade,
+                                  ))),
+                        ],
+                        onChanged: (v) =>
+                            setState(() => _selectedExpenseGroupId = v),
                       ),
-                      items: [
-                        const DropdownMenuItem<String?>(
-                            value: null, child: Text('None')),
-                        ...groups.map((ExpenseGroup g) =>
-                            DropdownMenuItem<String?>(
-                                value: g.id,
-                                child: Text(
-                                  g.name,
-                                  overflow: TextOverflow.fade,
-                                ))),
-                      ],
-                      onChanged: (v) =>
-                          setState(() => _selectedExpenseGroupId = v),
+                      loading: () => const LinearProgressIndicator(),
+                      error: (_, __) => const SizedBox(),
                     ),
-                    loading: () => const LinearProgressIndicator(),
-                    error: (_, __) => const SizedBox(),
-                  ),
-                if (_selectedType == 'expense') const SizedBox(height: 10),
+                  if (_selectedType == 'expense') const SizedBox(height: 10),
 
-                // Notes
-                TextFormField(
-                  controller: _notesController,
-                  decoration: const InputDecoration(
-                    labelText: 'Notes (optional)',
-                    border: OutlineInputBorder(),
+                  // Notes
+                  TextFormField(
+                    controller: _notesController,
+                    decoration: const InputDecoration(
+                      labelText: 'Notes (optional)',
+                      border: OutlineInputBorder(),
+                    ),
+                    maxLines: 2,
                   ),
-                  maxLines: 2,
-                ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
-                // Save Button
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: _isLoading ? null : _saveTransaction,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: _isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text('Save Transaction'),
+                  // Save Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: _isLoading ? null : _saveTransaction,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Text('Save Transaction'),
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -1151,4 +1199,3 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
     );
   }
 }
-

@@ -1,25 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:budgett_frontend/core/app_spacing.dart';
+import 'package:budgett_frontend/presentation/widgets/discard_guard.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/data/models/category_model.dart';
 import 'package:budgett_frontend/data/models/sub_category_model.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/presentation/utils/icon_helper.dart';
 
-
 class CreateCategoryDialog extends ConsumerStatefulWidget {
   const CreateCategoryDialog({super.key});
 
   @override
-  ConsumerState<CreateCategoryDialog> createState() => _CreateCategoryDialogState();
+  ConsumerState<CreateCategoryDialog> createState() =>
+      _CreateCategoryDialogState();
 }
 
 class _CreateCategoryDialogState extends ConsumerState<CreateCategoryDialog> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _subCategoryController = TextEditingController();
-  
+
   String _selectedType = 'expense';
   String _selectedIcon = 'category';
   String _selectedColor = '0xFF4CAF50'; // Default Green (Hogar)
@@ -40,213 +41,260 @@ class _CreateCategoryDialogState extends ConsumerState<CreateCategoryDialog> {
     '0xFFFFC107', // Amber
   ];
 
-  
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      insetPadding: EdgeInsets.symmetric(
-        horizontal: MediaQuery.of(context).size.width * 0.025,
-        vertical: 24,
-      ),
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 500, maxHeight: 600),
-        padding: kDialogPadding,
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              Row(
-                children: [
-                  Expanded(
-                    child: Text('Create Category', style: Theme.of(context).textTheme.headlineSmall),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-
-              // Scrollable Content
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Type Selector
-                      SegmentedButton<String>(
-                        segments: const [
-                          ButtonSegment(value: 'income', label: Text('Income'), icon: Icon(Icons.arrow_downward)),
-                          ButtonSegment(value: 'expense', label: Text('Expense'), icon: Icon(Icons.arrow_upward)),
-                          ButtonSegment(value: 'savings', label: Text('Savings'), icon: Icon(Icons.savings_outlined)),
-                        ],
-                        selected: {_selectedType},
-                        onSelectionChanged: (Set<String> newSelection) {
-                          setState(() {
-                            _selectedType = newSelection.first;
-                            if (_selectedType != 'savings') _targetAccountId = null;
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 10),
-
-                      // Name Input
-                      TextFormField(
-                        controller: _nameController,
-                        decoration: const InputDecoration(
-                          labelText: 'Name',
-                          border: OutlineInputBorder(),
-                        ),
-                        validator: (value) => value == null || value.isEmpty ? 'Required' : null,
-                      ),
-                      const SizedBox(height: 10),
-
-                      // Optional destination account for savings categories
-                      if (_selectedType == 'savings') ...[
-                        savingsTargetAccountField(
-                          selectedId: _targetAccountId,
-                          onChanged: (id) => setState(() => _targetAccountId = id),
-                        ),
-                        const SizedBox(height: 10),
-                      ],
-                      
-                      // Color Picker
-                      const Text('Color', style: TextStyle(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 8),
-                      Center(
-                        child: Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          alignment: WrapAlignment.center,
-                          children: _colors.map((colorStr) {
-                            final color = Color(int.parse(colorStr));
-                            final isSelected = _selectedColor == colorStr;
-                            
-                            return GestureDetector(
-                              onTap: () => setState(() => _selectedColor = colorStr),
-                              child: Container(
-                                width: 40,
-                                height: 40,
-                                decoration: BoxDecoration(
-                                  color: color,
-                                  shape: BoxShape.circle,
-                                  border: isSelected ? Border.all(color: Theme.of(context).colorScheme.onSurface, width: 2) : null,
-                                ),
-                                child: isSelected ? const Icon(Icons.check, color: Colors.white, size: 20) : null,
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-
-                      // Icon Picker
-                      Text('Icon', style: Theme.of(context).textTheme.titleSmall),
-                      const SizedBox(height: 8),
-                      _IconGrid(
-                        selectedIcon: _selectedIcon,
-                        onSelected: (key) => setState(() => _selectedIcon = key),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 10),
-                      
-              // Sub Categories
-              Text('Sub Categories (Optional)', style: Theme.of(context).textTheme.titleSmall),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _subCategoryController,
-                      decoration: const InputDecoration(
-                        labelText: 'Add Sub Category',
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      ),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        if (!_isDirty || await confirmDiscard(context)) {
+          if (context.mounted) Navigator.of(context).pop();
+        }
+      },
+      child: Dialog(
+        insetPadding: EdgeInsets.symmetric(
+          horizontal: MediaQuery.of(context).size.width * 0.025,
+          vertical: 24,
+        ),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 500, maxHeight: 600),
+          padding: kDialogPadding,
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text('Create Category',
+                          style: Theme.of(context).textTheme.headlineSmall),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton.filled(
-                    onPressed: () {
-                      if (_subCategoryController.text.isNotEmpty) {
-                        setState(() {
-                          _subCategories.add(_subCategoryController.text.trim());
-                          _subCategoryController.clear();
-                        });
-                      }
-                    },
-                    icon: const Icon(Icons.add),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              if (_subCategories.isNotEmpty)
-                Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade300),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _subCategories.length,
-                    separatorBuilder: (context, index) => const Divider(height: 1),
-                    itemBuilder: (context, index) {
-                      return ListTile(
-                        dense: true,
-                        title: Text(_subCategories[index]),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete, size: 18, color: Colors.grey),
-                          onPressed: () {
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.maybePop(context),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                // Scrollable Content
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Type Selector
+                        SegmentedButton<String>(
+                          segments: const [
+                            ButtonSegment(
+                                value: 'income',
+                                label: Text('Income'),
+                                icon: Icon(Icons.arrow_downward)),
+                            ButtonSegment(
+                                value: 'expense',
+                                label: Text('Expense'),
+                                icon: Icon(Icons.arrow_upward)),
+                            ButtonSegment(
+                                value: 'savings',
+                                label: Text('Savings'),
+                                icon: Icon(Icons.savings_outlined)),
+                          ],
+                          selected: {_selectedType},
+                          onSelectionChanged: (Set<String> newSelection) {
                             setState(() {
-                              _subCategories.removeAt(index);
+                              _selectedType = newSelection.first;
+                              if (_selectedType != 'savings')
+                                _targetAccountId = null;
                             });
                           },
                         ),
-                      );
-                    },
+                        const SizedBox(height: 10),
+
+                        // Name Input
+                        TextFormField(
+                          controller: _nameController,
+                          decoration: const InputDecoration(
+                            labelText: 'Name',
+                            border: OutlineInputBorder(),
+                          ),
+                          validator: (value) => value == null || value.isEmpty
+                              ? 'Required'
+                              : null,
+                        ),
+                        const SizedBox(height: 10),
+
+                        // Optional destination account for savings categories
+                        if (_selectedType == 'savings') ...[
+                          savingsTargetAccountField(
+                            selectedId: _targetAccountId,
+                            onChanged: (id) =>
+                                setState(() => _targetAccountId = id),
+                          ),
+                          const SizedBox(height: 10),
+                        ],
+
+                        // Color Picker
+                        const Text('Color',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        Center(
+                          child: Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            alignment: WrapAlignment.center,
+                            children: _colors.map((colorStr) {
+                              final color = Color(int.parse(colorStr));
+                              final isSelected = _selectedColor == colorStr;
+
+                              return GestureDetector(
+                                onTap: () =>
+                                    setState(() => _selectedColor = colorStr),
+                                child: Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: color,
+                                    shape: BoxShape.circle,
+                                    border: isSelected
+                                        ? Border.all(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurface,
+                                            width: 2)
+                                        : null,
+                                  ),
+                                  child: isSelected
+                                      ? const Icon(Icons.check,
+                                          color: Colors.white, size: 20)
+                                      : null,
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+
+                        // Icon Picker
+                        Text('Icon',
+                            style: Theme.of(context).textTheme.titleSmall),
+                        const SizedBox(height: 8),
+                        _IconGrid(
+                          selectedIcon: _selectedIcon,
+                          onSelected: (key) =>
+                              setState(() => _selectedIcon = key),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
 
-              const SizedBox(height: 8),
+                const SizedBox(height: 10),
 
-              // Action Buttons
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Cancel'),
+                // Sub Categories
+                Text('Sub Categories (Optional)',
+                    style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _subCategoryController,
+                        decoration: const InputDecoration(
+                          labelText: 'Add Sub Category',
+                          border: OutlineInputBorder(),
+                          contentPadding:
+                              EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton.filled(
+                      onPressed: () {
+                        if (_subCategoryController.text.isNotEmpty) {
+                          setState(() {
+                            _subCategories
+                                .add(_subCategoryController.text.trim());
+                            _subCategoryController.clear();
+                          });
+                        }
+                      },
+                      icon: const Icon(Icons.add),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                if (_subCategories.isNotEmpty)
+                  Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _subCategories.length,
+                      separatorBuilder: (context, index) =>
+                          const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        return ListTile(
+                          dense: true,
+                          title: Text(_subCategories[index]),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.delete,
+                                size: 18, color: Colors.grey),
+                            onPressed: () {
+                              setState(() {
+                                _subCategories.removeAt(index);
+                              });
+                            },
+                          ),
+                        );
+                      },
+                    ),
                   ),
-                  const SizedBox(width: 8),
-                  FilledButton(
-                    onPressed: _isLoading ? null : _saveCategory,
-                    child: _isLoading 
-                       ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                       : const Text('Create'),
-                  ),
-                ],
-              ),
-            ],
+
+                const SizedBox(height: 8),
+
+                // Action Buttons
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.maybePop(context),
+                      child: const Text('Cancel'),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      onPressed: _isLoading ? null : _saveCategory,
+                      child: _isLoading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white))
+                          : const Text('Create'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
+  bool get _isDirty =>
+      _nameController.text.isNotEmpty || _subCategories.isNotEmpty;
+
   Future<void> _saveCategory() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     setState(() => _isLoading = true);
-    
+
     try {
       final newCategory = Category(
         id: '', // Supabase will generate this
@@ -258,21 +306,21 @@ class _CreateCategoryDialogState extends ConsumerState<CreateCategoryDialog> {
       );
 
       final repo = ref.read(financeRepositoryProvider);
-      
+
       // 1. Add Category
       // We need the ID back from the database to add subcategories.
-      // Since addCategory currently doesn't return the ID, we might need to change it, 
+      // Since addCategory currently doesn't return the ID, we might need to change it,
       // OR we generate a UUID here if we can (but standard is DB gen).
       // Assuming for now we update addCategory to return the new Category object or ID (checking repo...).
       // Checked repo: addCategory is void. updating logic to fetch the category or assume we can rely on standard "insert and fetch" logic update.
       // For this step, I'll modify the logic to use Supabase's abilities or just make separate calls.
       // Actually, standard practice: repo.createCategory returning the object.
-      
+
       // Workaround without changing repo return type extensively right now:
       // We'll create the category, then fetch the latest one by name/user (risky concurrency) or Update repo first.
       // Let's assume I will update the repo immediately after this to return the ID.
-      // For now, I'll write the code assuming `repo.addCategory` returns `Category`. 
-      
+      // For now, I'll write the code assuming `repo.addCategory` returns `Category`.
+
       // WAIT, I should check FinanceRepository again.
       // It returns Future<void>.
       // I will update this code block to reflect a repo change I will make next.
@@ -286,10 +334,10 @@ class _CreateCategoryDialogState extends ConsumerState<CreateCategoryDialog> {
           name: subName,
         ));
       }
-      
+
       // Invalidate Categories provider to refresh list
       ref.invalidate(categoriesProvider);
-      
+
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -306,7 +354,7 @@ class _CreateCategoryDialogState extends ConsumerState<CreateCategoryDialog> {
       if (mounted) setState(() => _isLoading = false);
     }
   }
-  
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -360,7 +408,8 @@ class _SavingsTargetAccountField extends ConsumerWidget {
           isExpanded: true,
           decoration: const InputDecoration(
             labelText: 'Destination account (optional)',
-            helperText: 'Where the money physically lives. Purely informational.',
+            helperText:
+                'Where the money physically lives. Purely informational.',
             border: OutlineInputBorder(),
           ),
           items: [
