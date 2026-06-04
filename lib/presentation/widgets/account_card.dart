@@ -130,7 +130,8 @@ class AccountCard extends StatelessWidget {
         elevation: 4,
         shadowColor: Colors.black12,
         clipBehavior: Clip.antiAlias,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(kCardRadius)),
         child: InkWell(
           onTap: onTap,
           child: tileLayout

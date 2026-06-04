@@ -17,6 +17,9 @@ const double kSpaceXxl = 16; // screen body padding (was 24)
 /// last row isn't hidden behind it (FAB is ~56px + margin).
 const double kFabSafeBottom = 80;
 
+/// Canonical corner radius for cards/surfaces (matches the CardTheme).
+const double kCardRadius = 16;
+
 // ---------------------------------------------------------------------------
 // Pre-built EdgeInsets
 // ---------------------------------------------------------------------------
