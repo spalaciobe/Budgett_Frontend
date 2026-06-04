@@ -6,6 +6,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/presentation/providers/portfolio_provider.dart';
+import 'package:budgett_frontend/presentation/providers/fx_rate_provider.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:budgett_frontend/presentation/widgets/portfolio_donut_chart.dart';
 import 'package:budgett_frontend/presentation/widgets/portfolio_value_chart.dart';
@@ -345,6 +346,171 @@ class _PortfolioEmptyState extends StatelessWidget {
   }
 }
 
+/// Value-over-time with an asset selector (defaults to "All assets"),
+/// mirroring the per-account investment history. Picking an asset charts just
+/// that symbol's value across accounts and lists its purchase days as pills —
+/// buys on the same day collapsed into a single pill.
+class _PortfolioHistorySection extends ConsumerStatefulWidget {
+  final List<ConsolidatedPosition> positions;
+  const _PortfolioHistorySection({required this.positions});
+
+  @override
+  ConsumerState<_PortfolioHistorySection> createState() =>
+      _PortfolioHistorySectionState();
+}
+
+class _PortfolioHistorySectionState
+    extends ConsumerState<_PortfolioHistorySection> {
+  static const _allId = '__all__';
+  String _selected = _allId;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final validIds = {_allId, for (final p in widget.positions) p.symbol};
+    final selected = validIds.contains(_selected) ? _selected : _allId;
+
+    List<PortfolioValuePoint>? points;
+    List<PortfolioValueMarker> markers;
+    bool loading;
+
+    if (selected == _allId) {
+      final historyAsync = ref.watch(consolidatedPortfolioHistoryProvider);
+      points = historyAsync.valueOrNull?.points;
+      loading = historyAsync.isLoading;
+      markers =
+          ref.watch(consolidatedPortfolioMarkersProvider).valueOrNull ??
+              const [];
+    } else {
+      final position = widget.positions.firstWhere((p) => p.symbol == selected);
+      final historyAsync = ref.watch(allInvestmentPriceHistoryProvider);
+      final fxRate = ref.watch(fxRateProvider).valueOrNull;
+      loading = historyAsync.isLoading;
+      final rows = (historyAsync.valueOrNull ?? const [])
+          .where((r) => r.symbol == position.symbol)
+          .toList();
+      double convert(double v, String c) {
+        if (c == 'COP') return v;
+        if (c == 'USD' && fxRate != null) return v * fxRate.rate;
+        return v;
+      }
+
+      points = rows.isEmpty
+          ? const <PortfolioValuePoint>[]
+          : buildTotalValueSeries(rows, convert);
+      markers =
+          (ref.watch(consolidatedPortfolioMarkersProvider).valueOrNull ??
+                  const [])
+              .where((m) => m.label == position.displayName)
+              .toList();
+    }
+
+    final dropdown = SizedBox(
+      width: context.formFactor == FormFactor.mobile ? 220 : 280,
+      child: DropdownButtonFormField<String>(
+        value: selected,
+        isExpanded: true,
+        decoration: const InputDecoration(labelText: 'Asset', isDense: true),
+        items: [
+          const DropdownMenuItem(
+            value: _allId,
+            child: Text('All assets (total)', overflow: TextOverflow.fade),
+          ),
+          ...widget.positions.map((p) => DropdownMenuItem(
+                value: p.symbol,
+                child: Text(p.displayName, overflow: TextOverflow.fade),
+              )),
+        ],
+        onChanged: (v) {
+          if (v != null) setState(() => _selected = v);
+        },
+      ),
+    );
+
+    Widget body;
+    if (loading && points == null) {
+      body = const SizedBox(
+          height: 260, child: Center(child: CircularProgressIndicator()));
+    } else if (points == null || points.isEmpty) {
+      body = const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(child: Text('No price history yet.')),
+      );
+    } else {
+      body = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          PortfolioValueChart(
+              points: points, markers: _dedupeMarkersByDay(markers)),
+          if (markers.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Wrap(spacing: 8, runSpacing: 6, children: _markerPills(markers)),
+          ],
+        ],
+      );
+    }
+
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              const Icon(Icons.show_chart, size: 18),
+              const SizedBox(width: 8),
+              Text('Value over time',
+                  style: theme.textTheme.titleSmall
+                      ?.copyWith(fontWeight: FontWeight.w600)),
+            ]),
+            const SizedBox(height: 12),
+            dropdown,
+            const SizedBox(height: 12),
+            body,
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<PortfolioValueMarker> _dedupeMarkersByDay(
+      List<PortfolioValueMarker> markers) {
+    final seen = <DateTime>{};
+    final out = <PortfolioValueMarker>[];
+    for (final m in markers) {
+      final day = DateTime(m.date.year, m.date.month, m.date.day);
+      if (seen.add(day)) out.add(m);
+    }
+    return out;
+  }
+
+  List<Widget> _markerPills(List<PortfolioValueMarker> markers) {
+    final byDay = <DateTime, int>{};
+    final labels = <DateTime, Set<String>>{};
+    for (final m in markers) {
+      final day = DateTime(m.date.year, m.date.month, m.date.day);
+      byDay[day] = (byDay[day] ?? 0) + 1;
+      labels.putIfAbsent(day, () => <String>{}).add(m.label);
+    }
+    final days = byDay.keys.toList()..sort();
+    return days.map((day) {
+      final count = byDay[day]!;
+      final dateStr =
+          '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
+      return Tooltip(
+        message: labels[day]!.where((l) => l.isNotEmpty).join(', '),
+        child: Chip(
+          visualDensity: VisualDensity.compact,
+          avatar: const Icon(Icons.add_shopping_cart, size: 16),
+          label: Text(count > 1 ? '$dateStr · $count' : dateStr),
+        ),
+      );
+    }).toList();
+  }
+}
+
 class _PortfolioContent extends StatelessWidget {
   final ConsolidatedPortfolio portfolio;
 
@@ -470,52 +636,8 @@ class _PortfolioContent extends StatelessWidget {
         ),
         const SizedBox(height: 12),
 
-        // Total value over time
-        Consumer(
-          builder: (context, ref, _) {
-            final historyAsync =
-                ref.watch(consolidatedPortfolioHistoryProvider);
-            return historyAsync.when(
-              loading: () => const SizedBox(
-                height: 260,
-                child: Center(child: CircularProgressIndicator()),
-              ),
-              error: (_, __) => const SizedBox.shrink(),
-              data: (h) {
-                if (h.isEmpty) return const SizedBox.shrink();
-                final markers =
-                    ref.watch(consolidatedPortfolioMarkersProvider).valueOrNull ??
-                        const [];
-                return Card(
-                  elevation: 1,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.show_chart, size: 18),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Value over time',
-                              style: theme.textTheme.titleSmall
-                                  ?.copyWith(fontWeight: FontWeight.w600),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        PortfolioValueChart(points: h.points, markers: markers),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            );
-          },
-        ),
+        // Value over time, with an asset selector (defaults to All assets).
+        _PortfolioHistorySection(positions: portfolio.positions),
         const SizedBox(height: 12),
 
         // Two pie charts

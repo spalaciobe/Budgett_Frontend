@@ -976,7 +976,7 @@ class _InvestmentHistoryChartState
     };
     final selectedHoldingId = validIds.contains(_selectedHoldingId)
         ? _selectedHoldingId!
-        : chartableHoldings.first.id;
+        : _allAssetsId;
     if (_selectedHoldingId != selectedHoldingId) {
       _selectedHoldingId = selectedHoldingId;
     }
@@ -1327,21 +1327,43 @@ class _HistoryLineChart extends StatelessWidget {
           Wrap(
             spacing: 8,
             runSpacing: 6,
-            children: events.map((event) {
-              final d = event.date;
-              return Chip(
-                visualDensity: VisualDensity.compact,
-                avatar: Icon(
-                  event.source == 'created_at'
-                      ? Icons.history_toggle_off
-                      : Icons.add_shopping_cart,
-                  size: 16,
-                ),
-                label: Text(
-                  '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}',
-                ),
-              );
-            }).toList(),
+            // Collapse purchases made on the same day into a single pill
+            // (count + total in the tooltip) instead of one chip per buy.
+            children: () {
+              final byDay = <DateTime, List<InvestmentPurchaseEvent>>{};
+              for (final e in events) {
+                final day = DateTime(e.date.year, e.date.month, e.date.day);
+                byDay.putIfAbsent(day, () => []).add(e);
+              }
+              final days = byDay.keys.toList()..sort();
+              return days.map((day) {
+                final group = byDay[day]!;
+                final isPurchase =
+                    group.any((e) => e.source != 'created_at');
+                final total =
+                    group.fold<double>(0.0, (s, e) => s + e.amount);
+                final dateStr =
+                    '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
+                return Tooltip(
+                  message: group.length > 1
+                      ? '${group.length} purchases · ${CurrencyFormatter.format(total, currency: holding.currency)}'
+                      : CurrencyFormatter.format(total,
+                          currency: holding.currency),
+                  child: Chip(
+                    visualDensity: VisualDensity.compact,
+                    avatar: Icon(
+                      isPurchase
+                          ? Icons.add_shopping_cart
+                          : Icons.history_toggle_off,
+                      size: 16,
+                    ),
+                    label: Text(group.length > 1
+                        ? '$dateStr · ${group.length}'
+                        : dateStr),
+                  ),
+                );
+              }).toList();
+            }(),
           ),
         ],
       ],
