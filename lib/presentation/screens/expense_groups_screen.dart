@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/presentation/widgets/empty_state.dart';
+import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
@@ -26,30 +28,45 @@ class ExpenseGroupsScreen extends ConsumerWidget {
         child: expenseGroupsAsync.when(
           data: (groups) {
             if (groups.isEmpty) {
-              return LayoutBuilder(
-                builder: (context, constraints) => SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  child: SizedBox(
-                    height: constraints.maxHeight,
-                    child: const Center(
-                      child: Text('No expense groups.\nCreate one with the + button.',
-                          textAlign: TextAlign.center),
-                    ),
-                  ),
-                ),
+              return const EmptyState(
+                icon: Icons.folder_shared_outlined,
+                title: 'No expense groups',
+                message: 'Create one with the + button to group related spending.',
               );
             }
-            return ListView.builder(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: kScreenPadding,
-              itemCount: groups.length,
-              itemBuilder: (context, index) {
-                return _ExpenseGroupCard(group: groups[index]);
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                // Two columns on wide screens, one on mobile, so cards don't
+                // stretch across the whole (capped) width.
+                final twoCols = constraints.maxWidth >= 720;
+                if (!twoCols) {
+                  return ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: kScreenPaddingWithFab,
+                    itemCount: groups.length,
+                    itemBuilder: (context, index) =>
+                        _ExpenseGroupCard(group: groups[index]),
+                  );
+                }
+                const gap = 12.0;
+                final itemW = (constraints.maxWidth - 32 - gap) / 2;
+                return SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: kScreenPaddingWithFab,
+                  child: Wrap(
+                    spacing: gap,
+                    children: [
+                      for (final g in groups)
+                        SizedBox(
+                            width: itemW, child: _ExpenseGroupCard(group: g)),
+                    ],
+                  ),
+                );
               },
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, s) => Center(child: Text('Error: $e')),
+          error: (e, s) => Center(child: Text(friendlyError(e))),
         ),
       ),
       floatingActionButton: FloatingActionButton(
@@ -278,7 +295,7 @@ class _ExpenseGroupCard extends ConsumerWidget {
                               group.name,
                               style: Theme.of(context).textTheme.titleMedium,
                               maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                              overflow: TextOverflow.fade,
                             ),
                           ),
                         ],
@@ -317,7 +334,7 @@ class _ExpenseGroupCard extends ConsumerWidget {
                         child: Text(
                           '${CurrencyFormatter.format(spent)} spent',
                           maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          overflow: TextOverflow.fade,
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -325,7 +342,7 @@ class _ExpenseGroupCard extends ConsumerWidget {
                         child: Text(
                           'of ${CurrencyFormatter.format(group.budgetAmount)}',
                           maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          overflow: TextOverflow.fade,
                           textAlign: TextAlign.end,
                         ),
                       ),

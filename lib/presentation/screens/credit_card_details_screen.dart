@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:budgett_frontend/core/app_spacing.dart';
+import 'package:budgett_frontend/core/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../core/utils/credit_card_calculator.dart';
@@ -54,6 +56,7 @@ class CreditCardDetailsBody extends ConsumerWidget {
     // (mostly populated by scheduled installment cuotas) can be tucked into
     // a single collapsed "Upcoming installments" group.
     String? currentPeriod;
+    DateTime? nextPaymentDate;
     final rules = freshAccount.creditCardRules;
     final banks = banksAsync.valueOrNull;
     if (rules != null && banks != null) {
@@ -61,6 +64,7 @@ class CreditCardDetailsBody extends ConsumerWidget {
       if (bank != null) {
         currentPeriod = CreditCardCalculator.determineBillingPeriod(
             DateTime.now(), rules, bank);
+        nextPaymentDate = _computeNextPaymentDate(rules, bank);
       }
     }
 
@@ -100,6 +104,12 @@ class CreditCardDetailsBody extends ConsumerWidget {
                 ),
             ],
           ),
+          if (nextPaymentDate != null &&
+              (freshAccount.balance.abs() > 0 ||
+                  freshAccount.balanceUsd.abs() > 0)) ...[
+            const SizedBox(height: 8),
+            _NextPaymentBanner(date: nextPaymentDate),
+          ],
           const SizedBox(height: 8),
           CreditCardBillingSimulator(
             account: freshAccount,
@@ -112,14 +122,16 @@ class CreditCardDetailsBody extends ConsumerWidget {
             children: [
               Expanded(
                 child: _buildStatCard(
-                  context, 'Available COP', availableCop, Colors.green,
+                  context, 'Available COP', availableCop,
+                  context.semantic.positive,
                   isApprox: copIsApprox,
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: _buildStatCard(
-                  context, 'Used COP', freshAccount.balance.abs(), Colors.red,
+                  context, 'Used COP', freshAccount.balance.abs(),
+                  Theme.of(context).colorScheme.error,
                 ),
               ),
             ],
@@ -135,7 +147,7 @@ class CreditCardDetailsBody extends ConsumerWidget {
                     freshAccount.creditLimitUsd > 0
                         ? freshAccount.creditLimitUsd + freshAccount.balanceUsd
                         : 0,
-                    Colors.green,
+                    context.semantic.positive,
                     currency: 'USD',
                   ),
                 ),
@@ -145,7 +157,7 @@ class CreditCardDetailsBody extends ConsumerWidget {
                     context,
                     'Used USD',
                     freshAccount.balanceUsd.abs(),
-                    Colors.red,
+                    Theme.of(context).colorScheme.error,
                     currency: 'USD',
                   ),
                 ),
@@ -250,7 +262,7 @@ class CreditCardDetailsBody extends ConsumerWidget {
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
                             color: currency == 'USD'
-                                ? Colors.blue.withOpacity(0.12)
+                                ? Colors.blue.withValues(alpha: 0.12)
                                 : Theme.of(context).colorScheme.primaryContainer,
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -274,7 +286,7 @@ class CreditCardDetailsBody extends ConsumerWidget {
                         fontWeight: FontWeight.w600,
                       ),
                       maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      overflow: TextOverflow.fade,
                     ),
                     children: periodTransactions
                         .map((t) => TransactionTile(
@@ -321,7 +333,7 @@ class CreditCardDetailsBody extends ConsumerWidget {
               return Column(children: children);
             },
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, s) => Text('Error: $e'),
+            error: (e, s) => Text(friendlyError(e)),
           ),
         ],
       ),
@@ -351,7 +363,7 @@ class CreditCardDetailsBody extends ConsumerWidget {
           child: Column(
             children: [
               Icon(Icons.rule, size: 48,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.4)),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.4)),
               const SizedBox(height: 12),
               Text(
                 'No statement and payment rules configured',
@@ -440,7 +452,7 @@ class CreditCardDetailsBody extends ConsumerWidget {
         child: Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator())),
       ),
       error: (e, _) => Card(
-        child: Padding(padding: const EdgeInsets.all(16), child: Text('Error loading banks: $e')),
+        child: Padding(padding: const EdgeInsets.all(16), child: Text(friendlyError(e))),
       ),
     );
   }
@@ -455,7 +467,7 @@ class CreditCardDetailsBody extends ConsumerWidget {
           child: Text(
             value,
             style: const TextStyle(fontSize: 13),
-            overflow: TextOverflow.ellipsis,
+            overflow: TextOverflow.fade,
           ),
         ),
       ],
@@ -463,7 +475,7 @@ class CreditCardDetailsBody extends ConsumerWidget {
   }
 
   Widget _buildDateRow(BuildContext context, _CutoffPaymentPair pair) {
-    final dateFormat = DateFormat('d MMM yyyy', 'en');
+    final dateFormat = DateFormat('dd/MM/yyyy', 'en');
     final monthFormat = DateFormat('MMMM', 'en');
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -623,6 +635,76 @@ class _CutoffPaymentPair {
   _CutoffPaymentPair(this.cutoff, this.payment);
 }
 
+/// The next statement payment date on/after today, derived from the card's
+/// rules + bank (Colombian business-day adjustments included). Manual calendar
+/// overrides aren't applied here — the authoritative per-cycle list below uses
+/// them; this is a convenience highlight.
+DateTime _computeNextPaymentDate(CreditCardRules rules, Bank bank) {
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final payments = <DateTime>[];
+  for (int i = -1; i <= 2; i++) {
+    final t = DateTime(now.year, now.month + i);
+    final cutoff =
+        CreditCardCalculator.calculateCutoffDate(rules, bank, t.year, t.month);
+    payments.add(CreditCardCalculator.calculatePaymentDate(rules, bank, cutoff));
+  }
+  payments.sort();
+  return payments.firstWhere((d) => !d.isBefore(today),
+      orElse: () => payments.last);
+}
+
+/// Compact banner near "Pay card" showing when the next statement payment is
+/// due, with urgency color (overdue / due soon / upcoming).
+class _NextPaymentBanner extends StatelessWidget {
+  final DateTime date;
+  const _NextPaymentBanner({required this.date});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final days = date.difference(today).inDays;
+    final overdue = days < 0;
+    final urgent = days >= 0 && days <= 3;
+    final color = overdue
+        ? theme.colorScheme.error
+        : urgent
+            ? context.semantic.warning
+            : theme.colorScheme.primary;
+    final dateStr =
+        '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+    final whenText = overdue
+        ? 'overdue by ${-days} ${-days == 1 ? 'day' : 'days'}'
+        : days == 0
+            ? 'due today'
+            : 'in $days ${days == 1 ? 'day' : 'days'}';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.event_outlined, size: 16, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Next payment: $dateStr · $whenText',
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: color, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Wraps all billing periods after the current cycle in a single collapsed
 /// card so scheduled installment cuotas don't dominate the recent
 /// transactions panel. Tapping it reveals each future cycle as its own
@@ -686,7 +768,7 @@ class _UpcomingInstallmentsCard extends StatelessWidget {
             fontSize: 12,
           ),
           maxLines: 2,
-          overflow: TextOverflow.ellipsis,
+          overflow: TextOverflow.fade,
         ),
         childrenPadding: const EdgeInsets.symmetric(horizontal: 8),
         children: [
@@ -805,7 +887,7 @@ class _CreditCardRulesBottomSheetState extends ConsumerState<_CreditCardRulesBot
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(content: Text(friendlyError(e))),
         );
       }
     } finally {
@@ -846,7 +928,7 @@ class _CreditCardRulesBottomSheetState extends ConsumerState<_CreditCardRulesBot
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.3),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -870,7 +952,7 @@ class _CreditCardRulesBottomSheetState extends ConsumerState<_CreditCardRulesBot
                           value: b,
                           child: Text(
                             b.name,
-                            overflow: TextOverflow.ellipsis,
+                            overflow: TextOverflow.fade,
                           ),
                         ))
                     .toList(),
@@ -878,16 +960,16 @@ class _CreditCardRulesBottomSheetState extends ConsumerState<_CreditCardRulesBot
                 validator: (v) => v == null ? 'Select a bank' : null,
               ),
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Text('Error loading banks: $e'),
+              error: (e, _) => Text(friendlyError(e)),
             ),
             kGapXl,
             if (_isRappiCard)
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFF441A).withOpacity(0.08),
+                  color: const Color(0xFFFF441A).withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFFF441A).withOpacity(0.3)),
+                  border: Border.all(color: const Color(0xFFFF441A).withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
@@ -1044,7 +1126,7 @@ class _BillingCalendarSheetState extends ConsumerState<_BillingCalendarSheet> {
               child: Container(
                 width: 40, height: 4,
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.3),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -1132,7 +1214,7 @@ class _BillingCalendarSheetState extends ConsumerState<_BillingCalendarSheet> {
                 },
               ),
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Error: $e')),
+              error: (e, _) => Center(child: Text(friendlyError(e))),
             ),
           ),
         ],
@@ -1175,7 +1257,7 @@ class _BillingCalendarSheetState extends ConsumerState<_BillingCalendarSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: $e')));
+            .showSnackBar(SnackBar(content: Text(friendlyError(e))));
       }
     }
   }
@@ -1217,7 +1299,7 @@ class _BillingCalendarSheetState extends ConsumerState<_BillingCalendarSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: $e')));
+            .showSnackBar(SnackBar(content: Text(friendlyError(e))));
       }
     }
   }
@@ -1271,7 +1353,7 @@ class _MonthRow extends StatelessWidget {
                 Flexible(
                   child: Text(
                     monthName,
-                    overflow: TextOverflow.ellipsis,
+                    overflow: TextOverflow.fade,
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
                       color: isOverridden ? overrideColor : null,
@@ -1337,7 +1419,7 @@ class _EditMonthDialog extends StatefulWidget {
 class _EditMonthDialogState extends State<_EditMonthDialog> {
   late DateTime _cutoff;
   late DateTime _payment;
-  final _fmt = DateFormat('d MMM yyyy', 'en');
+  final _fmt = DateFormat('dd/MM/yyyy', 'en');
 
   @override
   void initState() {

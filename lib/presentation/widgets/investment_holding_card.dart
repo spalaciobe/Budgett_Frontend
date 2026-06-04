@@ -95,7 +95,7 @@ class InvestmentHoldingCard extends StatelessWidget {
               Text(
                 holding.name!,
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurface.withOpacity(0.6),
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
               ),
             ],
@@ -146,7 +146,7 @@ class InvestmentHoldingCard extends StatelessWidget {
                       Text('Market Value',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color:
-                                theme.colorScheme.onSurface.withOpacity(0.6),
+                                theme.colorScheme.onSurface.withValues(alpha: 0.6),
                           )),
                       Text(
                         CurrencyFormatter.format(holding.marketValue,
@@ -154,7 +154,7 @@ class InvestmentHoldingCard extends StatelessWidget {
                         style: theme.textTheme.bodyMedium
                             ?.copyWith(fontWeight: FontWeight.w600),
                         maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        overflow: TextOverflow.fade,
                       ),
                     ],
                   ),
@@ -167,7 +167,7 @@ class InvestmentHoldingCard extends StatelessWidget {
                       Text('Unrealized P&L',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color:
-                                theme.colorScheme.onSurface.withOpacity(0.6),
+                                theme.colorScheme.onSurface.withValues(alpha: 0.6),
                           )),
                       Text(
                         '${isPositive ? '+' : ''}${CurrencyFormatter.format(pnl, currency: holding.currency)} '
@@ -177,7 +177,7 @@ class InvestmentHoldingCard extends StatelessWidget {
                           color: pnlColor,
                         ),
                         maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        overflow: TextOverflow.fade,
                       ),
                     ],
                   ),
@@ -205,7 +205,7 @@ class _InfoChip extends StatelessWidget {
       children: [
         Text(label,
             style: theme.textTheme.labelSmall
-                ?.copyWith(color: theme.colorScheme.onSurface.withOpacity(0.55))),
+                ?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.55))),
         Text(value,
             style: theme.textTheme.bodySmall
                 ?.copyWith(fontWeight: FontWeight.w500)),

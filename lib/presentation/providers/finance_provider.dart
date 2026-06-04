@@ -72,6 +72,20 @@ final categoriesProvider = FutureProvider<List<Category>>((ref) async {
   return repository.getCategories();
 });
 
+/// Current-month income vs. spent (COP), for the Home summary card. Uses the
+/// same month-scoped repository methods as the Budget screen so the figures
+/// reconcile, instead of summing the (possibly truncated) recent-transactions
+/// list.
+final homeMonthSummaryProvider =
+    FutureProvider.autoDispose<({double income, double spent})>((ref) async {
+  final repository = ref.watch(financeRepositoryProvider);
+  final now = DateTime.now();
+  final income = await repository.getMonthlyIncome(now.month, now.year);
+  final spending = await repository.getSpendingByCategory(now.month, now.year);
+  final spent = spending.values.fold<double>(0.0, (s, v) => s + v.total);
+  return (income: income, spent: spent);
+});
+
 /// Transactions that make up a category's monthly total on the Budget screen.
 /// Mirrors the filters in [FinanceRepository.getCategoryMonthTransactions] so
 /// the list reconciles with the card's "Spent" / "Earned" / "Contributed"

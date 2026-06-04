@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:budgett_frontend/core/app_spacing.dart';
@@ -65,7 +66,7 @@ class CategoryTransactionsDialog extends ConsumerWidget {
                         categoryName,
                         style: Theme.of(context).textTheme.titleLarge,
                         maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        overflow: TextOverflow.fade,
                       ),
                       Text(
                         '${_months[month - 1]} $year',
@@ -134,7 +135,7 @@ class CategoryTransactionsDialog extends ConsumerWidget {
                                   fontWeight: FontWeight.w600, fontSize: 13),
                             ),
                             Text(
-                              CurrencyFormatter.format(net, decimalDigits: 2),
+                              CurrencyFormatter.format(net, decimalDigits: 0),
                               style: const TextStyle(
                                   fontWeight: FontWeight.bold, fontSize: 14),
                             ),
@@ -150,7 +151,7 @@ class CategoryTransactionsDialog extends ConsumerWidget {
                 ),
                 error: (e, _) => Padding(
                   padding: const EdgeInsets.symmetric(vertical: 32),
-                  child: Center(child: Text('Error: $e')),
+                  child: Center(child: Text(friendlyError(e))),
                 ),
               ),
             ),

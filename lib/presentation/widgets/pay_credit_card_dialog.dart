@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
@@ -376,7 +377,7 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Payment failed: $e')),
+        SnackBar(content: Text(friendlyError(e))),
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -451,7 +452,7 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
                             value: a.id,
                             child: Text(
                               '${a.name} · ${CurrencyFormatter.format(a.balance > 0 ? a.balance : a.balanceUsd, currency: a.balance > 0 ? 'COP' : 'USD')}',
-                              overflow: TextOverflow.ellipsis,
+                              overflow: TextOverflow.fade,
                             ),
                           ))
                       .toList(),
@@ -483,7 +484,7 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
                           Flexible(
                             child: Text(
                               statementChipLabel,
-                              overflow: TextOverflow.ellipsis,
+                              overflow: TextOverflow.fade,
                             ),
                           ),
                           if (availablePeriods.length > 1) ...[
@@ -712,7 +713,7 @@ class _CyclePickerTile extends StatelessWidget {
           Flexible(
             child: Text(
               label,
-              overflow: TextOverflow.ellipsis,
+              overflow: TextOverflow.fade,
               style: TextStyle(
                 fontWeight:
                     isSelected ? FontWeight.w700 : FontWeight.w500,
@@ -725,7 +726,7 @@ class _CyclePickerTile extends StatelessWidget {
               '(current)',
               style: TextStyle(
                 fontSize: 11,
-                color: theme.colorScheme.onSurface.withOpacity(0.55),
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
               ),
             ),
           ],
@@ -737,7 +738,7 @@ class _CyclePickerTile extends StatelessWidget {
           fontWeight: FontWeight.w600,
           color: total > 0
               ? theme.colorScheme.error
-              : theme.colorScheme.onSurface.withOpacity(0.55),
+              : theme.colorScheme.onSurface.withValues(alpha: 0.55),
         ),
       ),
     );

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -80,7 +81,7 @@ class _AddGoalDialogState extends ConsumerState<AddGoalDialog> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(content: Text(friendlyError(e))),
         );
       }
     }
@@ -224,7 +225,7 @@ class _AddGoalDialogState extends ConsumerState<AddGoalDialog> {
                             Text(
                               'Deadline (optional)',
                               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.6),
+                                color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.6),
                               ),
                             ),
                             const SizedBox(height: 4),

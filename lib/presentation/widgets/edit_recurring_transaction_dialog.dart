@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
@@ -76,7 +77,7 @@ class _EditRecurringTransactionDialogState
         child: Text(
           a.name,
           style: const TextStyle(fontSize: 13),
-          overflow: TextOverflow.ellipsis,
+          overflow: TextOverflow.fade,
         ),
       ));
       for (final p in a.pockets) {
@@ -87,13 +88,13 @@ class _EditRecurringTransactionDialogState
               const SizedBox(width: 16),
               Icon(Icons.subdirectory_arrow_right,
                   size: 12,
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
                   p.name,
                   style: const TextStyle(fontSize: 13),
-                  overflow: TextOverflow.ellipsis,
+                  overflow: TextOverflow.fade,
                 ),
               ),
             ],
@@ -171,7 +172,7 @@ class _EditRecurringTransactionDialogState
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(content: Text(friendlyError(e))),
         );
       }
     } finally {
@@ -281,7 +282,7 @@ class _EditRecurringTransactionDialogState
                       border: OutlineInputBorder(),
                       suffixIcon: Icon(Icons.calendar_today, size: 18),
                     ),
-                    child: Text(DateFormat('MM/dd/yyyy').format(_nextRunDate)),
+                    child: Text(DateFormat('dd/MM/yyyy').format(_nextRunDate)),
                   ),
                 ),
                 kGapMd,
@@ -301,7 +302,7 @@ class _EditRecurringTransactionDialogState
                     );
                   },
                   loading: () => const LinearProgressIndicator(),
-                  error: (e, _) => Text('Accounts error: $e'),
+                  error: (e, _) => Text(friendlyError(e)),
                 ),
                 kGapMd,
                 categoriesAsync.when(
@@ -326,7 +327,7 @@ class _EditRecurringTransactionDialogState
                             child: Text(
                               '${cat.name} > ${sub.name}',
                               style: const TextStyle(fontSize: 13),
-                              overflow: TextOverflow.ellipsis,
+                              overflow: TextOverflow.fade,
                             ),
                           ));
                         }
@@ -337,7 +338,7 @@ class _EditRecurringTransactionDialogState
                           child: Text(
                             cat.name,
                             style: const TextStyle(fontSize: 13),
-                            overflow: TextOverflow.ellipsis,
+                            overflow: TextOverflow.fade,
                           ),
                         ));
                       }
@@ -358,7 +359,7 @@ class _EditRecurringTransactionDialogState
                     );
                   },
                   loading: () => const LinearProgressIndicator(),
-                  error: (e, _) => Text('Categories error: $e'),
+                  error: (e, _) => Text(friendlyError(e)),
                 ),
                 kGapMd,
                 SwitchListTile(

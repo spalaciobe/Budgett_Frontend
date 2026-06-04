@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 
+import 'package:budgett_frontend/core/app_theme.dart';
 import 'package:budgett_frontend/presentation/utils/icon_helper.dart';
 import 'package:budgett_frontend/data/models/sub_category_model.dart';
 
@@ -46,7 +47,9 @@ class BudgetComparisonWidget extends StatefulWidget {
 }
 
 class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
-  bool _expanded = true;
+  // Cards start collapsed so the list shows an overview (name + slim bar + %)
+  // and the Financial Health summary stays in view; tap a card to expand it.
+  bool _expanded = false;
   bool _subExpanded = true;
 
   /// Magnifying-glass button that opens this category's transactions for the
@@ -61,7 +64,7 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
       tooltip: 'View transactions',
       icon: Icon(
         Icons.search,
-        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
       ),
       onPressed: widget.onViewTransactions,
     );
@@ -85,7 +88,7 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
               ? 'No monthly target set'
               : 'No budget set';
       final activityColor = widget.isIncome
-          ? Colors.green.shade600
+          ? context.semantic.positive
           : widget.isSavings
               ? Theme.of(context).colorScheme.primary
               : Theme.of(context).colorScheme.error;
@@ -117,13 +120,16 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                             style: const TextStyle(
                                 fontWeight: FontWeight.bold),
                             maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                            overflow: TextOverflow.fade,
                           ),
                           const SizedBox(height: 4),
                           Text(
                             emptyLabel,
                             style: TextStyle(
-                                fontSize: 12, color: Colors.grey[400]),
+                                fontSize: 12,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant),
                           ),
                         ],
                       ),
@@ -139,11 +145,14 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                           Text(
                             activityLabel,
                             style: TextStyle(
-                                fontSize: 11, color: Colors.grey[400]),
+                                fontSize: 11,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant),
                           ),
                           Text(
                             CurrencyFormatter.format(widget.spentAmount,
-                                decimalDigits: 2),
+                                decimalDigits: 0),
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
@@ -153,7 +162,8 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                         ],
                       )
                     else
-                      Icon(Icons.add_circle_outline, color: Colors.grey[400]),
+                      Icon(Icons.add_circle_outline,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant),
                   ],
                 ),
                 if (hasActivity) ...[
@@ -165,7 +175,8 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                     borderRadius: BorderRadius.circular(4),
                     child: LinearProgressIndicator(
                       value: 1.0,
-                      backgroundColor: Colors.grey.shade200,
+                      backgroundColor:
+                          Theme.of(context).colorScheme.surfaceContainerHighest,
                       color: activityColor,
                       minHeight: 6,
                     ),
@@ -175,7 +186,7 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: activityColor.withOpacity(0.1),
+                      color: activityColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
@@ -193,9 +204,9 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                         Expanded(
                           child: Text(
                             widget.isIncome
-                                ? '${CurrencyFormatter.format(widget.spentAmount, decimalDigits: 2)} earned — set a target to track progress'
+                                ? '${CurrencyFormatter.format(widget.spentAmount, decimalDigits: 0)} earned — set a target to track progress'
                                 : widget.isSavings
-                                    ? '${CurrencyFormatter.format(widget.spentAmount, decimalDigits: 2)} contributed — set a monthly target to track progress'
+                                    ? '${CurrencyFormatter.format(widget.spentAmount, decimalDigits: 0)} contributed — set a monthly target to track progress'
                                     : 'Spent without a budget — tap to set one',
                             style: TextStyle(
                               fontSize: 11,
@@ -223,13 +234,13 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
     Color statusColor;
     if (widget.isIncome) {
       statusColor = isOverBudget || progress >= 1.0
-          ? Colors.green
-          : Colors.orange;
+          ? context.semantic.positive
+          : context.semantic.warning;
     } else {
       statusColor = isOverBudget
           ? Theme.of(context).colorScheme.error
           : isNearLimit
-              ? Colors.orange
+              ? context.semantic.warning
               : Theme.of(context).colorScheme.primary;
     }
 
@@ -243,7 +254,7 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
         children: [
           // ── Header row (always visible) ──────────────────────────────────
           InkWell(
-            onTap: widget.onEditBudget,
+            onTap: () => setState(() => _expanded = !_expanded),
             borderRadius: _expanded
                 ? const BorderRadius.only(
                     topLeft: Radius.circular(12),
@@ -279,20 +290,40 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                      if (widget.onViewTransactions != null)
-                        _viewTransactionsButton(context),
-                      const SizedBox(width: 4),
-                      GestureDetector(
-                        onTap: () => setState(() => _expanded = !_expanded),
-                        child: Icon(
-                          _expanded
-                              ? Icons.expand_less
-                              : Icons.expand_more,
-                          size: 20,
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                            minWidth: 44, minHeight: 44),
+                        iconSize: 18,
+                        tooltip: 'Edit budget',
+                        onPressed: widget.onEditBudget,
+                        icon: Icon(
+                          Icons.edit_outlined,
                           color: Theme.of(context)
                               .colorScheme
                               .onSurface
-                              .withOpacity(0.5),
+                              .withValues(alpha: 0.5),
+                        ),
+                      ),
+                      if (widget.onViewTransactions != null)
+                        _viewTransactionsButton(context),
+                      const SizedBox(width: 4),
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                            minWidth: 44, minHeight: 44),
+                        iconSize: 20,
+                        tooltip: _expanded ? 'Collapse' : 'Expand',
+                        onPressed: () =>
+                            setState(() => _expanded = !_expanded),
+                        icon: Icon(
+                          _expanded ? Icons.expand_less : Icons.expand_more,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: 0.5),
                         ),
                       ),
                     ],
@@ -304,7 +335,9 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                       borderRadius: BorderRadius.circular(2),
                       child: LinearProgressIndicator(
                         value: progress,
-                        backgroundColor: Colors.grey.shade200,
+                        backgroundColor: Theme.of(context)
+                            .colorScheme
+                            .surfaceContainerHighest,
                         color: statusColor,
                         minHeight: 4,
                       ),
@@ -345,13 +378,15 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                                       ? 'Contributed'
                                       : 'Spent',
                               style: TextStyle(
-                                  fontSize: 12, color: Colors.grey[200]),
+                                  fontSize: 12,
+                                  color:
+                                      Theme.of(context).colorScheme.onSurfaceVariant),
                             ),
                             Text(
                               CurrencyFormatter.format(widget.spentAmount,
-                                  decimalDigits: 2),
+                                  decimalDigits: 0),
                               maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                              overflow: TextOverflow.fade,
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: !widget.isIncome &&
@@ -376,14 +411,16 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                                       ? 'Monthly target'
                                       : 'Budget',
                               maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                              overflow: TextOverflow.fade,
                               style: TextStyle(
-                                  fontSize: 12, color: Colors.grey[200]),
+                                  fontSize: 12,
+                                  color:
+                                      Theme.of(context).colorScheme.onSurfaceVariant),
                             ),
                             Text(
                               CurrencyFormatter.format(widget.budgetAmount),
                               maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                              overflow: TextOverflow.fade,
                               style:
                                   const TextStyle(fontWeight: FontWeight.bold),
                             ),
@@ -400,7 +437,8 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                     borderRadius: BorderRadius.circular(4),
                     child: LinearProgressIndicator(
                       value: progress,
-                      backgroundColor: Colors.grey.shade200,
+                      backgroundColor:
+                          Theme.of(context).colorScheme.surfaceContainerHighest,
                       color: statusColor,
                       minHeight: 8,
                     ),
@@ -413,7 +451,7 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.1),
+                      color: statusColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
@@ -437,10 +475,10 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                             widget.isIncome
                                 ? ((isOverBudget || progress >= 1)
                                     ? 'Target reached!'
-                                    : '${CurrencyFormatter.format(widget.budgetAmount - widget.spentAmount, decimalDigits: 2)} to go')
+                                    : '${CurrencyFormatter.format(widget.budgetAmount - widget.spentAmount, decimalDigits: 0)} to go')
                                 : (isOverBudget
-                                    ? 'Over budget by ${CurrencyFormatter.format(widget.spentAmount - widget.budgetAmount, decimalDigits: 2)}'
-                                    : '${CurrencyFormatter.format(widget.budgetAmount - widget.spentAmount, decimalDigits: 2)} remaining'),
+                                    ? 'Over budget by ${CurrencyFormatter.format(widget.spentAmount - widget.budgetAmount, decimalDigits: 0)}'
+                                    : '${CurrencyFormatter.format(widget.budgetAmount - widget.spentAmount, decimalDigits: 0)} remaining'),
                             style: TextStyle(
                               fontSize: 12,
                               color: statusColor,
@@ -452,7 +490,7 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                           '${(progress * 100).toStringAsFixed(0)}%',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey[200],
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -466,16 +504,19 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                     Row(
                       children: [
                         Icon(Icons.savings_outlined,
-                            size: 14, color: Colors.grey[300]),
+                            size: 14,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant),
                         const SizedBox(width: 4),
                         Text(
                           'Fund balance: ',
                           style: TextStyle(
-                              fontSize: 12, color: Colors.grey[200]),
+                              fontSize: 12,
+                              color:
+                                  Theme.of(context).colorScheme.onSurfaceVariant),
                         ),
                         Text(
                           CurrencyFormatter.format(widget.accumulatedBalance!,
-                              decimalDigits: 2),
+                              decimalDigits: 0),
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
@@ -492,34 +533,38 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                   if (hasSubs) ...[
                     const SizedBox(height: kSpaceLg),
                     // Subcategory header with collapse toggle
-                    GestureDetector(
+                    InkWell(
                       onTap: () =>
                           setState(() => _subExpanded = !_subExpanded),
-                      child: Row(
-                        children: [
-                          Text(
-                            'Subcategories',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Row(
+                          children: [
+                            Text(
+                              'Subcategories',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurface
+                                    .withValues(alpha: 0.5),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              _subExpanded
+                                  ? Icons.expand_less
+                                  : Icons.expand_more,
+                              size: 14,
                               color: Theme.of(context)
                                   .colorScheme
                                   .onSurface
-                                  .withOpacity(0.5),
+                                  .withValues(alpha: 0.4),
                             ),
-                          ),
-                          const SizedBox(width: 4),
-                          Icon(
-                            _subExpanded
-                                ? Icons.expand_less
-                                : Icons.expand_more,
-                            size: 14,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withOpacity(0.4),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                     AnimatedCrossFade(
@@ -543,14 +588,16 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                                       const EdgeInsets.only(left: 12.0),
                                   child: Text(
                                     sub.name,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                         fontSize: 12,
-                                        color: Colors.grey),
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant),
                                   ),
                                 ),
                                 Text(
                                   CurrencyFormatter.format(amount,
-                                      decimalDigits: 2),
+                                      decimalDigits: 0),
                                   style: const TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w500),
@@ -616,7 +663,7 @@ class _CategoryIconButtonState extends State<_CategoryIconButton> {
         },
         child: CircleAvatar(
           backgroundColor:
-              widget.color?.withOpacity(0.5) ?? Colors.grey.withOpacity(0.5),
+              widget.color?.withValues(alpha: 0.5) ?? Colors.grey.withValues(alpha: 0.5),
           radius: 16,
           child: _isHovered
               ? const Icon(Icons.more_horiz, color: Colors.white, size: 20)

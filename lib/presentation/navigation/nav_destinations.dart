@@ -18,6 +18,22 @@ class NavDestination {
   });
 }
 
+/// Maps any route — including detail routes that aren't themselves nav
+/// destinations (e.g. `/credit-card/:id`, `/account/:id`, `/profile`) — to the
+/// nav destination path that should read as selected, so the sidebar/rail keep
+/// highlighting the right section while on a detail screen.
+String navSectionFor(String path) {
+  if (path == '/accounts' ||
+      path.startsWith('/account/') ||
+      path.startsWith('/credit-card/') ||
+      path.startsWith('/investment/') ||
+      path.startsWith('/pockets/')) {
+    return '/accounts';
+  }
+  if (path == '/profile') return '/settings';
+  return path;
+}
+
 const kNavDestinations = <NavDestination>[
   NavDestination(
     path: '/',
@@ -48,14 +64,14 @@ const kNavDestinations = <NavDestination>[
   ),
   NavDestination(
     path: '/analysis',
-    icon: Icons.bar_chart,
+    icon: Icons.bar_chart_outlined,
     selectedIcon: Icons.bar_chart,
     label: 'Analysis',
   ),
   NavDestination(
     path: '/recurring',
     icon: Icons.repeat,
-    selectedIcon: Icons.repeat,
+    selectedIcon: Icons.repeat_on,
     label: 'Recurring',
     dividerBefore: true,
   ),

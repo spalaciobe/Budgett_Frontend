@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_spacing.dart';
@@ -116,7 +117,7 @@ class _SwapHoldingDialogState extends ConsumerState<SwapHoldingDialog> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: $e')));
+            .showSnackBar(SnackBar(content: Text(friendlyError(e))));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -163,7 +164,7 @@ class _SwapHoldingDialogState extends ConsumerState<SwapHoldingDialog> {
                   'Moves quantity between two holdings without touching cash. '
                   'Use for COPW → BTC, BTC → ETH, etc.',
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -181,7 +182,7 @@ class _SwapHoldingDialogState extends ConsumerState<SwapHoldingDialog> {
                             value: h.id,
                             child: Text(
                               '${h.symbol}  · ${CurrencyFormatter.formatQuantity(h.quantity)}',
-                              overflow: TextOverflow.ellipsis,
+                              overflow: TextOverflow.fade,
                             ),
                           ))
                       .toList(),
@@ -243,7 +244,7 @@ class _SwapHoldingDialogState extends ConsumerState<SwapHoldingDialog> {
                             value: h.id,
                             child: Text(
                               '${h.symbol}  · ${CurrencyFormatter.formatQuantity(h.quantity)}',
-                              overflow: TextOverflow.ellipsis,
+                              overflow: TextOverflow.fade,
                             ),
                           ))
                       .toList(),
@@ -316,7 +317,7 @@ class _SwapHoldingDialogState extends ConsumerState<SwapHoldingDialog> {
                                   value: c,
                                   child: Text(
                                     c,
-                                    overflow: TextOverflow.ellipsis,
+                                    overflow: TextOverflow.fade,
                                   ),
                                 ))
                             .toList(),

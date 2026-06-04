@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/app_spacing.dart';
+import '../../core/app_text.dart';
 import '../../data/models/account_model.dart';
 import '../utils/currency_formatter.dart';
 
@@ -36,11 +37,9 @@ class AccountCard extends StatelessWidget {
     final theme = Theme.of(context);
     final acc = account;
 
-    final isUsdInvestment =
-        acc.type == 'investment' &&
+    final isUsdInvestment = acc.type == 'investment' &&
         (acc.investmentDetails?.baseCurrency ?? 'COP') == 'USD';
-    final isSavingsWithPockets =
-        acc.isSavingsParent && acc.pockets.isNotEmpty;
+    final isSavingsWithPockets = acc.isSavingsParent && acc.pockets.isNotEmpty;
 
     final balanceDisplay = balanceText ??
         (isUsdInvestment
@@ -48,9 +47,9 @@ class AccountCard extends StatelessWidget {
             : isSavingsWithPockets
                 ? CurrencyFormatter.format(
                     acc.totalBalanceWithPockets,
-                    decimalDigits: 2,
+                    decimalDigits: 0,
                   )
-                : CurrencyFormatter.format(acc.balance, decimalDigits: 2));
+                : CurrencyFormatter.format(acc.balance, decimalDigits: 0));
 
     final gradient = BoxDecoration(
       gradient: LinearGradient(
@@ -58,7 +57,7 @@ class AccountCard extends StatelessWidget {
         end: Alignment.bottomRight,
         colors: [
           theme.colorScheme.surface,
-          theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+          theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         ],
       ),
     );
@@ -67,7 +66,7 @@ class AccountCard extends StatelessWidget {
       width: 40,
       height: 40,
       decoration: BoxDecoration(
-        color: theme.colorScheme.primary.withOpacity(0.1),
+        color: theme.colorScheme.primary.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
       ),
       child: _buildIcon(acc, theme),
@@ -82,20 +81,20 @@ class AccountCard extends StatelessWidget {
             (isSavingsWithPockets
                 ? Text(
                     '${acc.pockets.length} $pocketLabel · '
-                    '${CurrencyFormatter.format(acc.pocketsBalance, decimalDigits: 2)} stored',
+                    '${CurrencyFormatter.format(acc.pocketsBalance, decimalDigits: 0)} stored',
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacity(0.5),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
                     maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    overflow: TextOverflow.fade,
                   )
                 : Text(
                     CurrencyFormatter.format(acc.balanceUsd, currency: 'USD'),
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacity(0.5),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
                     maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    overflow: TextOverflow.fade,
                   )))
         : const SizedBox.shrink();
 
@@ -105,12 +104,10 @@ class AccountCard extends StatelessWidget {
       children: [
         Text(
           acc.name,
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
-            fontSize: 13,
+          style: AppText.cardName.copyWith(
+            color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
           ),
-          overflow: TextOverflow.ellipsis,
+          overflow: TextOverflow.fade,
         ),
         const SizedBox(height: 4),
         Text(
@@ -125,38 +122,44 @@ class AccountCard extends StatelessWidget {
       ],
     );
 
-    return Card(
-      elevation: 4,
-      shadowColor: Colors.black12,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: InkWell(
-        onTap: onTap,
-        child: tileLayout
-            ? Container(
-                decoration: gradient,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: kSpaceLg,
+    return Semantics(
+      label: '${acc.name}, balance $balanceDisplay',
+      button: true,
+      excludeSemantics: true,
+      child: Card(
+        elevation: 4,
+        shadowColor: Colors.black12,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(kCardRadius)),
+        child: InkWell(
+          onTap: onTap,
+          child: tileLayout
+              ? Container(
+                  decoration: gradient,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: kSpaceLg,
+                  ),
+                  child: Row(
+                    children: [
+                      iconWidget,
+                      const SizedBox(width: 14),
+                      Expanded(child: textContent),
+                    ],
+                  ),
+                )
+              : Container(
+                  width: 170,
+                  decoration: gradient,
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [iconWidget, textContent],
+                  ),
                 ),
-                child: Row(
-                  children: [
-                    iconWidget,
-                    const SizedBox(width: 14),
-                    Expanded(child: textContent),
-                  ],
-                ),
-              )
-            : Container(
-                width: 170,
-                decoration: gradient,
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [iconWidget, textContent],
-                ),
-              ),
+        ),
       ),
     );
   }

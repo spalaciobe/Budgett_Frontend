@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/app_theme.dart';
+import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 
@@ -90,7 +92,7 @@ class InvestmentDetailsScreen extends ConsumerWidget {
             physics: const AlwaysScrollableScrollPhysics(),
             children: [
               const SizedBox(height: 200),
-              Center(child: Text('Error: $e')),
+              Center(child: Text(friendlyError(e))),
             ],
           ),
           data: (holdings) {
@@ -172,7 +174,7 @@ class _Body extends ConsumerWidget {
           const SizedBox(height: 8),
           txAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Text('Error: $e'),
+            error: (e, _) => Text(friendlyError(e)),
             data: (txs) {
               if (txs.isEmpty) {
                 return const Text('No transactions yet.');
@@ -259,7 +261,7 @@ Future<void> _confirmDeleteSwap(
   } catch (e) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error deleting swap: $e')),
+        SnackBar(content: Text(friendlyError(e))),
       );
     }
   }
@@ -312,7 +314,7 @@ class _SummaryHeader extends StatelessWidget {
 
     final pnlPositive = pnl.pnl >= 0;
     final pnlColor =
-        pnlPositive ? Colors.green.shade600 : theme.colorScheme.error;
+        pnlPositive ? context.semantic.positive : theme.colorScheme.error;
 
     // Total invested (what the user has actually paid for current positions).
     // CDT → principal; multi-holding → aggregated cost basis.
@@ -332,7 +334,7 @@ class _SummaryHeader extends StatelessWidget {
               children: [
                 Text('Total Value',
                     style: theme.textTheme.labelLarge?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                     )),
                 if (isApprox) ...[
                   const SizedBox(width: 6),
@@ -345,8 +347,8 @@ class _SummaryHeader extends StatelessWidget {
                       visualDensity: VisualDensity.compact,
                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       backgroundColor: isStale
-                          ? Colors.orange.withOpacity(0.2)
-                          : theme.colorScheme.primaryContainer.withOpacity(0.5),
+                          ? Colors.orange.withValues(alpha: 0.2)
+                          : theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
                     ),
                   ),
                 ],
@@ -365,7 +367,7 @@ class _SummaryHeader extends StatelessWidget {
                 CurrencyFormatter.formatApprox(totalValue.totalCop,
                     currency: 'COP'),
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurface.withOpacity(0.5),
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                 ),
               ),
             ],
@@ -379,13 +381,13 @@ class _SummaryHeader extends StatelessWidget {
                   Icon(
                     Icons.account_balance_wallet_outlined,
                     size: 16,
-                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                   const SizedBox(width: 4),
                   Text(
                     'Funded ',
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                   ),
                   Text(
@@ -405,13 +407,13 @@ class _SummaryHeader extends StatelessWidget {
                   Icon(
                     Icons.savings_outlined,
                     size: 16,
-                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                   const SizedBox(width: 4),
                   Text(
                     'Invested ',
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                   ),
                   Text(
@@ -448,7 +450,7 @@ class _SummaryHeader extends StatelessWidget {
               Text(
                 'Prices updated ${_timeAgo(oldestPrice)}',
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurface.withOpacity(0.5),
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                 ),
               ),
             ],
@@ -510,7 +512,7 @@ class _CdtSection extends ConsumerWidget {
                       child: _StatItem(
                         label: 'Rate',
                         value: '${rate.toStringAsFixed(2)}% E.A.',
-                        color: Colors.green.shade600,
+                        color: context.semantic.positive,
                       ),
                     ),
                     Expanded(
@@ -531,7 +533,7 @@ class _CdtSection extends ConsumerWidget {
                       child: _StatItem(
                         label: 'Accrued Interest',
                         value: CurrencyFormatter.format(accrued),
-                        color: Colors.green.shade600,
+                        color: context.semantic.positive,
                       ),
                     ),
                     Expanded(
@@ -561,7 +563,7 @@ class _CdtSection extends ConsumerWidget {
               icon: const Icon(Icons.account_balance_wallet),
               label: const Text('Collect CDT'),
               style: FilledButton.styleFrom(
-                  backgroundColor: Colors.green.shade600),
+                  backgroundColor: context.semantic.positive),
             ),
           ),
         ],
@@ -975,7 +977,7 @@ class _InvestmentHistoryChartState
     };
     final selectedHoldingId = validIds.contains(_selectedHoldingId)
         ? _selectedHoldingId!
-        : chartableHoldings.first.id;
+        : _allAssetsId;
     if (_selectedHoldingId != selectedHoldingId) {
       _selectedHoldingId = selectedHoldingId;
     }
@@ -1014,14 +1016,14 @@ class _InvestmentHistoryChartState
                         value: _allAssetsId,
                         child: Text(
                           'All assets (total)',
-                          overflow: TextOverflow.ellipsis,
+                          overflow: TextOverflow.fade,
                         ),
                       ),
                       ...chartableHoldings.map((h) => DropdownMenuItem(
                             value: h.id,
                             child: Text(
                               h.displayName,
-                              overflow: TextOverflow.ellipsis,
+                              overflow: TextOverflow.fade,
                             ),
                           )),
                     ],
@@ -1062,7 +1064,7 @@ class _InvestmentHistoryChartState
                 height: 220,
                 child: Center(child: CircularProgressIndicator()),
               ),
-              error: (e, _) => Text('Error loading history: $e'),
+              error: (e, _) => Text(friendlyError(e)),
               data: (history) {
                 if (isAll) {
                   final currencies =
@@ -1326,21 +1328,43 @@ class _HistoryLineChart extends StatelessWidget {
           Wrap(
             spacing: 8,
             runSpacing: 6,
-            children: events.map((event) {
-              final d = event.date;
-              return Chip(
-                visualDensity: VisualDensity.compact,
-                avatar: Icon(
-                  event.source == 'created_at'
-                      ? Icons.history_toggle_off
-                      : Icons.add_shopping_cart,
-                  size: 16,
-                ),
-                label: Text(
-                  '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}',
-                ),
-              );
-            }).toList(),
+            // Collapse purchases made on the same day into a single pill
+            // (count + total in the tooltip) instead of one chip per buy.
+            children: () {
+              final byDay = <DateTime, List<InvestmentPurchaseEvent>>{};
+              for (final e in events) {
+                final day = DateTime(e.date.year, e.date.month, e.date.day);
+                byDay.putIfAbsent(day, () => []).add(e);
+              }
+              final days = byDay.keys.toList()..sort();
+              return days.map((day) {
+                final group = byDay[day]!;
+                final isPurchase =
+                    group.any((e) => e.source != 'created_at');
+                final total =
+                    group.fold<double>(0.0, (s, e) => s + e.amount);
+                final dateStr =
+                    '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
+                return Tooltip(
+                  message: group.length > 1
+                      ? '${group.length} purchases · ${CurrencyFormatter.format(total, currency: holding.currency)}'
+                      : CurrencyFormatter.format(total,
+                          currency: holding.currency),
+                  child: Chip(
+                    visualDensity: VisualDensity.compact,
+                    avatar: Icon(
+                      isPurchase
+                          ? Icons.add_shopping_cart
+                          : Icons.history_toggle_off,
+                      size: 16,
+                    ),
+                    label: Text(group.length > 1
+                        ? '$dateStr · ${group.length}'
+                        : dateStr),
+                  ),
+                );
+              }).toList();
+            }(),
           ),
         ],
       ],
@@ -1394,7 +1418,7 @@ class _StatItem extends StatelessWidget {
       children: [
         Text(label,
             style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurface.withOpacity(0.55),
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
             )),
         const SizedBox(height: 2),
         Text(
@@ -1437,7 +1461,7 @@ class InvestmentDetailsBody extends ConsumerWidget {
 
     return holdingsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Error: $e')),
+      error: (e, _) => Center(child: Text(friendlyError(e))),
       data: (holdings) => _Body(
         account: account,
         details: details,
@@ -1519,7 +1543,7 @@ class _UpdatePricesButtonState extends ConsumerState<_UpdatePricesButton> {
           SnackBar(
             duration: const Duration(seconds: 4),
             showCloseIcon: true,
-            content: Text('Updated $updated, skipped: $symbols'),
+            content: Text(friendlyError(symbols)),
             action: SnackBarAction(
               label: 'Edit manually',
               onPressed: () {
@@ -1535,7 +1559,7 @@ class _UpdatePricesButtonState extends ConsumerState<_UpdatePricesButton> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           showCloseIcon: true,
-          content: Text('Failed to fetch prices: $e'),
+          content: Text(friendlyError(e)),
           action: SnackBarAction(
             label: 'Edit manually',
             onPressed: _openManualDialog,

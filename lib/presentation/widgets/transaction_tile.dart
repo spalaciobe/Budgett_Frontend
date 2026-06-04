@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/app_text.dart';
+import '../../core/app_theme.dart';
 import '../../data/models/transaction_model.dart';
 import '../utils/currency_formatter.dart';
 
@@ -53,14 +55,14 @@ class TransactionTile extends StatelessWidget {
     if (isTransfer) {
       typeColor = theme.colorScheme.secondary;
     } else if (isPositive) {
-      typeColor = Colors.green.shade600;
+      typeColor = context.semantic.positive;
     } else {
       typeColor = theme.colorScheme.error;
     }
 
     final dotColor = isPending
-        ? Colors.orange.withOpacity(0.6)
-        : typeColor.withOpacity(0.6);
+        ? context.semantic.warning.withValues(alpha: 0.6)
+        : typeColor.withValues(alpha: 0.6);
 
     final String sign;
     if (!showSign || isTransfer) {
@@ -78,66 +80,73 @@ class TransactionTile extends StatelessWidget {
     if (t.place != null && t.place!.isNotEmpty) {
       extraLines.add(Text(
         t.place!,
-        style: TextStyle(
-          fontSize: 11,
-          color: theme.colorScheme.onSurface.withOpacity(0.6),
+        style: AppText.caption.copyWith(
+          color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
         ),
         maxLines: 1,
-        overflow: TextOverflow.ellipsis,
+        overflow: TextOverflow.fade,
       ));
     }
     if (t.isCrossCurrencyPayment && t.fxRate != null) {
       extraLines.add(Text(
         'Payment in COP @ \$${NumberFormat('#,###', 'en_US').format(t.fxRate!.toInt())}',
-        style: TextStyle(fontSize: 11, color: Colors.green.shade700),
+        style: AppText.caption.copyWith(color: context.semantic.positive),
       ));
     }
 
-    return ListTile(
-      dense: true,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-      onTap: onTap,
-      leading: CircleAvatar(
-        radius: 4,
-        backgroundColor: dotColor,
-      ),
-      title: Text(
-        t.description,
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
-          decoration: isPending ? TextDecoration.lineThrough : null,
-          color: isPending ? Colors.grey : null,
+    final typeWord =
+        isTransfer ? 'Transfer' : (isPositive ? 'Income' : 'Expense');
+    final semanticsLabel = [
+      typeWord,
+      t.description,
+      amountText,
+      if (isPending) 'pending'
+    ].join(', ');
+
+    return Semantics(
+      label: semanticsLabel,
+      button: onTap != null,
+      excludeSemantics: true,
+      child: ListTile(
+        dense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+        onTap: onTap,
+        leading: CircleAvatar(
+          radius: 4,
+          backgroundColor: dotColor,
         ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      trailing: Text(
-        amountText,
-        style: TextStyle(
-          fontWeight: FontWeight.bold,
-          fontSize: 13,
-          color: amountColor,
-        ),
-      ),
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Wrap(
-            spacing: 6,
-            runSpacing: 2,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Text(
-                DateFormat('d MMM', 'en').format(t.date),
-                style: const TextStyle(fontSize: 11),
-              ),
-              if (isPending) const _PendingBadge(),
-            ],
+        title: Text(
+          t.description,
+          style: AppText.tileTitle.copyWith(
+            decoration: isPending ? TextDecoration.lineThrough : null,
+            color: isPending ? Colors.grey : null,
           ),
-          ...extraLines,
-        ],
+          maxLines: 1,
+          overflow: TextOverflow.fade,
+        ),
+        trailing: Text(
+          amountText,
+          style: AppText.amount.copyWith(color: amountColor),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Wrap(
+              spacing: 6,
+              runSpacing: 2,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text(
+                  DateFormat('d MMM', 'en').format(t.date),
+                  style: AppText.caption,
+                ),
+                if (isPending) const _PendingBadge(),
+              ],
+            ),
+            ...extraLines,
+          ],
+        ),
       ),
     );
   }
@@ -148,19 +157,16 @@ class _PendingBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final warning = context.semantic.warning;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
       decoration: BoxDecoration(
-        color: Colors.orange.withOpacity(0.15),
+        color: warning.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(4),
       ),
-      child: const Text(
+      child: Text(
         'Pending',
-        style: TextStyle(
-          fontSize: 10,
-          color: Colors.orange,
-          fontWeight: FontWeight.w500,
-        ),
+        style: AppText.badge.copyWith(color: warning),
       ),
     );
   }

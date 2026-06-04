@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:budgett_frontend/core/app_spacing.dart';
+import 'package:budgett_frontend/core/app_theme.dart';
 import 'package:budgett_frontend/data/models/account_model.dart';
 import 'package:budgett_frontend/data/models/transaction_model.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
@@ -36,6 +38,76 @@ String _buildDetails(
       : (t.categoryId != null ? categoryMap[t.categoryId!] : null);
   if (catName != null && catName.isNotEmpty) return '$accountName  ·  $catName';
   return accountName;
+}
+
+/// Compact current-month summary (Income / Spent / Net) at the top of Home.
+class _MonthSummaryCard extends ConsumerWidget {
+  const _MonthSummaryCard();
+
+  static const _months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final now = DateTime.now();
+    final data = ref.watch(homeMonthSummaryProvider).valueOrNull;
+    final income = data?.income ?? 0.0;
+    final spent = data?.spent ?? 0.0;
+    final net = income - spent;
+
+    final mutedStyle = theme.textTheme.labelSmall?.copyWith(
+        color: theme.colorScheme.onSurface.withValues(alpha: 0.55));
+
+    Widget metric(String label, double amount, Color color) {
+      return Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: mutedStyle),
+            const SizedBox(height: 2),
+            Text(
+              CurrencyFormatter.format(amount),
+              maxLines: 1,
+              overflow: TextOverflow.fade,
+              style: theme.textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold, color: color),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${_months[now.month - 1]} ${now.year}', style: mutedStyle),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                metric('Income', income, context.semantic.positive),
+                metric('Spent', spent, theme.colorScheme.error),
+                metric(
+                  'Net',
+                  net,
+                  net >= 0
+                      ? context.semantic.positive
+                      : theme.colorScheme.error,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -332,10 +404,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: kScreenPadding,
+          padding: kScreenPaddingWithFab,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const _MonthSummaryCard(),
+              const SizedBox(height: 16),
               Text(
                 'Recent Transactions',
                 style: Theme.of(context)
@@ -452,7 +526,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             color: Theme.of(context)
                                 .colorScheme
                                 .onSurface
-                                .withOpacity(0.5),
+                                .withValues(alpha: 0.5),
                           ),
                         ),
                       ),
@@ -493,7 +567,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   );
                 },
                 loading: () => const LinearProgressIndicator(),
-                error: (err, stack) => Text('Error: $err'),
+                error: (err, stack) => Text(friendlyError(err)),
               ),
             ],
           ),
@@ -560,7 +634,7 @@ class _SheetHandle extends StatelessWidget {
         width: 36,
         height: 4,
         decoration: BoxDecoration(
-          color: Colors.grey.withOpacity(0.3),
+          color: Colors.grey.withValues(alpha: 0.3),
           borderRadius: BorderRadius.circular(2),
         ),
       ),
@@ -602,7 +676,7 @@ class _TransferDetails extends StatelessWidget {
   Widget build(BuildContext context) {
     final textStyle = TextStyle(
       fontSize: 12,
-      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
     );
     return Row(
       children: [
@@ -611,7 +685,7 @@ class _TransferDetails extends StatelessWidget {
           child: Text(
             sourceName,
             maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            overflow: TextOverflow.fade,
             style: textStyle,
           ),
         ),
@@ -624,7 +698,7 @@ class _TransferDetails extends StatelessWidget {
           child: Text(
             targetName,
             maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            overflow: TextOverflow.fade,
             style: textStyle,
           ),
         ),
@@ -644,7 +718,7 @@ class _Badge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
@@ -699,12 +773,12 @@ class _TransactionListTile extends StatelessWidget {
     final isTransfer = t.type == 'transfer';
 
     final typeColor = isPending
-        ? Theme.of(context).colorScheme.onSurface.withOpacity(0.4)
+        ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)
         : isTransfer
             ? Theme.of(context).colorScheme.onSurfaceVariant
             : isExpense
                 ? Theme.of(context).colorScheme.error
-                : Theme.of(context).colorScheme.secondary;
+                : context.semantic.positive;
 
     final icon = isTransfer
         ? Icons.sync_alt
@@ -753,7 +827,7 @@ class _TransactionListTile extends StatelessWidget {
         );
       },
       leading: CircleAvatar(
-        backgroundColor: typeColor.withOpacity(0.12),
+        backgroundColor: typeColor.withValues(alpha: 0.12),
         child: Icon(icon, color: typeColor, size: 20),
       ),
       title: Row(
@@ -762,7 +836,7 @@ class _TransactionListTile extends StatelessWidget {
             child: Text(
               t.description,
               maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+              overflow: TextOverflow.fade,
               style: TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: 14,
@@ -780,7 +854,7 @@ class _TransactionListTile extends StatelessWidget {
               Text(
                 '${isTransfer ? '' : (isExpense ? '−' : '+')}${CurrencyFormatter.format(t.amount, decimalDigits: 0)}',
                 maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                overflow: TextOverflow.fade,
                 style: TextStyle(
                   color: typeColor,
                   fontWeight: FontWeight.bold,
@@ -795,7 +869,7 @@ class _TransactionListTile extends StatelessWidget {
                     color: Theme.of(context)
                         .colorScheme
                         .onSurface
-                        .withOpacity(0.5),
+                        .withValues(alpha: 0.5),
                   ),
                 ),
             ],
@@ -833,13 +907,13 @@ class _TransactionListTile extends StatelessWidget {
                   child: Text(
                     details,
                     maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    overflow: TextOverflow.fade,
                     style: TextStyle(
                       fontSize: 12,
                       color: Theme.of(context)
                           .colorScheme
                           .onSurface
-                          .withOpacity(0.6),
+                          .withValues(alpha: 0.6),
                     ),
                   ),
                 ),
@@ -855,12 +929,12 @@ class _TransactionListTile extends StatelessWidget {
                   color: Theme.of(context)
                       .colorScheme
                       .onSurface
-                      .withOpacity(0.45),
+                      .withValues(alpha: 0.45),
                 ),
               ),
               if (isPending) ...[
                 const SizedBox(width: 6),
-                _Badge(label: 'Pending', color: Colors.orange),
+                _Badge(label: 'Pending', color: context.semantic.warning),
               ],
               if (movementLabel != null) ...[
                 const SizedBox(width: 6),
@@ -957,7 +1031,7 @@ class _InstallmentGroupTileState extends State<_InstallmentGroupTile> {
             clipBehavior: Clip.none,
             children: [
               CircleAvatar(
-                backgroundColor: color.withOpacity(0.12),
+                backgroundColor: color.withValues(alpha: 0.12),
                 child: Icon(Icons.layers_outlined, color: color, size: 20),
               ),
               Positioned(
@@ -970,7 +1044,7 @@ class _InstallmentGroupTileState extends State<_InstallmentGroupTile> {
                     color: theme.colorScheme.surface,
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(
-                      color: color.withOpacity(0.4),
+                      color: color.withValues(alpha: 0.4),
                       width: 0.8,
                     ),
                   ),
@@ -992,7 +1066,7 @@ class _InstallmentGroupTileState extends State<_InstallmentGroupTile> {
                 child: Text(
                   _baseDescription,
                   maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  overflow: TextOverflow.fade,
                   style: const TextStyle(
                       fontWeight: FontWeight.w600, fontSize: 14),
                 ),
@@ -1014,7 +1088,7 @@ class _InstallmentGroupTileState extends State<_InstallmentGroupTile> {
                     '× $numCuotas · ${CurrencyFormatter.format(total, decimalDigits: 0)}',
                     style: TextStyle(
                       fontSize: 10,
-                      color: theme.colorScheme.onSurface.withOpacity(0.5),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
                   ),
                 ],
@@ -1045,10 +1119,10 @@ class _InstallmentGroupTileState extends State<_InstallmentGroupTile> {
                       child: Text(
                         detailLine,
                         maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        overflow: TextOverflow.fade,
                         style: TextStyle(
                           fontSize: 12,
-                          color: theme.colorScheme.onSurface.withOpacity(0.6),
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                         ),
                       ),
                     ),
@@ -1060,7 +1134,7 @@ class _InstallmentGroupTileState extends State<_InstallmentGroupTile> {
                   Icon(
                     Icons.event_outlined,
                     size: 11,
-                    color: theme.colorScheme.onSurface.withOpacity(0.45),
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
                   ),
                   const SizedBox(width: 3),
                   Text(
@@ -1069,7 +1143,7 @@ class _InstallmentGroupTileState extends State<_InstallmentGroupTile> {
                         : 'Paid · ${_formatDate(nextDue.toLocal())}',
                     style: TextStyle(
                       fontSize: 11,
-                      color: theme.colorScheme.onSurface.withOpacity(0.45),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
                     ),
                   ),
                   const SizedBox(width: 6),
@@ -1085,7 +1159,7 @@ class _InstallmentGroupTileState extends State<_InstallmentGroupTile> {
                   Icon(
                     _expanded ? Icons.expand_less : Icons.expand_more,
                     size: 16,
-                    color: theme.colorScheme.onSurface.withOpacity(0.5),
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                   ),
                 ],
               ),
@@ -1095,7 +1169,7 @@ class _InstallmentGroupTileState extends State<_InstallmentGroupTile> {
         ),
         if (_expanded)
           Container(
-            color: theme.colorScheme.onSurface.withOpacity(0.025),
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.025),
             padding: const EdgeInsets.only(left: 20),
             child: Column(
               children: [

@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -258,7 +259,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Icon upload failed: $e')),
+            SnackBar(content: Text(friendlyError(e))),
           );
         }
         setState(() => _isLoading = false);
@@ -398,7 +399,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(content: Text(friendlyError(e))),
         );
       }
     } finally {
@@ -458,7 +459,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
       );
     } catch (e) {
       messenger.showSnackBar(
-        SnackBar(content: Text('Error: $e')),
+        SnackBar(content: Text(friendlyError(e))),
       );
       if (mounted) setState(() => _isLoading = false);
     }
@@ -637,7 +638,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                       ),
                       child: Text(
                         _savingsLastInterestDate != null
-                            ? DateFormat('MMM d, y')
+                            ? DateFormat('dd/MM/yyyy')
                                 .format(_savingsLastInterestDate!)
                             : 'Not set',
                         style: _savingsLastInterestDate == null
@@ -648,7 +649,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                                     color: Theme.of(context)
                                         .colorScheme
                                         .onSurface
-                                        .withOpacity(0.45))
+                                        .withValues(alpha: 0.45))
                             : null,
                       ),
                     ),
@@ -791,7 +792,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                               value: t,
                               child: Text(
                                 t.displayName,
-                                overflow: TextOverflow.ellipsis,
+                                overflow: TextOverflow.fade,
                               ),
                             ))
                         .toList(),
@@ -840,7 +841,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                                   value: b,
                                   child: Text(
                                     b.name,
-                                    overflow: TextOverflow.ellipsis,
+                                    overflow: TextOverflow.fade,
                                   ),
                                 ))
                             .toList(),
@@ -850,7 +851,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                     },
                     loading: () =>
                         const Center(child: CircularProgressIndicator()),
-                    error: (e, _) => Text('Error: $e'),
+                    error: (e, _) => Text(friendlyError(e)),
                   ),
                   const SizedBox(height: 12),
 

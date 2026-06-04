@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/app_theme.dart';
+import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -83,7 +85,7 @@ Widget? _investmentGainsSubtitle(
   if (details == null) return null;
 
   final theme = Theme.of(context);
-  final dimColor = theme.colorScheme.onSurface.withOpacity(0.45);
+  final dimColor = theme.colorScheme.onSurface.withValues(alpha: 0.45);
   final baseStyle = theme.textTheme.labelSmall;
 
   switch (details.investmentType) {
@@ -98,7 +100,7 @@ Widget? _investmentGainsSubtitle(
       if (accrued <= 0) return null;
       return Text(
         '+${CurrencyFormatter.format(accrued, decimalDigits: 2)} earned',
-        style: baseStyle?.copyWith(color: Colors.green.shade600),
+        style: baseStyle?.copyWith(color: context.semantic.positive),
       );
 
     case InvestmentType.fic:
@@ -113,7 +115,7 @@ Widget? _investmentGainsSubtitle(
       }
       final positive = pnl.pnl >= 0;
       final pnlColor =
-          positive ? Colors.green.shade600 : theme.colorScheme.error;
+          positive ? context.semantic.positive : theme.colorScheme.error;
       return Text(
         '${positive ? '+' : ''}${CurrencyFormatter.format(pnl.pnl, currency: baseCurrency)}'
         '  (${positive ? '+' : ''}${pnl.pnlPct.toStringAsFixed(2)}%)',
@@ -220,7 +222,7 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
               : _buildMobileList(sorted, reorderable: reorderable);
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('Error: $err')),
+        error: (err, _) => Center(child: Text(friendlyError(err))),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => showDialog(
@@ -441,7 +443,7 @@ class _AccountListItem extends ConsumerWidget {
       balanceSubtitle = Text(
         CurrencyFormatter.format(account.balanceUsd, currency: 'USD'),
         style: theme.textTheme.labelSmall?.copyWith(
-          color: theme.colorScheme.onSurface.withOpacity(0.45),
+          color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
         ),
       );
     } else if (account.isSavingsParent && account.pockets.isNotEmpty) {
@@ -453,10 +455,10 @@ class _AccountListItem extends ConsumerWidget {
         '${account.pockets.length} $pocketLabel · '
         '${CurrencyFormatter.format(account.pocketsBalance, decimalDigits: 2)} stored',
         style: theme.textTheme.labelSmall?.copyWith(
-          color: theme.colorScheme.onSurface.withOpacity(0.45),
+          color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
         ),
         maxLines: 1,
-        overflow: TextOverflow.ellipsis,
+        overflow: TextOverflow.fade,
       );
     } else {
       balance = CurrencyFormatter.format(account.balance, decimalDigits: 2);
@@ -472,7 +474,7 @@ class _AccountListItem extends ConsumerWidget {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
           decoration: BoxDecoration(
             color: isSelected
-                ? theme.colorScheme.primary.withOpacity(0.12)
+                ? theme.colorScheme.primary.withValues(alpha: 0.12)
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
           ),
@@ -496,7 +498,7 @@ class _AccountListItem extends ConsumerWidget {
                 width: 38,
                 height: 38,
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withOpacity(0.1),
+                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Center(
@@ -516,13 +518,13 @@ class _AccountListItem extends ConsumerWidget {
                             ? theme.colorScheme.primary
                             : theme.colorScheme.onSurface,
                       ),
-                      overflow: TextOverflow.ellipsis,
+                      overflow: TextOverflow.fade,
                     ),
                     const SizedBox(height: 1),
                     Text(
                       balance,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurface.withOpacity(0.55),
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
                       ),
                     ),
                     if (balanceSubtitle != null) balanceSubtitle,
@@ -628,7 +630,7 @@ class _AccountDetailPanel extends ConsumerWidget {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withOpacity(0.1),
+              color: theme.colorScheme.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Center(child: _buildAccountIcon(account, theme, size: 40)),
@@ -642,7 +644,7 @@ class _AccountDetailPanel extends ConsumerWidget {
                   account.name,
                   style: theme.textTheme.titleMedium
                       ?.copyWith(fontWeight: FontWeight.bold),
-                  overflow: TextOverflow.ellipsis,
+                  overflow: TextOverflow.fade,
                 ),
                 const SizedBox(height: 3),
                 Container(
@@ -692,7 +694,7 @@ class _AccountDetailPanel extends ConsumerWidget {
         subBalance = Text(
           CurrencyFormatter.format(account.balanceUsd, currency: 'USD'),
           style: theme.textTheme.bodySmall
-              ?.copyWith(color: theme.colorScheme.onSurface.withOpacity(0.5)),
+              ?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
         );
       }
     } else if (account.isSavingsParent && account.pockets.isNotEmpty) {
@@ -703,9 +705,9 @@ class _AccountDetailPanel extends ConsumerWidget {
         '${CurrencyFormatter.format(account.balance, decimalDigits: 2)} own · '
         '${CurrencyFormatter.format(account.pocketsBalance, decimalDigits: 2)} in pockets',
         style: theme.textTheme.bodySmall
-            ?.copyWith(color: theme.colorScheme.onSurface.withOpacity(0.55)),
+            ?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.55)),
         maxLines: 1,
-        overflow: TextOverflow.ellipsis,
+        overflow: TextOverflow.fade,
       );
     } else {
       balanceText = CurrencyFormatter.format(account.balance, decimalDigits: 2);
@@ -730,7 +732,7 @@ class _AccountDetailPanel extends ConsumerWidget {
             width: 52,
             height: 52,
             decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withOpacity(0.1),
+              color: theme.colorScheme.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Center(child: _buildAccountIcon(account, theme, size: 52)),
@@ -745,7 +747,7 @@ class _AccountDetailPanel extends ConsumerWidget {
                   account.name,
                   style: theme.textTheme.titleLarge
                       ?.copyWith(fontWeight: FontWeight.bold),
-                  overflow: TextOverflow.ellipsis,
+                  overflow: TextOverflow.fade,
                 ),
                 const SizedBox(height: 4),
                 Container(
@@ -831,7 +833,7 @@ class _AccountDetailPanel extends ConsumerWidget {
           Text(
             'No recent transactions',
             style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurface.withOpacity(0.5),
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
             ),
           )
         else
@@ -895,7 +897,7 @@ class _InvestmentAccountCard extends ConsumerWidget {
     if (details == null) return null;
 
     final dimColor =
-        Theme.of(context).colorScheme.onSurface.withOpacity(0.55);
+        Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55);
     const subtitleStyle = TextStyle(fontSize: 11);
 
     switch (details.investmentType) {
@@ -910,7 +912,7 @@ class _InvestmentAccountCard extends ConsumerWidget {
         if (accrued <= 0) return null;
         return Text(
           '+${CurrencyFormatter.format(accrued, decimalDigits: 2)} earned',
-          style: subtitleStyle.copyWith(color: Colors.green.shade600),
+          style: subtitleStyle.copyWith(color: context.semantic.positive),
         );
 
       case InvestmentType.fic:
@@ -925,7 +927,7 @@ class _InvestmentAccountCard extends ConsumerWidget {
         }
         final positive = pnl.pnl >= 0;
         final pnlColor = positive
-            ? Colors.green.shade600
+            ? context.semantic.positive
             : Theme.of(context).colorScheme.error;
         return Text(
           '${positive ? '+' : ''}${CurrencyFormatter.format(pnl.pnl, currency: baseCurrency)}'
@@ -980,12 +982,12 @@ class _SavingsInterestCard extends ConsumerWidget {
                     theme,
                     'APY',
                     '${apyPct.toStringAsFixed(2)}% E.A.',
-                    Colors.green.shade600,
+                    context.semantic.positive,
                   ),
                 ),
                 Expanded(
                   child: _miniStat(theme, 'Daily',
-                      CurrencyFormatter.format(daily), Colors.green.shade600),
+                      CurrencyFormatter.format(daily), context.semantic.positive),
                 ),
                 Expanded(
                   child: _miniStat(theme, 'Annual',
@@ -999,7 +1001,7 @@ class _SavingsInterestCard extends ConsumerWidget {
                 '+${CurrencyFormatter.format(accrued)} accrued since '
                 '${sid.lastInterestDate!.toIso8601String().split("T")[0]}',
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: Colors.green.shade700,
+                  color: context.semantic.positive,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -1031,7 +1033,7 @@ class _SavingsInterestCard extends ConsumerWidget {
       children: [
         Text(label,
             style: theme.textTheme.labelSmall
-                ?.copyWith(color: theme.colorScheme.onSurface.withOpacity(0.55))),
+                ?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.55))),
         Text(
           value,
           style: theme.textTheme.titleSmall
@@ -1069,7 +1071,7 @@ class _PocketList extends ConsumerWidget {
           Text(
             'No pockets yet. Add one to allocate part of your balance with its own APY.',
             style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurface.withOpacity(0.55),
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
             ),
           )
         else
@@ -1137,7 +1139,7 @@ class _PocketList extends ConsumerWidget {
               } catch (e) {
                 if (ctx.mounted) {
                   ScaffoldMessenger.of(ctx).showSnackBar(
-                    SnackBar(content: Text('Error: $e')),
+                    SnackBar(content: Text(friendlyError(e))),
                   );
                 }
               }
@@ -1163,14 +1165,14 @@ class _PocketTile extends ConsumerWidget {
         : null;
     return Card(
       elevation: 0,
-      color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.4),
+      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
       margin: const EdgeInsets.symmetric(vertical: 4),
       child: ListTile(
         leading: Icon(Icons.savings, color: theme.colorScheme.primary),
         title: Text(pocket.name),
         subtitle: apyPct != null
             ? Text('$apyPct APY',
-                style: TextStyle(color: Colors.green.shade600, fontSize: 12))
+                style: TextStyle(color: context.semantic.positive, fontSize: 12))
             : null,
         trailing: Text(
           CurrencyFormatter.format(pocket.balance),
@@ -1256,7 +1258,7 @@ class AccountDetailsScreen extends ConsumerWidget {
                         'Balance',
                         style: theme.textTheme.labelLarge?.copyWith(
                           color:
-                              theme.colorScheme.onSurface.withOpacity(0.6),
+                              theme.colorScheme.onSurface.withValues(alpha: 0.6),
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -1273,10 +1275,10 @@ class AccountDetailsScreen extends ConsumerWidget {
                           '${CurrencyFormatter.format(account.pocketsBalance, decimalDigits: 2)} in pockets',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurface
-                                .withOpacity(0.55),
+                                .withValues(alpha: 0.55),
                           ),
                           maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          overflow: TextOverflow.fade,
                         ),
                       ],
                     ],
@@ -1302,7 +1304,7 @@ class AccountDetailsScreen extends ConsumerWidget {
                 Text(
                   'No recent transactions',
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurface.withOpacity(0.5),
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                   ),
                 )
               else

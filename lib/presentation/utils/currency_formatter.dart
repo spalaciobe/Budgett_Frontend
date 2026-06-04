@@ -4,7 +4,9 @@ import 'package:intl/intl.dart';
 class CurrencyFormatter {
   /// Formats [amount] according to [currency].
   ///
-  /// COP: es_CO locale, '$' prefix, 2 decimal digits (e.g. $1.200.000,50)
+  /// COP: es_CO grouping, '$' as a *prefix* (matching the input field, where
+  /// the user types the symbol in front), 0 decimals by default — centavos
+  /// aren't used for COP (e.g. $1.200.000). Pass [decimalDigits] to override.
   /// USD: en_US locale, 'US$' prefix, 2 decimal digits (e.g. US$1,200.50)
   static String format(
     double amount, {
@@ -19,15 +21,17 @@ class CurrencyFormatter {
         decimalDigits: decimalDigits ?? 2,
       );
       return formatter.format(amount).trim();
-    } else {
-      // Default: COP
-      final formatter = NumberFormat.currency(
-        locale: 'es_CO',
-        symbol: includeSymbol ? '\$' : '',
-        decimalDigits: decimalDigits ?? 2,
-      );
-      return formatter.format(amount).trim();
     }
+    // COP: build the number without a symbol so we can place '$' as a prefix
+    // (NumberFormat.currency for es_CO renders it as a suffix), and keep the
+    // sign in front of the symbol (e.g. -$1.200.000).
+    final digits = decimalDigits ?? 0;
+    final formatter = NumberFormat.decimalPattern('es_CO')
+      ..minimumFractionDigits = digits
+      ..maximumFractionDigits = digits;
+    final number = formatter.format(amount.abs());
+    final sign = amount < 0 ? '-' : '';
+    return includeSymbol ? '$sign\$$number' : '$sign$number';
   }
 
   /// Parses a formatted currency string back to a double.

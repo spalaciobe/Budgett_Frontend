@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/app_theme.dart';
+import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
@@ -35,6 +37,10 @@ class _EditBudgetDialogState extends ConsumerState<EditBudgetDialog> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _amountController;
 
+  /// Guards against double submission (double-tap / slow network), which would
+  /// post the budget twice and pop the screen behind the dialog.
+  bool _isLoading = false;
+
   @override
   void initState() {
     super.initState();
@@ -52,6 +58,7 @@ class _EditBudgetDialogState extends ConsumerState<EditBudgetDialog> {
   }
 
   Future<void> _saveBudget() async {
+    if (_isLoading) return;
     if (!_formKey.currentState!.validate()) return;
 
     final budget = Budget(
@@ -62,12 +69,13 @@ class _EditBudgetDialogState extends ConsumerState<EditBudgetDialog> {
       year: widget.year,
     );
 
+    setState(() => _isLoading = true);
     try {
       await ref.read(financeRepositoryProvider).setBudget(budget);
-      
+
       // Invalidate to refresh
       ref.invalidate(budgetsProvider);
-      
+
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -77,9 +85,11 @@ class _EditBudgetDialogState extends ConsumerState<EditBudgetDialog> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(content: Text(friendlyError(e))),
         );
       }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -97,7 +107,7 @@ class _EditBudgetDialogState extends ConsumerState<EditBudgetDialog> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.2),
+                color: color.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
@@ -120,14 +130,19 @@ class _EditBudgetDialogState extends ConsumerState<EditBudgetDialog> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: isIncome ? Colors.green.withOpacity(0.2) : Colors.orange.withOpacity(0.2),
+                    color: (isIncome
+                            ? context.semantic.positive
+                            : context.semantic.warning)
+                        .withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     isIncome ? 'Income' : 'Expense',
                     style: TextStyle(
                       fontSize: 12,
-                      color: isIncome ? Colors.green : Colors.orange,
+                      color: isIncome
+                          ? context.semantic.positive
+                          : context.semantic.warning,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -167,8 +182,14 @@ class _EditBudgetDialogState extends ConsumerState<EditBudgetDialog> {
           child: const Text('Cancel'),
         ),
         FilledButton(
-          onPressed: _saveBudget,
-          child: const Text('Save'),
+          onPressed: _isLoading ? null : _saveBudget,
+          child: _isLoading
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Save'),
         ),
       ],
     );

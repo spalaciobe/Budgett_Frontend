@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/app_theme.dart';
+import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
@@ -94,7 +96,7 @@ class PocketDetailsScreen extends ConsumerWidget {
               txAsync.when(
                 loading: () =>
                     const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Text('Error: $e'),
+                error: (e, _) => Text(friendlyError(e)),
                 data: (txs) {
                   if (txs.isEmpty) {
                     return const Text('No transactions yet.');
@@ -143,12 +145,12 @@ class _BalanceHeader extends StatelessWidget {
               Text(
                 'Pocket of ${parent!.name}',
                 style: theme.textTheme.labelSmall?.copyWith(
-                  color: theme.colorScheme.onSurface.withOpacity(0.55),
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
                 ),
               ),
             Text('Balance',
                 style: theme.textTheme.labelLarge?.copyWith(
-                  color: theme.colorScheme.onSurface.withOpacity(0.6),
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                 )),
             const SizedBox(height: 4),
             Text(
@@ -204,14 +206,14 @@ class _InterestSection extends ConsumerWidget {
                       child: _StatItem(
                         label: 'APY',
                         value: '${apyPct.toStringAsFixed(2)}% E.A.',
-                        color: Colors.green.shade600,
+                        color: context.semantic.positive,
                       ),
                     ),
                     Expanded(
                       child: _StatItem(
                         label: 'Daily Earnings',
                         value: CurrencyFormatter.format(daily),
-                        color: Colors.green.shade600,
+                        color: context.semantic.positive,
                       ),
                     ),
                     Expanded(
@@ -234,7 +236,7 @@ class _InterestSection extends ConsumerWidget {
                         child: _StatItem(
                           label: 'Accrued Interest',
                           value: CurrencyFormatter.format(accrued),
-                          color: Colors.green.shade600,
+                          color: context.semantic.positive,
                         ),
                       ),
                       Expanded(
@@ -245,10 +247,10 @@ class _InterestSection extends ConsumerWidget {
                             Text('Since',
                                 style: theme.textTheme.labelSmall?.copyWith(
                                   color: theme.colorScheme.onSurface
-                                      .withOpacity(0.55),
+                                      .withValues(alpha: 0.55),
                                 )),
                             Text(
-                              DateFormat('MMM d, y').format(fromDate!),
+                              DateFormat('dd/MM/yyyy').format(fromDate!),
                               style: theme.textTheme.bodySmall
                                   ?.copyWith(fontWeight: FontWeight.w500),
                             ),
@@ -256,7 +258,7 @@ class _InterestSection extends ConsumerWidget {
                               '${DateTime.now().difference(fromDate).inDays} days',
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: theme.colorScheme.onSurface
-                                    .withOpacity(0.55),
+                                    .withValues(alpha: 0.55),
                               ),
                             ),
                             if (segments.isNotEmpty)
@@ -312,7 +314,7 @@ class _SetStartDatePrompt extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     return Card(
-      color: theme.colorScheme.secondaryContainer.withOpacity(0.5),
+      color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.5),
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
@@ -322,14 +324,14 @@ class _SetStartDatePrompt extends ConsumerWidget {
             Icon(Icons.calendar_today,
                 size: 18,
                 color: theme.colorScheme.onSecondaryContainer
-                    .withOpacity(0.7)),
+                    .withValues(alpha: 0.7)),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 'Set a start date to begin tracking daily accrued interest.',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSecondaryContainer
-                      .withOpacity(0.8),
+                      .withValues(alpha: 0.8),
                 ),
               ),
             ),
@@ -353,7 +355,7 @@ class _SetStartDatePrompt extends ConsumerWidget {
                 } catch (e) {
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Error: $e')));
+                        SnackBar(content: Text(friendlyError(e))));
                   }
                 }
               },
@@ -380,7 +382,7 @@ class _StatItem extends StatelessWidget {
       children: [
         Text(label,
             style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.55))),
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.55))),
         Text(
           value,
           style: theme.textTheme.titleMedium
@@ -399,13 +401,13 @@ class _TxTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isPositive = tx.type == 'income';
-    final color = isPositive ? Colors.green.shade600 : theme.colorScheme.error;
+    final color = isPositive ? context.semantic.positive : theme.colorScheme.error;
     final sign = isPositive ? '+' : '-';
     return ListTile(
       dense: true,
       title: Text(tx.description, style: theme.textTheme.bodyMedium),
       subtitle: Text(
-        DateFormat('MMM d, y').format(tx.date),
+        DateFormat('dd/MM/yyyy').format(tx.date),
         style: theme.textTheme.bodySmall,
       ),
       trailing: Text(

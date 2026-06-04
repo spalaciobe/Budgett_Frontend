@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/presentation/widgets/empty_state.dart';
+import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
@@ -24,19 +26,15 @@ class GoalsScreen extends ConsumerWidget {
         child: goalsAsync.when(
         data: (goals) {
           if (goals.isEmpty) {
-            return LayoutBuilder(
-              builder: (context, constraints) => SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: SizedBox(
-                  height: constraints.maxHeight,
-                  child: const Center(child: Text('No goals set yet. Start dreaming!')),
-                ),
-              ),
+            return const EmptyState(
+              icon: Icons.flag_outlined,
+              title: 'No goals yet',
+              message: 'Set a savings goal with the + button.',
             );
           }
           return ListView.separated(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: kScreenPadding,
+            padding: kScreenPaddingWithFab,
             itemCount: goals.length,
             separatorBuilder: (context, index) => kGapLg,
             itemBuilder: (context, index) {
@@ -93,7 +91,7 @@ class GoalsScreen extends ConsumerWidget {
 
               return Card(
                 elevation: 2,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(kCardRadius)),
                 child: InkWell(
                   onTap: () {
                     showDialog(
@@ -130,7 +128,7 @@ class GoalsScreen extends ConsumerWidget {
                                 goal.name,
                                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                                 maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                                overflow: TextOverflow.fade,
                               ),
                               const SizedBox(height: 4),
                               Text.rich(
@@ -150,7 +148,7 @@ class GoalsScreen extends ConsumerWidget {
                                   ],
                                 ),
                                 maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                                overflow: TextOverflow.fade,
                               ),
                               const SizedBox(height: 8),
                               Stack(
@@ -171,7 +169,7 @@ class GoalsScreen extends ConsumerWidget {
                                           Container(
                                             height: 10,
                                             decoration: BoxDecoration(
-                                              color: Colors.green.withOpacity(0.3),
+                                              color: Colors.green.withValues(alpha: 0.3),
                                               borderRadius: BorderRadius.circular(5),
                                             ),
                                           ),
@@ -183,7 +181,7 @@ class GoalsScreen extends ConsumerWidget {
                                             child: CustomPaint(
                                               size: const Size(2, 10),
                                               painter: _DottedVerticalLinePainter(
-                                                color: Colors.black.withOpacity(0.35),
+                                                color: Colors.black.withValues(alpha: 0.35),
                                               ),
                                             ),
                                           ),
@@ -216,7 +214,7 @@ class GoalsScreen extends ConsumerWidget {
                           decoration: BoxDecoration(
                             // Removed explicit background color and border as per request "Dont use white background"
                             // Using a subtle surface tone or transparent
-                            color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5), 
+                            color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5), 
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Column(
@@ -243,9 +241,9 @@ class GoalsScreen extends ConsumerWidget {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                   decoration: BoxDecoration(
-                                    color: Colors.red.withOpacity(0.1),
+                                    color: Colors.red.withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: Colors.red.withOpacity(0.2)),
+                                    border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
                                   ),
                                   child: FittedBox(
                                     fit: BoxFit.scaleDown,
@@ -271,9 +269,9 @@ class GoalsScreen extends ConsumerWidget {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                   decoration: BoxDecoration(
-                                    color: Colors.green.withOpacity(0.1),
+                                    color: Colors.green.withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: Colors.green.withOpacity(0.2)),
+                                    border: Border.all(color: Colors.green.withValues(alpha: 0.2)),
                                   ),
                                   child: FittedBox(
                                     fit: BoxFit.scaleDown,
@@ -307,7 +305,7 @@ class GoalsScreen extends ConsumerWidget {
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, stack) => Center(child: Text('Error: $err')),
+        error: (err, stack) => Center(child: Text(friendlyError(err))),
         ),
       ),
       floatingActionButton: FloatingActionButton(

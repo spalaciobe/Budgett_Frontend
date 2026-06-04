@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -123,7 +124,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
           child: Text(
             a.name,
             style: const TextStyle(fontSize: 13),
-            overflow: TextOverflow.ellipsis,
+            overflow: TextOverflow.fade,
           ),
         ));
       }
@@ -139,13 +140,13 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                   color: Theme.of(context)
                       .colorScheme
                       .onSurface
-                      .withOpacity(0.5)),
+                      .withValues(alpha: 0.5)),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
                   p.name,
                   style: const TextStyle(fontSize: 13),
-                  overflow: TextOverflow.ellipsis,
+                  overflow: TextOverflow.fade,
                 ),
               ),
             ],
@@ -400,7 +401,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(content: Text(friendlyError(e))),
         );
       }
     } finally {
@@ -449,7 +450,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(content: Text(friendlyError(e))),
         );
       }
     } finally {
@@ -539,7 +540,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                     color: Theme.of(context)
                         .colorScheme
                         .primaryContainer
-                        .withOpacity(0.5),
+                        .withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
@@ -587,7 +588,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                     color: Theme.of(context)
                         .colorScheme
                         .tertiaryContainer
-                        .withOpacity(0.5),
+                        .withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Row(
@@ -692,7 +693,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                                   Text(
                                     'Date',
                                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.6),
+                                      color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.6),
                                     ),
                                   ),
                                   const SizedBox(height: 4),
@@ -780,7 +781,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                           );
                         },
                         loading: () => const CircularProgressIndicator(),
-                        error: (e, s) => Text('Error loading accounts: $e'),
+                        error: (e, s) => Text(friendlyError(e)),
                       ),
                       const SizedBox(height: 10),
 
@@ -844,7 +845,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                             );
                           },
                           loading: () => const CircularProgressIndicator(),
-                          error: (e, s) => Text('Error loading categories: $e'),
+                          error: (e, s) => Text(friendlyError(e)),
                         ),
                       if (_selectedType != 'transfer') const SizedBox(height: 10),
 
@@ -863,7 +864,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                             onChanged: (value) => setState(() => _selectedTargetAccountId = value),
                           ),
                           loading: () => const CircularProgressIndicator(),
-                          error: (e, s) => Text('Error loading accounts: $e'),
+                          error: (e, s) => Text(friendlyError(e)),
                         ),
                       if (_selectedType == 'transfer') const SizedBox(height: 10),
 
@@ -902,7 +903,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                                       DropdownMenuItem<String?>(
                                         value: c.id,
                                         child: Text(c.name,
-                                            overflow: TextOverflow.ellipsis),
+                                            overflow: TextOverflow.fade),
                                       )),
                                 ],
                                 onChanged: (v) => setState(() {

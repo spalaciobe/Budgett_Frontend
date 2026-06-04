@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_spacing.dart';
+import '../../core/app_theme.dart';
 import '../../data/models/category_model.dart';
 import '../providers/finance_provider.dart';
 import '../utils/icon_helper.dart';
@@ -18,18 +20,6 @@ class CategoriesScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Categories'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            tooltip: 'New Category',
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (_) => const CreateCategoryDialog(),
-              );
-            },
-          ),
-        ],
       ),
       body: RefreshIndicator(
         onRefresh: () async {
@@ -38,50 +28,79 @@ class CategoriesScreen extends ConsumerWidget {
         },
         child: categoriesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        error: (e, _) => Center(child: Text(friendlyError(e))),
         data: (categories) {
           final income = categories.where((c) => c.type == 'income').toList();
           final expense = categories.where((c) => c.type == 'expense').toList();
 
-          return ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: kScreenPadding,
-            children: [
-              _SectionHeader(
-                label: 'Income',
-                icon: Icons.arrow_downward,
-                color: Colors.green,
-                count: income.length,
-              ),
-              const SizedBox(height: 8),
-              ...income.map((c) => _CategoryTile(category: c, ref: ref)),
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              // Two-column grid of tiles on wide screens, single column on
+              // mobile.
+              final twoCols = constraints.maxWidth >= 720;
+              const gap = 12.0;
+              final itemW = (constraints.maxWidth - 32 - gap) / 2;
 
-              kGapXl,
-              _SectionHeader(
-                label: 'Expenses',
-                icon: Icons.arrow_upward,
-                color: Colors.red,
-                count: expense.length,
-              ),
-              const SizedBox(height: 8),
-              ...expense.map((c) => _CategoryTile(category: c, ref: ref)),
+              Widget section(List<Category> cats) {
+                if (!twoCols) {
+                  return Column(
+                    children: cats
+                        .map((c) => _CategoryTile(category: c, ref: ref))
+                        .toList(),
+                  );
+                }
+                return Wrap(
+                  spacing: gap,
+                  children: [
+                    for (final c in cats)
+                      SizedBox(
+                        width: itemW,
+                        child: _CategoryTile(category: c, ref: ref),
+                      ),
+                  ],
+                );
+              }
 
-              const SizedBox(height: 64),
-            ],
+              return ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: kScreenPadding,
+                children: [
+                  _SectionHeader(
+                    label: 'Income',
+                    icon: Icons.arrow_downward,
+                    color: context.semantic.positive,
+                    count: income.length,
+                  ),
+                  const SizedBox(height: 8),
+                  section(income),
+                  kGapXl,
+                  _SectionHeader(
+                    label: 'Expenses',
+                    icon: Icons.arrow_upward,
+                    color: Theme.of(context).colorScheme.error,
+                    count: expense.length,
+                  ),
+                  const SizedBox(height: 8),
+                  section(expense),
+                  const SizedBox(height: 64),
+                ],
+              );
+            },
           );
         },
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: FloatingActionButton(
         onPressed: () {
           showDialog(
             context: context,
             builder: (_) => const CreateCategoryDialog(),
           );
         },
-        icon: const Icon(Icons.add),
-        label: const Text('New Category'),
+        tooltip: 'New Category',
+        child: const Icon(Icons.add),
       ),
+
     );
   }
 }
@@ -146,7 +165,7 @@ class _CategoryTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       child: ExpansionTile(
         leading: CircleAvatar(
-          backgroundColor: color.withOpacity(0.15),
+          backgroundColor: color.withValues(alpha: 0.15),
           child: Icon(iconData, color: color, size: 20),
         ),
         title: Row(
@@ -251,7 +270,7 @@ class _CategoryTile extends StatelessWidget {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error deleting: $e')),
+          SnackBar(content: Text(friendlyError(e))),
         );
       }
     }

@@ -26,6 +26,27 @@ class MainScaffold extends ConsumerWidget {
   }
 }
 
+// ─── Body width cap (desktop / tablet) ───────────────────────────────────────
+
+/// Caps the body width on large screens so lists and cards don't stretch
+/// full-bleed to ~1440px — which leaves big empty gutters and breaks proximity
+/// (title far left, actions far right). Below the cap (and on mobile, which
+/// never uses this) it's a no-op.
+class _ConstrainedBody extends StatelessWidget {
+  final Widget child;
+  const _ConstrainedBody({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1100),
+        child: child,
+      ),
+    );
+  }
+}
+
 // ─── Desktop shell (sidebar) ──────────────────────────────────────────────────
 
 class _DesktopShell extends ConsumerStatefulWidget {
@@ -48,7 +69,7 @@ class _DesktopShellState extends ConsumerState<_DesktopShell> {
             isExpanded: _isExpanded,
             onToggle: () => setState(() => _isExpanded = !_isExpanded),
           ),
-          Expanded(child: widget.child),
+          Expanded(child: _ConstrainedBody(child: widget.child)),
         ],
       ),
     );
@@ -90,15 +111,16 @@ class _TabletShell extends ConsumerWidget {
             ),
           ),
           const VerticalDivider(width: 1, thickness: 1),
-          Expanded(child: child),
+          Expanded(child: _ConstrainedBody(child: child)),
         ],
       ),
     );
   }
 
-  int _selectedIndex(String currentPath) {
-    final idx = kNavDestinations.indexWhere((d) => d.path == currentPath);
-    return idx < 0 ? 0 : idx;
+  int? _selectedIndex(String currentPath) {
+    final idx = kNavDestinations
+        .indexWhere((d) => d.path == navSectionFor(currentPath));
+    return idx < 0 ? null : idx;
   }
 }
 
@@ -202,6 +224,7 @@ class _Sidebar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(userProvider);
+    final section = navSectionFor(GoRouterState.of(context).uri.path);
     final profile = ref.watch(profileProvider).valueOrNull;
     final displayName = (profile?.firstName != null)
         ? [profile!.firstName!, profile?.lastName].whereType<String>().join(' ')
@@ -210,7 +233,6 @@ class _Sidebar extends ConsumerWidget {
         ? displayName[0].toUpperCase()
         : 'U';
     final theme = Theme.of(context);
-    final currentPath = GoRouterState.of(context).uri.path;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
@@ -280,7 +302,7 @@ class _Sidebar extends ConsumerWidget {
                     _SidebarItem(
                       icon: dest.selectedIcon,
                       label: dest.label,
-                      isSelected: currentPath == dest.path,
+                      isSelected: section == dest.path,
                       isExpanded: isExpanded,
                       onTap: () => context.go(dest.path),
                     ),
@@ -329,14 +351,14 @@ class _Sidebar extends ConsumerWidget {
                             displayName,
                             style: theme.textTheme.bodySmall?.copyWith(
                                 fontWeight: FontWeight.bold),
-                            overflow: TextOverflow.ellipsis,
+                            overflow: TextOverflow.fade,
                           ),
                         ),
                         IconButton(
                           iconSize: 18,
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(
-                              minWidth: 32, minHeight: 32),
+                              minWidth: 44, minHeight: 44),
                           icon: Icon(Icons.logout,
                               color: theme.colorScheme.error),
                           tooltip: 'Log out',
@@ -377,7 +399,7 @@ class _SidebarItem extends StatelessWidget {
     final theme = Theme.of(context);
     final color = isSelected
         ? theme.colorScheme.primary
-        : theme.iconTheme.color?.withOpacity(0.7);
+        : theme.iconTheme.color?.withValues(alpha: 0.7);
 
     return InkWell(
       onTap: onTap,
@@ -387,7 +409,7 @@ class _SidebarItem extends StatelessWidget {
         padding: EdgeInsets.symmetric(horizontal: isExpanded ? 12 : 8),
         decoration: BoxDecoration(
           color: isSelected
-              ? theme.colorScheme.primary.withOpacity(0.1)
+              ? theme.colorScheme.primary.withValues(alpha: 0.1)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
         ),
@@ -414,7 +436,7 @@ class _SidebarItem extends StatelessWidget {
                             ? FontWeight.bold
                             : FontWeight.normal,
                       ),
-                      overflow: TextOverflow.ellipsis,
+                      overflow: TextOverflow.fade,
                     ),
                   ),
                 ],

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:budgett_frontend/core/responsive.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
@@ -51,7 +52,7 @@ class BudgetScreen extends ConsumerWidget {
             color: Theme.of(context)
                 .colorScheme
                 .surfaceContainerHighest
-                .withOpacity(0.5),
+                .withValues(alpha: 0.5),
             borderRadius: BorderRadius.circular(20),
           ),
           child: Row(
@@ -161,7 +162,7 @@ class BudgetScreen extends ConsumerWidget {
                   );
                 }
               } catch (e) {
-                messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+                messenger.showSnackBar(SnackBar(content: Text(friendlyError(e))));
               }
             },
           ),
@@ -384,7 +385,7 @@ class BudgetScreen extends ConsumerWidget {
                         Expanded(
                           child: ListView(
                             physics: const AlwaysScrollableScrollPhysics(),
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, kFabSafeBottom),
                             children: [
                               ...activeNonSavings.map(buildRow),
 
@@ -410,7 +411,7 @@ class BudgetScreen extends ConsumerWidget {
                                           color: Theme.of(context)
                                               .colorScheme
                                               .onSurface
-                                              .withOpacity(0.7),
+                                              .withValues(alpha: 0.7),
                                         ),
                                         const SizedBox(width: 6),
                                         Text(
@@ -421,7 +422,7 @@ class BudgetScreen extends ConsumerWidget {
                                             color: Theme.of(context)
                                                 .colorScheme
                                                 .onSurface
-                                                .withOpacity(0.75),
+                                                .withValues(alpha: 0.75),
                                           ),
                                         ),
                                         const SizedBox(width: 8),
@@ -435,9 +436,9 @@ class BudgetScreen extends ConsumerWidget {
                                               color: Theme.of(context)
                                                   .colorScheme
                                                   .onSurface
-                                                  .withOpacity(0.4),
+                                                  .withValues(alpha: 0.4),
                                             ),
-                                            overflow: TextOverflow.ellipsis,
+                                            overflow: TextOverflow.fade,
                                           ),
                                         ),
                                       ],
@@ -459,7 +460,7 @@ class BudgetScreen extends ConsumerWidget {
                                           color: Theme.of(context)
                                               .colorScheme
                                               .onSurface
-                                              .withOpacity(0.7)),
+                                              .withValues(alpha: 0.7)),
                                       const SizedBox(width: 6),
                                       Text(
                                         'Savings & Sinking Funds',
@@ -469,7 +470,7 @@ class BudgetScreen extends ConsumerWidget {
                                           color: Theme.of(context)
                                               .colorScheme
                                               .onSurface
-                                              .withOpacity(0.75),
+                                              .withValues(alpha: 0.75),
                                         ),
                                       ),
                                     ],
@@ -487,11 +488,11 @@ class BudgetScreen extends ConsumerWidget {
               },
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, s) =>
-                  Center(child: Text('Error loading categories: $e')),
+                  Center(child: Text(friendlyError(e))),
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (err, stack) => Center(child: Text('Error: $err')),
+          error: (err, stack) => Center(child: Text(friendlyError(err))),
         ),
       ),
       floatingActionButton: FloatingActionButton(
@@ -580,8 +581,8 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
           gradient: LinearGradient(
             colors: [
               Theme.of(context).cardTheme.color ?? Colors.white,
-              Theme.of(context).cardTheme.color?.withOpacity(0.95) ??
-                  Colors.white.withOpacity(0.95),
+              Theme.of(context).cardTheme.color?.withValues(alpha: 0.95) ??
+                  Colors.white.withValues(alpha: 0.95),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -665,13 +666,13 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: widget.allocationPercentage > 100
-            ? Colors.red.withOpacity(0.1)
-            : Theme.of(context).colorScheme.primary.withOpacity(0.1),
+            ? Colors.red.withValues(alpha: 0.1)
+            : Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: widget.allocationPercentage > 100
-              ? Colors.red.withOpacity(0.2)
-              : Theme.of(context).colorScheme.primary.withOpacity(0.2),
+              ? Colors.red.withValues(alpha: 0.2)
+              : Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
         ),
       ),
       // Wrap (not Row) so the badge can flow onto a second line on narrow
@@ -793,9 +794,9 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.05),
+                  color: Colors.red.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red.withOpacity(0.1)),
+                  border: Border.all(color: Colors.red.withValues(alpha: 0.1)),
                 ),
                 child: Row(
                   children: [
@@ -803,7 +804,7 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Over budget by ${CurrencyFormatter.format(widget.totalSpent - widget.totalBudget, decimalDigits: 2)}',
+                        'Over budget by ${CurrencyFormatter.format(widget.totalSpent - widget.totalBudget, decimalDigits: 0)}',
                         style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -819,10 +820,10 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFD32F2F).withOpacity(0.25),
+                  color: const Color(0xFFD32F2F).withValues(alpha: 0.25),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                      color: const Color(0xFFD32F2F).withOpacity(0.7)),
+                      color: const Color(0xFFD32F2F).withValues(alpha: 0.7)),
                 ),
                 child: Row(
                   children: [
@@ -831,7 +832,7 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Spending exceeds actual income by ${CurrencyFormatter.format(widget.totalSpent - widget.monthlyIncome, decimalDigits: 2)}',
+                        'Spending exceeds actual income by ${CurrencyFormatter.format(widget.totalSpent - widget.monthlyIncome, decimalDigits: 0)}',
                         style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -933,7 +934,7 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
                         color: Theme.of(context)
                             .colorScheme
                             .onSurface
-                            .withOpacity(0.6),
+                            .withValues(alpha: 0.6),
                       ),
                     ),
                     Text(
@@ -973,7 +974,7 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
                     child: Text(
                       '${c.name}  ${pct.toStringAsFixed(0)}%',
                       style: const TextStyle(fontSize: 11),
-                      overflow: TextOverflow.ellipsis,
+                      overflow: TextOverflow.fade,
                     ),
                   ),
                 ],
@@ -1004,12 +1005,12 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
                 height: 10,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(3),
-                  border: Border.all(color: color.withOpacity(0.5)),
+                  border: Border.all(color: color.withValues(alpha: 0.5)),
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(2),
                   child: CustomPaint(
-                    painter: _HatchedPainter(color: color.withOpacity(0.5)),
+                    painter: _HatchedPainter(color: color.withValues(alpha: 0.5)),
                   ),
                 ),
               )
@@ -1087,7 +1088,7 @@ class _FinancialHealthBar extends StatelessWidget {
       return Container(
         height: 36,
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.06),
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(8),
         ),
       );
@@ -1274,7 +1275,7 @@ class _FinancialHealthBar extends StatelessWidget {
                         color: Theme.of(context)
                             .colorScheme
                             .onSurface
-                            .withOpacity(0.06),
+                            .withValues(alpha: 0.06),
                         borderRadius: BorderRadius.circular(radius),
                       ),
                     ),
@@ -1288,7 +1289,7 @@ class _FinancialHealthBar extends StatelessWidget {
                           borderRadius: rightRadius(expectedWidth),
                           child: CustomPaint(
                             painter: _HatchedPainter(
-                              color: incomeColor.withOpacity(0.45),
+                              color: incomeColor.withValues(alpha: 0.45),
                             ),
                             size: Size.infinite,
                           ),
@@ -1336,7 +1337,7 @@ class _FinancialHealthBar extends StatelessWidget {
                         child: ClipRect(
                           child: CustomPaint(
                             painter: _HatchedPainter(
-                              color: savingsColor.withOpacity(0.75),
+                              color: savingsColor.withValues(alpha: 0.75),
                             ),
                             size: Size.infinite,
                           ),
@@ -1353,7 +1354,7 @@ class _FinancialHealthBar extends StatelessWidget {
                         width: savingsSegmentWidth,
                         child: Container(
                           decoration: BoxDecoration(
-                            color: effectiveSavingsColor.withOpacity(0.85),
+                            color: effectiveSavingsColor.withValues(alpha: 0.85),
                             borderRadius: BorderRadius.only(
                               topRight: savedWidth >= maxWidth - 0.5
                                   ? const Radius.circular(radius)
@@ -1483,7 +1484,7 @@ class _MonthPickerDialogState extends State<_MonthPickerDialog> {
                   border: Border.all(
                     color: isSelected
                         ? Theme.of(context).primaryColor
-                        : Colors.grey.withOpacity(0.3),
+                        : Colors.grey.withValues(alpha: 0.3),
                   ),
                 ),
                 alignment: Alignment.center,

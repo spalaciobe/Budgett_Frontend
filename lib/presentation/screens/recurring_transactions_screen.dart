@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:budgett_frontend/presentation/widgets/edit_recurring_transaction_dialog.dart';
+import 'package:budgett_frontend/presentation/widgets/empty_state.dart';
 import 'package:intl/intl.dart';
 
 class RecurringTransactionsScreen extends ConsumerWidget {
@@ -23,24 +25,10 @@ class RecurringTransactionsScreen extends ConsumerWidget {
         child: recurringAsync.when(
           data: (transactions) {
             if (transactions.isEmpty) {
-              return LayoutBuilder(
-                builder: (context, constraints) => SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  child: SizedBox(
-                    height: constraints.maxHeight,
-                    child: const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.repeat, size: 64, color: Colors.grey),
-                          SizedBox(height: 16),
-                          Text('No recurring transactions yet.'),
-                          Text('Add one when creating a new transaction.', style: TextStyle(color: Colors.grey)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
+              return const EmptyState(
+                icon: Icons.repeat,
+                title: 'No recurring transactions yet',
+                message: 'Add one when creating a new transaction.',
               );
             }
             return ListView.separated(
@@ -62,8 +50,8 @@ class RecurringTransactionsScreen extends ConsumerWidget {
                   ),
                   leading: CircleAvatar(
                     backgroundColor: item.type == 'income' 
-                        ? Colors.green.withOpacity(0.1) 
-                        : Colors.red.withOpacity(0.1),
+                        ? Colors.green.withValues(alpha: 0.1) 
+                        : Colors.red.withValues(alpha: 0.1),
                     child: Icon(
                       item.type == 'income' ? Icons.arrow_downward : Icons.arrow_upward,
                       color: item.type == 'income' ? Colors.green : Colors.red,
@@ -73,9 +61,9 @@ class RecurringTransactionsScreen extends ConsumerWidget {
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('${_capitalize(item.frequency)} • Next: ${DateFormat('MM/dd/yyyy').format(item.nextRunDate)}'),
+                      Text('${_capitalize(item.frequency)} • Next: ${DateFormat('dd/MM/yyyy').format(item.nextRunDate)}'),
                       if (item.lastRunDate != null)
-                        Text('Last: ${DateFormat('MM/dd/yyyy').format(item.lastRunDate!)}', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                        Text('Last: ${DateFormat('dd/MM/yyyy').format(item.lastRunDate!)}', style: const TextStyle(fontSize: 10, color: Colors.grey)),
                     ],
                   ),
                   trailing: Row(
@@ -178,7 +166,7 @@ class RecurringTransactionsScreen extends ConsumerWidget {
           );
         },
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, s) => Center(child: Text('Error: $e')),
+          error: (e, s) => Center(child: Text(friendlyError(e))),
         ),
       ),
     );

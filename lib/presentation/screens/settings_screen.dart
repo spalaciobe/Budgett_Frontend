@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -142,7 +143,7 @@ class SettingsScreen extends ConsumerWidget {
                         subtitle: Text('Unavailable'),
                       );
                     }
-                    final dateStr = DateFormat('d MMM yyyy', 'en').format(fxRate.asOfDate);
+                    final dateStr = DateFormat('dd/MM/yyyy', 'en').format(fxRate.asOfDate);
                     final rateStr = NumberFormat('#,##0.00', 'en_US').format(fxRate.rate);
                     return ListTile(
                       leading: const Icon(Icons.currency_exchange),
@@ -236,7 +237,7 @@ class SettingsScreen extends ConsumerWidget {
     } catch (e) {
       if (!context.mounted) return;
       messenger.showSnackBar(
-        SnackBar(content: Text('Update check failed: $e')),
+        SnackBar(content: Text(friendlyError(e))),
       );
     }
   }
