@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/app_theme.dart';
 import '../../data/models/transaction_model.dart';
 import '../utils/currency_formatter.dart';
 
@@ -53,13 +54,13 @@ class TransactionTile extends StatelessWidget {
     if (isTransfer) {
       typeColor = theme.colorScheme.secondary;
     } else if (isPositive) {
-      typeColor = Colors.green.shade600;
+      typeColor = context.semantic.positive;
     } else {
       typeColor = theme.colorScheme.error;
     }
 
     final dotColor = isPending
-        ? Colors.orange.withValues(alpha: 0.6)
+        ? context.semantic.warning.withValues(alpha: 0.6)
         : typeColor.withValues(alpha: 0.6);
 
     final String sign;
@@ -89,7 +90,7 @@ class TransactionTile extends StatelessWidget {
     if (t.isCrossCurrencyPayment && t.fxRate != null) {
       extraLines.add(Text(
         'Payment in COP @ \$${NumberFormat('#,###', 'en_US').format(t.fxRate!.toInt())}',
-        style: TextStyle(fontSize: 11, color: Colors.green.shade700),
+        style: TextStyle(fontSize: 11, color: context.semantic.positive),
       ));
     }
 
@@ -148,17 +149,18 @@ class _PendingBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final warning = context.semantic.warning;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
       decoration: BoxDecoration(
-        color: Colors.orange.withValues(alpha: 0.15),
+        color: warning.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(4),
       ),
-      child: const Text(
+      child: Text(
         'Pending',
         style: TextStyle(
           fontSize: 10,
-          color: Colors.orange,
+          color: warning,
           fontWeight: FontWeight.w500,
         ),
       ),

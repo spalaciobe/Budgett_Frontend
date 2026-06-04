@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 
+import 'package:budgett_frontend/core/app_theme.dart';
 import 'package:budgett_frontend/presentation/utils/icon_helper.dart';
 import 'package:budgett_frontend/data/models/sub_category_model.dart';
 
@@ -85,7 +86,7 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
               ? 'No monthly target set'
               : 'No budget set';
       final activityColor = widget.isIncome
-          ? Colors.green.shade600
+          ? context.semantic.positive
           : widget.isSavings
               ? Theme.of(context).colorScheme.primary
               : Theme.of(context).colorScheme.error;
@@ -123,7 +124,10 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                           Text(
                             emptyLabel,
                             style: TextStyle(
-                                fontSize: 12, color: Colors.grey[400]),
+                                fontSize: 12,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant),
                           ),
                         ],
                       ),
@@ -139,7 +143,10 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                           Text(
                             activityLabel,
                             style: TextStyle(
-                                fontSize: 11, color: Colors.grey[400]),
+                                fontSize: 11,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant),
                           ),
                           Text(
                             CurrencyFormatter.format(widget.spentAmount,
@@ -153,7 +160,8 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                         ],
                       )
                     else
-                      Icon(Icons.add_circle_outline, color: Colors.grey[400]),
+                      Icon(Icons.add_circle_outline,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant),
                   ],
                 ),
                 if (hasActivity) ...[
@@ -165,7 +173,8 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                     borderRadius: BorderRadius.circular(4),
                     child: LinearProgressIndicator(
                       value: 1.0,
-                      backgroundColor: Colors.grey.shade200,
+                      backgroundColor:
+                          Theme.of(context).colorScheme.surfaceContainerHighest,
                       color: activityColor,
                       minHeight: 6,
                     ),
@@ -223,13 +232,13 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
     Color statusColor;
     if (widget.isIncome) {
       statusColor = isOverBudget || progress >= 1.0
-          ? Colors.green
-          : Colors.orange;
+          ? context.semantic.positive
+          : context.semantic.warning;
     } else {
       statusColor = isOverBudget
           ? Theme.of(context).colorScheme.error
           : isNearLimit
-              ? Colors.orange
+              ? context.semantic.warning
               : Theme.of(context).colorScheme.primary;
     }
 
@@ -304,7 +313,9 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                       borderRadius: BorderRadius.circular(2),
                       child: LinearProgressIndicator(
                         value: progress,
-                        backgroundColor: Colors.grey.shade200,
+                        backgroundColor: Theme.of(context)
+                            .colorScheme
+                            .surfaceContainerHighest,
                         color: statusColor,
                         minHeight: 4,
                       ),
@@ -345,7 +356,9 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                                       ? 'Contributed'
                                       : 'Spent',
                               style: TextStyle(
-                                  fontSize: 12, color: Colors.grey[200]),
+                                  fontSize: 12,
+                                  color:
+                                      Theme.of(context).colorScheme.onSurfaceVariant),
                             ),
                             Text(
                               CurrencyFormatter.format(widget.spentAmount,
@@ -378,7 +391,9 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                  fontSize: 12, color: Colors.grey[200]),
+                                  fontSize: 12,
+                                  color:
+                                      Theme.of(context).colorScheme.onSurfaceVariant),
                             ),
                             Text(
                               CurrencyFormatter.format(widget.budgetAmount),
@@ -400,7 +415,8 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                     borderRadius: BorderRadius.circular(4),
                     child: LinearProgressIndicator(
                       value: progress,
-                      backgroundColor: Colors.grey.shade200,
+                      backgroundColor:
+                          Theme.of(context).colorScheme.surfaceContainerHighest,
                       color: statusColor,
                       minHeight: 8,
                     ),
@@ -452,7 +468,7 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                           '${(progress * 100).toStringAsFixed(0)}%',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey[200],
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -466,12 +482,15 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                     Row(
                       children: [
                         Icon(Icons.savings_outlined,
-                            size: 14, color: Colors.grey[300]),
+                            size: 14,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant),
                         const SizedBox(width: 4),
                         Text(
                           'Fund balance: ',
                           style: TextStyle(
-                              fontSize: 12, color: Colors.grey[200]),
+                              fontSize: 12,
+                              color:
+                                  Theme.of(context).colorScheme.onSurfaceVariant),
                         ),
                         Text(
                           CurrencyFormatter.format(widget.accumulatedBalance!,
@@ -543,9 +562,11 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                                       const EdgeInsets.only(left: 12.0),
                                   child: Text(
                                     sub.name,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                         fontSize: 12,
-                                        color: Colors.grey),
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant),
                                   ),
                                 ),
                                 Text(

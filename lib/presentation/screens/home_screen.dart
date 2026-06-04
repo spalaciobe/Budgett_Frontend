@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:budgett_frontend/core/app_spacing.dart';
+import 'package:budgett_frontend/core/app_theme.dart';
 import 'package:budgett_frontend/data/models/account_model.dart';
 import 'package:budgett_frontend/data/models/transaction_model.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
@@ -704,7 +705,7 @@ class _TransactionListTile extends StatelessWidget {
             ? Theme.of(context).colorScheme.onSurfaceVariant
             : isExpense
                 ? Theme.of(context).colorScheme.error
-                : Theme.of(context).colorScheme.secondary;
+                : context.semantic.positive;
 
     final icon = isTransfer
         ? Icons.sync_alt
@@ -860,7 +861,7 @@ class _TransactionListTile extends StatelessWidget {
               ),
               if (isPending) ...[
                 const SizedBox(width: 6),
-                _Badge(label: 'Pending', color: Colors.orange),
+                _Badge(label: 'Pending', color: context.semantic.warning),
               ],
               if (movementLabel != null) ...[
                 const SizedBox(width: 6),

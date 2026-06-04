@@ -24,6 +24,7 @@ class AppTheme {
       useMaterial3: true,
       brightness: Brightness.light,
       visualDensity: VisualDensity.compact,
+      extensions: const <ThemeExtension<dynamic>>[AppSemanticColors.light],
       colorScheme: const ColorScheme.light(
         primary: _primary,
         onPrimary: Colors.white,
@@ -97,6 +98,7 @@ class AppTheme {
       brightness: Brightness.dark,
       visualDensity: VisualDensity.compact,
       scaffoldBackgroundColor: _darkBackground,
+      extensions: const <ThemeExtension<dynamic>>[AppSemanticColors.dark],
       colorScheme: const ColorScheme.dark(
         primary: _primary,
         onPrimary: Colors.white,
@@ -186,4 +188,54 @@ class AppTheme {
       ),
     );
   }
+}
+
+/// Semantic finance colors that aren't part of Material's [ColorScheme].
+///
+/// "Positive" (income / gains) and "warning" (pending / near-limit) need a
+/// single, theme-aware source of truth so the same concept isn't painted with
+/// a different raw `Colors.green`/`Colors.orange` on every screen. "Negative"
+/// already maps cleanly to [ColorScheme.error], so it's not duplicated here.
+/// Values are chosen for ~AA contrast against each theme's surface.
+@immutable
+class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
+  final Color positive;
+  final Color warning;
+
+  const AppSemanticColors({required this.positive, required this.warning});
+
+  /// Darker shades that keep contrast on the light surface (near-white).
+  static const light = AppSemanticColors(
+    positive: Color(0xFF2E7D32), // green 800
+    warning: Color(0xFFC2410C), // burnt orange
+  );
+
+  /// Lighter shades that keep contrast on the dark surface (#1E2229).
+  static const dark = AppSemanticColors(
+    positive: Color(0xFF66BB6A), // green 400
+    warning: Color(0xFFFFB74D), // orange 300
+  );
+
+  @override
+  AppSemanticColors copyWith({Color? positive, Color? warning}) =>
+      AppSemanticColors(
+        positive: positive ?? this.positive,
+        warning: warning ?? this.warning,
+      );
+
+  @override
+  AppSemanticColors lerp(ThemeExtension<AppSemanticColors>? other, double t) {
+    if (other is! AppSemanticColors) return this;
+    return AppSemanticColors(
+      positive: Color.lerp(positive, other.positive, t)!,
+      warning: Color.lerp(warning, other.warning, t)!,
+    );
+  }
+}
+
+extension AppSemanticColorsX on BuildContext {
+  /// Theme-aware semantic finance colors. Falls back to the dark palette if the
+  /// extension somehow isn't registered.
+  AppSemanticColors get semantic =>
+      Theme.of(this).extension<AppSemanticColors>() ?? AppSemanticColors.dark;
 }
