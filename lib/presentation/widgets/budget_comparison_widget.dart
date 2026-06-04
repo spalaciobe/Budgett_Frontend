@@ -150,7 +150,7 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                           ),
                           Text(
                             CurrencyFormatter.format(widget.spentAmount,
-                                decimalDigits: 2),
+                                decimalDigits: 0),
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
@@ -202,9 +202,9 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                         Expanded(
                           child: Text(
                             widget.isIncome
-                                ? '${CurrencyFormatter.format(widget.spentAmount, decimalDigits: 2)} earned — set a target to track progress'
+                                ? '${CurrencyFormatter.format(widget.spentAmount, decimalDigits: 0)} earned — set a target to track progress'
                                 : widget.isSavings
-                                    ? '${CurrencyFormatter.format(widget.spentAmount, decimalDigits: 2)} contributed — set a monthly target to track progress'
+                                    ? '${CurrencyFormatter.format(widget.spentAmount, decimalDigits: 0)} contributed — set a monthly target to track progress'
                                     : 'Spent without a budget — tap to set one',
                             style: TextStyle(
                               fontSize: 11,
@@ -362,7 +362,7 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                             ),
                             Text(
                               CurrencyFormatter.format(widget.spentAmount,
-                                  decimalDigits: 2),
+                                  decimalDigits: 0),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
@@ -453,10 +453,10 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                             widget.isIncome
                                 ? ((isOverBudget || progress >= 1)
                                     ? 'Target reached!'
-                                    : '${CurrencyFormatter.format(widget.budgetAmount - widget.spentAmount, decimalDigits: 2)} to go')
+                                    : '${CurrencyFormatter.format(widget.budgetAmount - widget.spentAmount, decimalDigits: 0)} to go')
                                 : (isOverBudget
-                                    ? 'Over budget by ${CurrencyFormatter.format(widget.spentAmount - widget.budgetAmount, decimalDigits: 2)}'
-                                    : '${CurrencyFormatter.format(widget.budgetAmount - widget.spentAmount, decimalDigits: 2)} remaining'),
+                                    ? 'Over budget by ${CurrencyFormatter.format(widget.spentAmount - widget.budgetAmount, decimalDigits: 0)}'
+                                    : '${CurrencyFormatter.format(widget.budgetAmount - widget.spentAmount, decimalDigits: 0)} remaining'),
                             style: TextStyle(
                               fontSize: 12,
                               color: statusColor,
@@ -494,7 +494,7 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                         ),
                         Text(
                           CurrencyFormatter.format(widget.accumulatedBalance!,
-                              decimalDigits: 2),
+                              decimalDigits: 0),
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
@@ -571,7 +571,7 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                                 ),
                                 Text(
                                   CurrencyFormatter.format(amount,
-                                      decimalDigits: 2),
+                                      decimalDigits: 0),
                                   style: const TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w500),

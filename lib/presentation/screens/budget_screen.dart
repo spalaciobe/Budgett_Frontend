@@ -804,7 +804,7 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Over budget by ${CurrencyFormatter.format(widget.totalSpent - widget.totalBudget, decimalDigits: 2)}',
+                        'Over budget by ${CurrencyFormatter.format(widget.totalSpent - widget.totalBudget, decimalDigits: 0)}',
                         style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -832,7 +832,7 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Spending exceeds actual income by ${CurrencyFormatter.format(widget.totalSpent - widget.monthlyIncome, decimalDigits: 2)}',
+                        'Spending exceeds actual income by ${CurrencyFormatter.format(widget.totalSpent - widget.monthlyIncome, decimalDigits: 0)}',
                         style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,

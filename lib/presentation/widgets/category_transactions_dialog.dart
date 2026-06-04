@@ -135,7 +135,7 @@ class CategoryTransactionsDialog extends ConsumerWidget {
                                   fontWeight: FontWeight.w600, fontSize: 13),
                             ),
                             Text(
-                              CurrencyFormatter.format(net, decimalDigits: 2),
+                              CurrencyFormatter.format(net, decimalDigits: 0),
                               style: const TextStyle(
                                   fontWeight: FontWeight.bold, fontSize: 14),
                             ),
