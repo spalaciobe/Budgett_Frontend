@@ -47,7 +47,9 @@ class BudgetComparisonWidget extends StatefulWidget {
 }
 
 class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
-  bool _expanded = true;
+  // Cards start collapsed so the list shows an overview (name + slim bar + %)
+  // and the Financial Health summary stays in view; tap a card to expand it.
+  bool _expanded = false;
   bool _subExpanded = true;
 
   /// Magnifying-glass button that opens this category's transactions for the
@@ -252,7 +254,7 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
         children: [
           // ── Header row (always visible) ──────────────────────────────────
           InkWell(
-            onTap: widget.onEditBudget,
+            onTap: () => setState(() => _expanded = !_expanded),
             borderRadius: _expanded
                 ? const BorderRadius.only(
                     topLeft: Radius.circular(12),
@@ -288,6 +290,22 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                            minWidth: 44, minHeight: 44),
+                        iconSize: 18,
+                        tooltip: 'Edit budget',
+                        onPressed: widget.onEditBudget,
+                        icon: Icon(
+                          Icons.edit_outlined,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: 0.5),
+                        ),
+                      ),
                       if (widget.onViewTransactions != null)
                         _viewTransactionsButton(context),
                       const SizedBox(width: 4),
