@@ -56,6 +56,7 @@ class CreditCardDetailsBody extends ConsumerWidget {
     // (mostly populated by scheduled installment cuotas) can be tucked into
     // a single collapsed "Upcoming installments" group.
     String? currentPeriod;
+    DateTime? nextPaymentDate;
     final rules = freshAccount.creditCardRules;
     final banks = banksAsync.valueOrNull;
     if (rules != null && banks != null) {
@@ -63,6 +64,7 @@ class CreditCardDetailsBody extends ConsumerWidget {
       if (bank != null) {
         currentPeriod = CreditCardCalculator.determineBillingPeriod(
             DateTime.now(), rules, bank);
+        nextPaymentDate = _computeNextPaymentDate(rules, bank);
       }
     }
 
@@ -102,6 +104,12 @@ class CreditCardDetailsBody extends ConsumerWidget {
                 ),
             ],
           ),
+          if (nextPaymentDate != null &&
+              (freshAccount.balance.abs() > 0 ||
+                  freshAccount.balanceUsd.abs() > 0)) ...[
+            const SizedBox(height: 8),
+            _NextPaymentBanner(date: nextPaymentDate),
+          ],
           const SizedBox(height: 8),
           CreditCardBillingSimulator(
             account: freshAccount,
@@ -625,6 +633,76 @@ class _CutoffPaymentPair {
   final DateTime cutoff;
   final DateTime payment;
   _CutoffPaymentPair(this.cutoff, this.payment);
+}
+
+/// The next statement payment date on/after today, derived from the card's
+/// rules + bank (Colombian business-day adjustments included). Manual calendar
+/// overrides aren't applied here — the authoritative per-cycle list below uses
+/// them; this is a convenience highlight.
+DateTime _computeNextPaymentDate(CreditCardRules rules, Bank bank) {
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final payments = <DateTime>[];
+  for (int i = -1; i <= 2; i++) {
+    final t = DateTime(now.year, now.month + i);
+    final cutoff =
+        CreditCardCalculator.calculateCutoffDate(rules, bank, t.year, t.month);
+    payments.add(CreditCardCalculator.calculatePaymentDate(rules, bank, cutoff));
+  }
+  payments.sort();
+  return payments.firstWhere((d) => !d.isBefore(today),
+      orElse: () => payments.last);
+}
+
+/// Compact banner near "Pay card" showing when the next statement payment is
+/// due, with urgency color (overdue / due soon / upcoming).
+class _NextPaymentBanner extends StatelessWidget {
+  final DateTime date;
+  const _NextPaymentBanner({required this.date});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final days = date.difference(today).inDays;
+    final overdue = days < 0;
+    final urgent = days >= 0 && days <= 3;
+    final color = overdue
+        ? theme.colorScheme.error
+        : urgent
+            ? context.semantic.warning
+            : theme.colorScheme.primary;
+    final dateStr =
+        '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+    final whenText = overdue
+        ? 'overdue by ${-days} ${-days == 1 ? 'day' : 'days'}'
+        : days == 0
+            ? 'due today'
+            : 'in $days ${days == 1 ? 'day' : 'days'}';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.event_outlined, size: 16, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Next payment: $dateStr · $whenText',
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: color, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 /// Wraps all billing periods after the current cycle in a single collapsed
