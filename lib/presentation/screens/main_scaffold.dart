@@ -26,27 +26,6 @@ class MainScaffold extends ConsumerWidget {
   }
 }
 
-// ─── Body width cap (desktop / tablet) ───────────────────────────────────────
-
-/// Caps the body width on large screens so lists and cards don't stretch
-/// full-bleed to ~1440px — which leaves big empty gutters and breaks proximity
-/// (title far left, actions far right). Below the cap (and on mobile, which
-/// never uses this) it's a no-op.
-class _ConstrainedBody extends StatelessWidget {
-  final Widget child;
-  const _ConstrainedBody({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1100),
-        child: child,
-      ),
-    );
-  }
-}
-
 // ─── Desktop shell (sidebar) ──────────────────────────────────────────────────
 
 class _DesktopShell extends ConsumerStatefulWidget {
@@ -69,7 +48,7 @@ class _DesktopShellState extends ConsumerState<_DesktopShell> {
             isExpanded: _isExpanded,
             onToggle: () => setState(() => _isExpanded = !_isExpanded),
           ),
-          Expanded(child: _ConstrainedBody(child: widget.child)),
+          Expanded(child: widget.child),
         ],
       ),
     );
@@ -111,7 +90,7 @@ class _TabletShell extends ConsumerWidget {
             ),
           ),
           const VerticalDivider(width: 1, thickness: 1),
-          Expanded(child: _ConstrainedBody(child: child)),
+          Expanded(child: child),
         ],
       ),
     );
