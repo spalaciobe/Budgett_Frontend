@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/app_text.dart';
 import '../../core/app_theme.dart';
 import '../../data/models/transaction_model.dart';
 import '../utils/currency_formatter.dart';
@@ -79,8 +80,7 @@ class TransactionTile extends StatelessWidget {
     if (t.place != null && t.place!.isNotEmpty) {
       extraLines.add(Text(
         t.place!,
-        style: TextStyle(
-          fontSize: 11,
+        style: AppText.caption.copyWith(
           color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
         ),
         maxLines: 1,
@@ -90,7 +90,7 @@ class TransactionTile extends StatelessWidget {
     if (t.isCrossCurrencyPayment && t.fxRate != null) {
       extraLines.add(Text(
         'Payment in COP @ \$${NumberFormat('#,###', 'en_US').format(t.fxRate!.toInt())}',
-        style: TextStyle(fontSize: 11, color: context.semantic.positive),
+        style: AppText.caption.copyWith(color: context.semantic.positive),
       ));
     }
 
@@ -104,9 +104,7 @@ class TransactionTile extends StatelessWidget {
       ),
       title: Text(
         t.description,
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
+        style: AppText.tileTitle.copyWith(
           decoration: isPending ? TextDecoration.lineThrough : null,
           color: isPending ? Colors.grey : null,
         ),
@@ -115,11 +113,7 @@ class TransactionTile extends StatelessWidget {
       ),
       trailing: Text(
         amountText,
-        style: TextStyle(
-          fontWeight: FontWeight.bold,
-          fontSize: 13,
-          color: amountColor,
-        ),
+        style: AppText.amount.copyWith(color: amountColor),
       ),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -132,7 +126,7 @@ class TransactionTile extends StatelessWidget {
             children: [
               Text(
                 DateFormat('d MMM', 'en').format(t.date),
-                style: const TextStyle(fontSize: 11),
+                style: AppText.caption,
               ),
               if (isPending) const _PendingBadge(),
             ],
@@ -158,11 +152,7 @@ class _PendingBadge extends StatelessWidget {
       ),
       child: Text(
         'Pending',
-        style: TextStyle(
-          fontSize: 10,
-          color: warning,
-          fontWeight: FontWeight.w500,
-        ),
+        style: AppText.badge.copyWith(color: warning),
       ),
     );
   }

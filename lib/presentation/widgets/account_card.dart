@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/app_spacing.dart';
+import '../../core/app_text.dart';
 import '../../data/models/account_model.dart';
 import '../utils/currency_formatter.dart';
 
@@ -48,9 +49,9 @@ class AccountCard extends StatelessWidget {
             : isSavingsWithPockets
                 ? CurrencyFormatter.format(
                     acc.totalBalanceWithPockets,
-                    decimalDigits: 2,
+                    decimalDigits: 0,
                   )
-                : CurrencyFormatter.format(acc.balance, decimalDigits: 2));
+                : CurrencyFormatter.format(acc.balance, decimalDigits: 0));
 
     final gradient = BoxDecoration(
       gradient: LinearGradient(
@@ -82,7 +83,7 @@ class AccountCard extends StatelessWidget {
             (isSavingsWithPockets
                 ? Text(
                     '${acc.pockets.length} $pocketLabel · '
-                    '${CurrencyFormatter.format(acc.pocketsBalance, decimalDigits: 2)} stored',
+                    '${CurrencyFormatter.format(acc.pocketsBalance, decimalDigits: 0)} stored',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
@@ -105,10 +106,8 @@ class AccountCard extends StatelessWidget {
       children: [
         Text(
           acc.name,
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
+          style: AppText.cardName.copyWith(
             color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
-            fontSize: 13,
           ),
           overflow: TextOverflow.ellipsis,
         ),
