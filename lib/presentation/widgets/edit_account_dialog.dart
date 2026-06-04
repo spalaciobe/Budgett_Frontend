@@ -638,7 +638,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                       ),
                       child: Text(
                         _savingsLastInterestDate != null
-                            ? DateFormat('MMM d, y')
+                            ? DateFormat('dd/MM/yyyy')
                                 .format(_savingsLastInterestDate!)
                             : 'Not set',
                         style: _savingsLastInterestDate == null

@@ -282,7 +282,7 @@ class _EditRecurringTransactionDialogState
                       border: OutlineInputBorder(),
                       suffixIcon: Icon(Icons.calendar_today, size: 18),
                     ),
-                    child: Text(DateFormat('MM/dd/yyyy').format(_nextRunDate)),
+                    child: Text(DateFormat('dd/MM/yyyy').format(_nextRunDate)),
                   ),
                 ),
                 kGapMd,

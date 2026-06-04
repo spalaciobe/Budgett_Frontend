@@ -143,7 +143,7 @@ class SettingsScreen extends ConsumerWidget {
                         subtitle: Text('Unavailable'),
                       );
                     }
-                    final dateStr = DateFormat('d MMM yyyy', 'en').format(fxRate.asOfDate);
+                    final dateStr = DateFormat('dd/MM/yyyy', 'en').format(fxRate.asOfDate);
                     final rateStr = NumberFormat('#,##0.00', 'en_US').format(fxRate.rate);
                     return ListTile(
                       leading: const Icon(Icons.currency_exchange),

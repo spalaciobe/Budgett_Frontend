@@ -464,7 +464,7 @@ class CreditCardDetailsBody extends ConsumerWidget {
   }
 
   Widget _buildDateRow(BuildContext context, _CutoffPaymentPair pair) {
-    final dateFormat = DateFormat('d MMM yyyy', 'en');
+    final dateFormat = DateFormat('dd/MM/yyyy', 'en');
     final monthFormat = DateFormat('MMMM', 'en');
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -1338,7 +1338,7 @@ class _EditMonthDialog extends StatefulWidget {
 class _EditMonthDialogState extends State<_EditMonthDialog> {
   late DateTime _cutoff;
   late DateTime _payment;
-  final _fmt = DateFormat('d MMM yyyy', 'en');
+  final _fmt = DateFormat('dd/MM/yyyy', 'en');
 
   @override
   void initState() {

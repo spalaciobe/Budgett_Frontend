@@ -249,7 +249,7 @@ class _InterestSection extends ConsumerWidget {
                                       .withValues(alpha: 0.55),
                                 )),
                             Text(
-                              DateFormat('MMM d, y').format(fromDate!),
+                              DateFormat('dd/MM/yyyy').format(fromDate!),
                               style: theme.textTheme.bodySmall
                                   ?.copyWith(fontWeight: FontWeight.w500),
                             ),
@@ -406,7 +406,7 @@ class _TxTile extends StatelessWidget {
       dense: true,
       title: Text(tx.description, style: theme.textTheme.bodyMedium),
       subtitle: Text(
-        DateFormat('MMM d, y').format(tx.date),
+        DateFormat('dd/MM/yyyy').format(tx.date),
         style: theme.textTheme.bodySmall,
       ),
       trailing: Text(

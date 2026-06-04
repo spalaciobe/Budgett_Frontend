@@ -744,7 +744,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                   children: [
                     Expanded(
                       child: Text(
-                        'Date: ${DateFormat('MM/dd/yyyy').format(_selectedDate)}',
+                        'Date: ${DateFormat('dd/MM/yyyy').format(_selectedDate)}',
                         style: const TextStyle(fontSize: 16),
                       ),
                     ),
