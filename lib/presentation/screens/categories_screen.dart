@@ -3,6 +3,7 @@ import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_spacing.dart';
+import '../../core/app_theme.dart';
 import '../../data/models/category_model.dart';
 import '../providers/finance_provider.dart';
 import '../utils/icon_helper.dart';
@@ -19,18 +20,6 @@ class CategoriesScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Categories'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            tooltip: 'New Category',
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (_) => const CreateCategoryDialog(),
-              );
-            },
-          ),
-        ],
       ),
       body: RefreshIndicator(
         onRefresh: () async {
@@ -51,7 +40,7 @@ class CategoriesScreen extends ConsumerWidget {
               _SectionHeader(
                 label: 'Income',
                 icon: Icons.arrow_downward,
-                color: Colors.green,
+                color: context.semantic.positive,
                 count: income.length,
               ),
               const SizedBox(height: 8),
@@ -61,7 +50,7 @@ class CategoriesScreen extends ConsumerWidget {
               _SectionHeader(
                 label: 'Expenses',
                 icon: Icons.arrow_upward,
-                color: Colors.red,
+                color: Theme.of(context).colorScheme.error,
                 count: expense.length,
               ),
               const SizedBox(height: 8),
@@ -73,16 +62,17 @@ class CategoriesScreen extends ConsumerWidget {
         },
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: FloatingActionButton(
         onPressed: () {
           showDialog(
             context: context,
             builder: (_) => const CreateCategoryDialog(),
           );
         },
-        icon: const Icon(Icons.add),
-        label: const Text('New Category'),
+        tooltip: 'New Category',
+        child: const Icon(Icons.add),
       ),
+
     );
   }
 }
