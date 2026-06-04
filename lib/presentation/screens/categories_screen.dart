@@ -33,31 +33,59 @@ class CategoriesScreen extends ConsumerWidget {
           final income = categories.where((c) => c.type == 'income').toList();
           final expense = categories.where((c) => c.type == 'expense').toList();
 
-          return ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: kScreenPadding,
-            children: [
-              _SectionHeader(
-                label: 'Income',
-                icon: Icons.arrow_downward,
-                color: context.semantic.positive,
-                count: income.length,
-              ),
-              const SizedBox(height: 8),
-              ...income.map((c) => _CategoryTile(category: c, ref: ref)),
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              // Two-column grid of tiles on wide screens, single column on
+              // mobile.
+              final twoCols = constraints.maxWidth >= 720;
+              const gap = 12.0;
+              final itemW = (constraints.maxWidth - 32 - gap) / 2;
 
-              kGapXl,
-              _SectionHeader(
-                label: 'Expenses',
-                icon: Icons.arrow_upward,
-                color: Theme.of(context).colorScheme.error,
-                count: expense.length,
-              ),
-              const SizedBox(height: 8),
-              ...expense.map((c) => _CategoryTile(category: c, ref: ref)),
+              Widget section(List<Category> cats) {
+                if (!twoCols) {
+                  return Column(
+                    children: cats
+                        .map((c) => _CategoryTile(category: c, ref: ref))
+                        .toList(),
+                  );
+                }
+                return Wrap(
+                  spacing: gap,
+                  children: [
+                    for (final c in cats)
+                      SizedBox(
+                        width: itemW,
+                        child: _CategoryTile(category: c, ref: ref),
+                      ),
+                  ],
+                );
+              }
 
-              const SizedBox(height: 64),
-            ],
+              return ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: kScreenPadding,
+                children: [
+                  _SectionHeader(
+                    label: 'Income',
+                    icon: Icons.arrow_downward,
+                    color: context.semantic.positive,
+                    count: income.length,
+                  ),
+                  const SizedBox(height: 8),
+                  section(income),
+                  kGapXl,
+                  _SectionHeader(
+                    label: 'Expenses',
+                    icon: Icons.arrow_upward,
+                    color: Theme.of(context).colorScheme.error,
+                    count: expense.length,
+                  ),
+                  const SizedBox(height: 8),
+                  section(expense),
+                  const SizedBox(height: 64),
+                ],
+              );
+            },
           );
         },
         ),

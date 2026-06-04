@@ -34,12 +34,34 @@ class ExpenseGroupsScreen extends ConsumerWidget {
                 message: 'Create one with the + button to group related spending.',
               );
             }
-            return ListView.builder(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: kScreenPaddingWithFab,
-              itemCount: groups.length,
-              itemBuilder: (context, index) {
-                return _ExpenseGroupCard(group: groups[index]);
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                // Two columns on wide screens, one on mobile, so cards don't
+                // stretch across the whole (capped) width.
+                final twoCols = constraints.maxWidth >= 720;
+                if (!twoCols) {
+                  return ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: kScreenPaddingWithFab,
+                    itemCount: groups.length,
+                    itemBuilder: (context, index) =>
+                        _ExpenseGroupCard(group: groups[index]),
+                  );
+                }
+                const gap = 12.0;
+                final itemW = (constraints.maxWidth - 32 - gap) / 2;
+                return SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: kScreenPaddingWithFab,
+                  child: Wrap(
+                    spacing: gap,
+                    children: [
+                      for (final g in groups)
+                        SizedBox(
+                            width: itemW, child: _ExpenseGroupCard(group: g)),
+                    ],
+                  ),
+                );
               },
             );
           },
