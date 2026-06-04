@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:budgett_frontend/core/app_spacing.dart';
+import 'package:budgett_frontend/core/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../core/utils/credit_card_calculator.dart';
@@ -113,14 +114,16 @@ class CreditCardDetailsBody extends ConsumerWidget {
             children: [
               Expanded(
                 child: _buildStatCard(
-                  context, 'Available COP', availableCop, Colors.green,
+                  context, 'Available COP', availableCop,
+                  context.semantic.positive,
                   isApprox: copIsApprox,
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: _buildStatCard(
-                  context, 'Used COP', freshAccount.balance.abs(), Colors.red,
+                  context, 'Used COP', freshAccount.balance.abs(),
+                  Theme.of(context).colorScheme.error,
                 ),
               ),
             ],
@@ -136,7 +139,7 @@ class CreditCardDetailsBody extends ConsumerWidget {
                     freshAccount.creditLimitUsd > 0
                         ? freshAccount.creditLimitUsd + freshAccount.balanceUsd
                         : 0,
-                    Colors.green,
+                    context.semantic.positive,
                     currency: 'USD',
                   ),
                 ),
@@ -146,7 +149,7 @@ class CreditCardDetailsBody extends ConsumerWidget {
                     context,
                     'Used USD',
                     freshAccount.balanceUsd.abs(),
-                    Colors.red,
+                    Theme.of(context).colorScheme.error,
                     currency: 'USD',
                   ),
                 ),
