@@ -146,7 +146,7 @@ class _CategoryTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       child: ExpansionTile(
         leading: CircleAvatar(
-          backgroundColor: color.withOpacity(0.15),
+          backgroundColor: color.withValues(alpha: 0.15),
           child: Icon(iconData, color: color, size: 20),
         ),
         title: Row(

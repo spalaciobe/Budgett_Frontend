@@ -61,7 +61,7 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
       tooltip: 'View transactions',
       icon: Icon(
         Icons.search,
-        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
       ),
       onPressed: widget.onViewTransactions,
     );
@@ -175,7 +175,7 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: activityColor.withOpacity(0.1),
+                      color: activityColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
@@ -292,7 +292,7 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                           color: Theme.of(context)
                               .colorScheme
                               .onSurface
-                              .withOpacity(0.5),
+                              .withValues(alpha: 0.5),
                         ),
                       ),
                     ],
@@ -413,7 +413,7 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.1),
+                      color: statusColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
@@ -505,7 +505,7 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                               color: Theme.of(context)
                                   .colorScheme
                                   .onSurface
-                                  .withOpacity(0.5),
+                                  .withValues(alpha: 0.5),
                             ),
                           ),
                           const SizedBox(width: 4),
@@ -517,7 +517,7 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                             color: Theme.of(context)
                                 .colorScheme
                                 .onSurface
-                                .withOpacity(0.4),
+                                .withValues(alpha: 0.4),
                           ),
                         ],
                       ),
@@ -616,7 +616,7 @@ class _CategoryIconButtonState extends State<_CategoryIconButton> {
         },
         child: CircleAvatar(
           backgroundColor:
-              widget.color?.withOpacity(0.5) ?? Colors.grey.withOpacity(0.5),
+              widget.color?.withValues(alpha: 0.5) ?? Colors.grey.withValues(alpha: 0.5),
           radius: 16,
           child: _isHovered
               ? const Icon(Icons.more_horiz, color: Colors.white, size: 20)

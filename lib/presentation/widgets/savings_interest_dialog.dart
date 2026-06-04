@@ -133,7 +133,7 @@ class _SavingsInterestDialogState
                 '${apy.toStringAsFixed(2)}% E.A. · ${CurrencyFormatter.format(widget.account.balance)} balance'
                 '${days != null ? ' · $days days accrued' : ''}',
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurface.withOpacity(0.65),
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
                 ),
               ),
               if (fromDate != null) ...[
@@ -141,7 +141,7 @@ class _SavingsInterestDialogState
                 Text(
                   'Period: ${DateFormat('MMM d, y').format(fromDate)} → ${DateFormat('MMM d, y').format(_recordDate)}',
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurface.withOpacity(0.65),
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
                   ),
                 ),
               ],
@@ -156,7 +156,7 @@ class _SavingsInterestDialogState
                         horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
                       color: theme.colorScheme.primaryContainer
-                          .withOpacity(0.35),
+                          .withValues(alpha: 0.35),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
@@ -252,7 +252,7 @@ class _SavingsInterestDialogState
                       horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     color: theme.colorScheme.secondaryContainer
-                        .withOpacity(0.4),
+                        .withValues(alpha: 0.4),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
@@ -260,7 +260,7 @@ class _SavingsInterestDialogState
                       Icon(Icons.info_outline,
                           size: 16,
                           color:
-                              theme.colorScheme.onSurface.withOpacity(0.6)),
+                              theme.colorScheme.onSurface.withValues(alpha: 0.6)),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -268,7 +268,7 @@ class _SavingsInterestDialogState
                           'then update the account rate.',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurface
-                                .withOpacity(0.65),
+                                .withValues(alpha: 0.65),
                           ),
                         ),
                       ),
@@ -317,7 +317,7 @@ class _SegmentBreakdown extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final dimStyle = theme.textTheme.bodySmall?.copyWith(
-      color: theme.colorScheme.onSurface.withOpacity(0.6),
+      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
     );
     final valueStyle =
         theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600);
@@ -373,7 +373,7 @@ class _SegmentBreakdown extends StatelessWidget {
 
     return Card(
       elevation: 0,
-      color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.4),
+      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),

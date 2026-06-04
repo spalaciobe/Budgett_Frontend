@@ -139,7 +139,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                   color: Theme.of(context)
                       .colorScheme
                       .onSurface
-                      .withOpacity(0.5)),
+                      .withValues(alpha: 0.5)),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
@@ -539,7 +539,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                     color: Theme.of(context)
                         .colorScheme
                         .primaryContainer
-                        .withOpacity(0.5),
+                        .withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
@@ -587,7 +587,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                     color: Theme.of(context)
                         .colorScheme
                         .tertiaryContainer
-                        .withOpacity(0.5),
+                        .withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Row(
@@ -692,7 +692,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                                   Text(
                                     'Date',
                                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.6),
+                                      color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.6),
                                     ),
                                   ),
                                   const SizedBox(height: 4),

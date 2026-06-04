@@ -725,7 +725,7 @@ class _CyclePickerTile extends StatelessWidget {
               '(current)',
               style: TextStyle(
                 fontSize: 11,
-                color: theme.colorScheme.onSurface.withOpacity(0.55),
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
               ),
             ),
           ],
@@ -737,7 +737,7 @@ class _CyclePickerTile extends StatelessWidget {
           fontWeight: FontWeight.w600,
           color: total > 0
               ? theme.colorScheme.error
-              : theme.colorScheme.onSurface.withOpacity(0.55),
+              : theme.colorScheme.onSurface.withValues(alpha: 0.55),
         ),
       ),
     );

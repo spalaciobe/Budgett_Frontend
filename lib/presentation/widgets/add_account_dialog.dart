@@ -572,7 +572,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                   Text(
                     'If your card has a USD balance, enter it here.',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.7),
+                          color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                         ),
                   ),
                   const SizedBox(height: 12),
@@ -606,11 +606,11 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFF441A).withOpacity(0.08),
+                        color: const Color(0xFFFF441A).withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
                             color:
-                                const Color(0xFFFF441A).withOpacity(0.3)),
+                                const Color(0xFFFF441A).withValues(alpha: 0.3)),
                       ),
                       child: Row(
                         children: [
@@ -701,7 +701,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                                   color: Theme.of(context)
                                       .colorScheme
                                       .onSurface
-                                      .withOpacity(0.55),
+                                      .withValues(alpha: 0.55),
                                 ),
                       ),
                     ],
@@ -922,13 +922,13 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                         color: Theme.of(context)
                             .colorScheme
                             .primaryContainer
-                            .withOpacity(0.4),
+                            .withValues(alpha: 0.4),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
                           color: Theme.of(context)
                               .colorScheme
                               .primary
-                              .withOpacity(0.25),
+                              .withValues(alpha: 0.25),
                         ),
                       ),
                       child: Row(

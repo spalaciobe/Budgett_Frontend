@@ -163,7 +163,7 @@ class _SwapHoldingDialogState extends ConsumerState<SwapHoldingDialog> {
                   'Moves quantity between two holdings without touching cash. '
                   'Use for COPW → BTC, BTC → ETH, etc.',
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                 ),
                 const SizedBox(height: 16),

@@ -224,9 +224,9 @@ class CreditCardBillingSimulator extends ConsumerWidget {
                Container(
                  padding: const EdgeInsets.all(8),
                  decoration: BoxDecoration(
-                   color: Colors.orange.withOpacity(0.1),
+                   color: Colors.orange.withValues(alpha: 0.1),
                    borderRadius: BorderRadius.circular(8),
-                   border: Border.all(color: Colors.orange.withOpacity(0.3))
+                   border: Border.all(color: Colors.orange.withValues(alpha: 0.3))
                  ),
                  child: Row(
                    children: [
@@ -293,7 +293,7 @@ class CreditCardBillingSimulator extends ConsumerWidget {
                 left: 0,
                 right: 0,
                 top: lineTop,
-                child: Container(height: 2, color: Colors.grey.withOpacity(0.3)),
+                child: Container(height: 2, color: Colors.grey.withValues(alpha: 0.3)),
               ),
               _buildTimelineNode(context, width, 0.0, 'Start', cycleStart, color: primary, lineTop: lineTop),
               _buildTimelineNode(context, width, todayRatio, 'Today', today, color: primary, isPrimary: true, above: todayAbove, lineTop: lineTop),
@@ -330,7 +330,7 @@ class CreditCardBillingSimulator extends ConsumerWidget {
         border: isPrimary ? Border.all(color: Colors.white, width: 2) : null,
         boxShadow: [
           if (isPrimary)
-            BoxShadow(color: color.withOpacity(0.4), blurRadius: 4, spreadRadius: 2),
+            BoxShadow(color: color.withValues(alpha: 0.4), blurRadius: 4, spreadRadius: 2),
         ],
       ),
     );

@@ -43,7 +43,7 @@ class PortfolioDonutChart extends StatelessWidget {
           child: Text(
             'No data to show',
             style: TextStyle(
-              color: theme.colorScheme.onSurface.withOpacity(0.5),
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
             ),
           ),
         ),
@@ -81,7 +81,7 @@ class PortfolioDonutChart extends StatelessWidget {
                     centerLabel,
                     style: TextStyle(
                       fontSize: 11,
-                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -126,7 +126,7 @@ class PortfolioDonutChart extends StatelessWidget {
                     Text(
                       s.trailing!,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurface.withOpacity(0.55),
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
                       ),
                     ),
                   ],

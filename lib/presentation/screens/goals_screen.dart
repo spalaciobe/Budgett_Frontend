@@ -171,7 +171,7 @@ class GoalsScreen extends ConsumerWidget {
                                           Container(
                                             height: 10,
                                             decoration: BoxDecoration(
-                                              color: Colors.green.withOpacity(0.3),
+                                              color: Colors.green.withValues(alpha: 0.3),
                                               borderRadius: BorderRadius.circular(5),
                                             ),
                                           ),
@@ -183,7 +183,7 @@ class GoalsScreen extends ConsumerWidget {
                                             child: CustomPaint(
                                               size: const Size(2, 10),
                                               painter: _DottedVerticalLinePainter(
-                                                color: Colors.black.withOpacity(0.35),
+                                                color: Colors.black.withValues(alpha: 0.35),
                                               ),
                                             ),
                                           ),
@@ -216,7 +216,7 @@ class GoalsScreen extends ConsumerWidget {
                           decoration: BoxDecoration(
                             // Removed explicit background color and border as per request "Dont use white background"
                             // Using a subtle surface tone or transparent
-                            color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5), 
+                            color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5), 
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Column(
@@ -243,9 +243,9 @@ class GoalsScreen extends ConsumerWidget {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                   decoration: BoxDecoration(
-                                    color: Colors.red.withOpacity(0.1),
+                                    color: Colors.red.withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: Colors.red.withOpacity(0.2)),
+                                    border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
                                   ),
                                   child: FittedBox(
                                     fit: BoxFit.scaleDown,
@@ -271,9 +271,9 @@ class GoalsScreen extends ConsumerWidget {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                   decoration: BoxDecoration(
-                                    color: Colors.green.withOpacity(0.1),
+                                    color: Colors.green.withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: Colors.green.withOpacity(0.2)),
+                                    border: Border.all(color: Colors.green.withValues(alpha: 0.2)),
                                   ),
                                   child: FittedBox(
                                     fit: BoxFit.scaleDown,

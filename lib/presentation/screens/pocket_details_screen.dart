@@ -143,12 +143,12 @@ class _BalanceHeader extends StatelessWidget {
               Text(
                 'Pocket of ${parent!.name}',
                 style: theme.textTheme.labelSmall?.copyWith(
-                  color: theme.colorScheme.onSurface.withOpacity(0.55),
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
                 ),
               ),
             Text('Balance',
                 style: theme.textTheme.labelLarge?.copyWith(
-                  color: theme.colorScheme.onSurface.withOpacity(0.6),
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                 )),
             const SizedBox(height: 4),
             Text(
@@ -245,7 +245,7 @@ class _InterestSection extends ConsumerWidget {
                             Text('Since',
                                 style: theme.textTheme.labelSmall?.copyWith(
                                   color: theme.colorScheme.onSurface
-                                      .withOpacity(0.55),
+                                      .withValues(alpha: 0.55),
                                 )),
                             Text(
                               DateFormat('MMM d, y').format(fromDate!),
@@ -256,7 +256,7 @@ class _InterestSection extends ConsumerWidget {
                               '${DateTime.now().difference(fromDate).inDays} days',
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: theme.colorScheme.onSurface
-                                    .withOpacity(0.55),
+                                    .withValues(alpha: 0.55),
                               ),
                             ),
                             if (segments.isNotEmpty)
@@ -312,7 +312,7 @@ class _SetStartDatePrompt extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     return Card(
-      color: theme.colorScheme.secondaryContainer.withOpacity(0.5),
+      color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.5),
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
@@ -322,14 +322,14 @@ class _SetStartDatePrompt extends ConsumerWidget {
             Icon(Icons.calendar_today,
                 size: 18,
                 color: theme.colorScheme.onSecondaryContainer
-                    .withOpacity(0.7)),
+                    .withValues(alpha: 0.7)),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 'Set a start date to begin tracking daily accrued interest.',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSecondaryContainer
-                      .withOpacity(0.8),
+                      .withValues(alpha: 0.8),
                 ),
               ),
             ),
@@ -380,7 +380,7 @@ class _StatItem extends StatelessWidget {
       children: [
         Text(label,
             style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.55))),
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.55))),
         Text(
           value,
           style: theme.textTheme.titleMedium

@@ -452,7 +452,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             color: Theme.of(context)
                                 .colorScheme
                                 .onSurface
-                                .withOpacity(0.5),
+                                .withValues(alpha: 0.5),
                           ),
                         ),
                       ),
@@ -560,7 +560,7 @@ class _SheetHandle extends StatelessWidget {
         width: 36,
         height: 4,
         decoration: BoxDecoration(
-          color: Colors.grey.withOpacity(0.3),
+          color: Colors.grey.withValues(alpha: 0.3),
           borderRadius: BorderRadius.circular(2),
         ),
       ),
@@ -602,7 +602,7 @@ class _TransferDetails extends StatelessWidget {
   Widget build(BuildContext context) {
     final textStyle = TextStyle(
       fontSize: 12,
-      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
     );
     return Row(
       children: [
@@ -644,7 +644,7 @@ class _Badge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
@@ -699,7 +699,7 @@ class _TransactionListTile extends StatelessWidget {
     final isTransfer = t.type == 'transfer';
 
     final typeColor = isPending
-        ? Theme.of(context).colorScheme.onSurface.withOpacity(0.4)
+        ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)
         : isTransfer
             ? Theme.of(context).colorScheme.onSurfaceVariant
             : isExpense
@@ -753,7 +753,7 @@ class _TransactionListTile extends StatelessWidget {
         );
       },
       leading: CircleAvatar(
-        backgroundColor: typeColor.withOpacity(0.12),
+        backgroundColor: typeColor.withValues(alpha: 0.12),
         child: Icon(icon, color: typeColor, size: 20),
       ),
       title: Row(
@@ -795,7 +795,7 @@ class _TransactionListTile extends StatelessWidget {
                     color: Theme.of(context)
                         .colorScheme
                         .onSurface
-                        .withOpacity(0.5),
+                        .withValues(alpha: 0.5),
                   ),
                 ),
             ],
@@ -839,7 +839,7 @@ class _TransactionListTile extends StatelessWidget {
                       color: Theme.of(context)
                           .colorScheme
                           .onSurface
-                          .withOpacity(0.6),
+                          .withValues(alpha: 0.6),
                     ),
                   ),
                 ),
@@ -855,7 +855,7 @@ class _TransactionListTile extends StatelessWidget {
                   color: Theme.of(context)
                       .colorScheme
                       .onSurface
-                      .withOpacity(0.45),
+                      .withValues(alpha: 0.45),
                 ),
               ),
               if (isPending) ...[
@@ -957,7 +957,7 @@ class _InstallmentGroupTileState extends State<_InstallmentGroupTile> {
             clipBehavior: Clip.none,
             children: [
               CircleAvatar(
-                backgroundColor: color.withOpacity(0.12),
+                backgroundColor: color.withValues(alpha: 0.12),
                 child: Icon(Icons.layers_outlined, color: color, size: 20),
               ),
               Positioned(
@@ -970,7 +970,7 @@ class _InstallmentGroupTileState extends State<_InstallmentGroupTile> {
                     color: theme.colorScheme.surface,
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(
-                      color: color.withOpacity(0.4),
+                      color: color.withValues(alpha: 0.4),
                       width: 0.8,
                     ),
                   ),
@@ -1014,7 +1014,7 @@ class _InstallmentGroupTileState extends State<_InstallmentGroupTile> {
                     '× $numCuotas · ${CurrencyFormatter.format(total, decimalDigits: 0)}',
                     style: TextStyle(
                       fontSize: 10,
-                      color: theme.colorScheme.onSurface.withOpacity(0.5),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
                   ),
                 ],
@@ -1048,7 +1048,7 @@ class _InstallmentGroupTileState extends State<_InstallmentGroupTile> {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 12,
-                          color: theme.colorScheme.onSurface.withOpacity(0.6),
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                         ),
                       ),
                     ),
@@ -1060,7 +1060,7 @@ class _InstallmentGroupTileState extends State<_InstallmentGroupTile> {
                   Icon(
                     Icons.event_outlined,
                     size: 11,
-                    color: theme.colorScheme.onSurface.withOpacity(0.45),
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
                   ),
                   const SizedBox(width: 3),
                   Text(
@@ -1069,7 +1069,7 @@ class _InstallmentGroupTileState extends State<_InstallmentGroupTile> {
                         : 'Paid · ${_formatDate(nextDue.toLocal())}',
                     style: TextStyle(
                       fontSize: 11,
-                      color: theme.colorScheme.onSurface.withOpacity(0.45),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
                     ),
                   ),
                   const SizedBox(width: 6),
@@ -1085,7 +1085,7 @@ class _InstallmentGroupTileState extends State<_InstallmentGroupTile> {
                   Icon(
                     _expanded ? Icons.expand_less : Icons.expand_more,
                     size: 16,
-                    color: theme.colorScheme.onSurface.withOpacity(0.5),
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                   ),
                 ],
               ),
@@ -1095,7 +1095,7 @@ class _InstallmentGroupTileState extends State<_InstallmentGroupTile> {
         ),
         if (_expanded)
           Container(
-            color: theme.colorScheme.onSurface.withOpacity(0.025),
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.025),
             padding: const EdgeInsets.only(left: 20),
             child: Column(
               children: [

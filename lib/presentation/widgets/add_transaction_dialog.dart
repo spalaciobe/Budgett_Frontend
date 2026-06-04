@@ -104,7 +104,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
               const SizedBox(width: 16),
               Icon(Icons.subdirectory_arrow_right,
                   size: 12,
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
@@ -591,7 +591,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
           children: [
             TableRow(
               decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.12)),
+                  color: Colors.grey.withValues(alpha: 0.12)),
               children: const [
                 Padding(
                   padding: EdgeInsets.symmetric(vertical: 4, horizontal: 4),

@@ -212,7 +212,7 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: Colors.blue.withOpacity(0.12),
+                                      color: Colors.blue.withValues(alpha: 0.12),
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: Text('USD',
@@ -321,13 +321,13 @@ class _PortfolioEmptyState extends StatelessWidget {
           Icon(
             Icons.pie_chart_outline,
             size: 48,
-            color: theme.colorScheme.onSurface.withOpacity(0.3),
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
           ),
           const SizedBox(height: 12),
           Text(
             'No positions to show',
             style: theme.textTheme.titleSmall?.copyWith(
-              color: theme.colorScheme.onSurface.withOpacity(0.6),
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
             ),
           ),
           const SizedBox(height: 4),
@@ -335,7 +335,7 @@ class _PortfolioEmptyState extends StatelessWidget {
             'Add FIC, crypto or stock investment accounts\nto see your consolidated portfolio here.',
             textAlign: TextAlign.center,
             style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurface.withOpacity(0.5),
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
             ),
           ),
         ],
@@ -382,7 +382,7 @@ class _PortfolioContent extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primaryContainer.withOpacity(0.5),
+                    color: theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: const Text('≈', style: TextStyle(fontSize: 11)),
@@ -411,7 +411,7 @@ class _PortfolioContent extends StatelessWidget {
                         'Total value',
                         style: theme.textTheme.labelSmall?.copyWith(
                           color:
-                              theme.colorScheme.onSurface.withOpacity(0.55),
+                              theme.colorScheme.onSurface.withValues(alpha: 0.55),
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -433,7 +433,7 @@ class _PortfolioContent extends StatelessWidget {
                         'P&L',
                         style: theme.textTheme.labelSmall?.copyWith(
                           color:
-                              theme.colorScheme.onSurface.withOpacity(0.55),
+                              theme.colorScheme.onSurface.withValues(alpha: 0.55),
                         ),
                       ),
                       const SizedBox(height: 2),

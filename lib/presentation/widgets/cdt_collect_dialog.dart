@@ -108,7 +108,7 @@ class _CdtCollectDialogState extends ConsumerState<CdtCollectDialog> {
                       color: Theme.of(context)
                           .colorScheme
                           .onSurface
-                          .withOpacity(0.65),
+                          .withValues(alpha: 0.65),
                     ),
               ),
               const SizedBox(height: 10),

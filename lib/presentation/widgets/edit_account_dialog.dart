@@ -648,7 +648,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                                     color: Theme.of(context)
                                         .colorScheme
                                         .onSurface
-                                        .withOpacity(0.45))
+                                        .withValues(alpha: 0.45))
                             : null,
                       ),
                     ),

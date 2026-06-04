@@ -87,7 +87,7 @@ class _EditRecurringTransactionDialogState
               const SizedBox(width: 16),
               Icon(Icons.subdirectory_arrow_right,
                   size: 12,
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(

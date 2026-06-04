@@ -250,7 +250,7 @@ class CreditCardDetailsBody extends ConsumerWidget {
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
                             color: currency == 'USD'
-                                ? Colors.blue.withOpacity(0.12)
+                                ? Colors.blue.withValues(alpha: 0.12)
                                 : Theme.of(context).colorScheme.primaryContainer,
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -351,7 +351,7 @@ class CreditCardDetailsBody extends ConsumerWidget {
           child: Column(
             children: [
               Icon(Icons.rule, size: 48,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.4)),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.4)),
               const SizedBox(height: 12),
               Text(
                 'No statement and payment rules configured',
@@ -846,7 +846,7 @@ class _CreditCardRulesBottomSheetState extends ConsumerState<_CreditCardRulesBot
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.3),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -885,9 +885,9 @@ class _CreditCardRulesBottomSheetState extends ConsumerState<_CreditCardRulesBot
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFF441A).withOpacity(0.08),
+                  color: const Color(0xFFFF441A).withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFFF441A).withOpacity(0.3)),
+                  border: Border.all(color: const Color(0xFFFF441A).withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
@@ -1044,7 +1044,7 @@ class _BillingCalendarSheetState extends ConsumerState<_BillingCalendarSheet> {
               child: Container(
                 width: 40, height: 4,
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.3),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),

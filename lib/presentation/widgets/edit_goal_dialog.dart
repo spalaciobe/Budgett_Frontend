@@ -301,7 +301,7 @@ class _EditGoalDialogState extends ConsumerState<EditGoalDialog> {
                             Text(
                               'Deadline (optional)',
                               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.6),
+                                color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.6),
                               ),
                             ),
                             const SizedBox(height: 4),

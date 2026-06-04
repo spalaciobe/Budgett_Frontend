@@ -377,7 +377,7 @@ class _SidebarItem extends StatelessWidget {
     final theme = Theme.of(context);
     final color = isSelected
         ? theme.colorScheme.primary
-        : theme.iconTheme.color?.withOpacity(0.7);
+        : theme.iconTheme.color?.withValues(alpha: 0.7);
 
     return InkWell(
       onTap: onTap,
@@ -387,7 +387,7 @@ class _SidebarItem extends StatelessWidget {
         padding: EdgeInsets.symmetric(horizontal: isExpanded ? 12 : 8),
         decoration: BoxDecoration(
           color: isSelected
-              ? theme.colorScheme.primary.withOpacity(0.1)
+              ? theme.colorScheme.primary.withValues(alpha: 0.1)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
         ),

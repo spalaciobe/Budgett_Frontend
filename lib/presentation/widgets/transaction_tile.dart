@@ -59,8 +59,8 @@ class TransactionTile extends StatelessWidget {
     }
 
     final dotColor = isPending
-        ? Colors.orange.withOpacity(0.6)
-        : typeColor.withOpacity(0.6);
+        ? Colors.orange.withValues(alpha: 0.6)
+        : typeColor.withValues(alpha: 0.6);
 
     final String sign;
     if (!showSign || isTransfer) {
@@ -80,7 +80,7 @@ class TransactionTile extends StatelessWidget {
         t.place!,
         style: TextStyle(
           fontSize: 11,
-          color: theme.colorScheme.onSurface.withOpacity(0.6),
+          color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
         ),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
@@ -151,7 +151,7 @@ class _PendingBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
       decoration: BoxDecoration(
-        color: Colors.orange.withOpacity(0.15),
+        color: Colors.orange.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(4),
       ),
       child: const Text(

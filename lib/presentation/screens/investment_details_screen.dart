@@ -332,7 +332,7 @@ class _SummaryHeader extends StatelessWidget {
               children: [
                 Text('Total Value',
                     style: theme.textTheme.labelLarge?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                     )),
                 if (isApprox) ...[
                   const SizedBox(width: 6),
@@ -345,8 +345,8 @@ class _SummaryHeader extends StatelessWidget {
                       visualDensity: VisualDensity.compact,
                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       backgroundColor: isStale
-                          ? Colors.orange.withOpacity(0.2)
-                          : theme.colorScheme.primaryContainer.withOpacity(0.5),
+                          ? Colors.orange.withValues(alpha: 0.2)
+                          : theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
                     ),
                   ),
                 ],
@@ -365,7 +365,7 @@ class _SummaryHeader extends StatelessWidget {
                 CurrencyFormatter.formatApprox(totalValue.totalCop,
                     currency: 'COP'),
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurface.withOpacity(0.5),
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                 ),
               ),
             ],
@@ -379,13 +379,13 @@ class _SummaryHeader extends StatelessWidget {
                   Icon(
                     Icons.account_balance_wallet_outlined,
                     size: 16,
-                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                   const SizedBox(width: 4),
                   Text(
                     'Funded ',
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                   ),
                   Text(
@@ -405,13 +405,13 @@ class _SummaryHeader extends StatelessWidget {
                   Icon(
                     Icons.savings_outlined,
                     size: 16,
-                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                   const SizedBox(width: 4),
                   Text(
                     'Invested ',
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                   ),
                   Text(
@@ -448,7 +448,7 @@ class _SummaryHeader extends StatelessWidget {
               Text(
                 'Prices updated ${_timeAgo(oldestPrice)}',
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurface.withOpacity(0.5),
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                 ),
               ),
             ],
@@ -1394,7 +1394,7 @@ class _StatItem extends StatelessWidget {
       children: [
         Text(label,
             style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurface.withOpacity(0.55),
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
             )),
         const SizedBox(height: 2),
         Text(

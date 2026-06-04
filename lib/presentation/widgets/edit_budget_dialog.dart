@@ -97,7 +97,7 @@ class _EditBudgetDialogState extends ConsumerState<EditBudgetDialog> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.2),
+                color: color.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
@@ -120,7 +120,7 @@ class _EditBudgetDialogState extends ConsumerState<EditBudgetDialog> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: isIncome ? Colors.green.withOpacity(0.2) : Colors.orange.withOpacity(0.2),
+                    color: isIncome ? Colors.green.withValues(alpha: 0.2) : Colors.orange.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(

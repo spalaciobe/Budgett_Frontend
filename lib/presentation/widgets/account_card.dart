@@ -58,7 +58,7 @@ class AccountCard extends StatelessWidget {
         end: Alignment.bottomRight,
         colors: [
           theme.colorScheme.surface,
-          theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+          theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         ],
       ),
     );
@@ -67,7 +67,7 @@ class AccountCard extends StatelessWidget {
       width: 40,
       height: 40,
       decoration: BoxDecoration(
-        color: theme.colorScheme.primary.withOpacity(0.1),
+        color: theme.colorScheme.primary.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
       ),
       child: _buildIcon(acc, theme),
@@ -84,7 +84,7 @@ class AccountCard extends StatelessWidget {
                     '${acc.pockets.length} $pocketLabel · '
                     '${CurrencyFormatter.format(acc.pocketsBalance, decimalDigits: 2)} stored',
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacity(0.5),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -92,7 +92,7 @@ class AccountCard extends StatelessWidget {
                 : Text(
                     CurrencyFormatter.format(acc.balanceUsd, currency: 'USD'),
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacity(0.5),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -107,7 +107,7 @@ class AccountCard extends StatelessWidget {
           acc.name,
           style: TextStyle(
             fontWeight: FontWeight.w600,
-            color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+            color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
             fontSize: 13,
           ),
           overflow: TextOverflow.ellipsis,
