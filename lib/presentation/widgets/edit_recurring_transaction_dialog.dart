@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
@@ -171,7 +172,7 @@ class _EditRecurringTransactionDialogState
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(content: Text(friendlyError(e))),
         );
       }
     } finally {
@@ -301,7 +302,7 @@ class _EditRecurringTransactionDialogState
                     );
                   },
                   loading: () => const LinearProgressIndicator(),
-                  error: (e, _) => Text('Accounts error: $e'),
+                  error: (e, _) => Text(friendlyError(e)),
                 ),
                 kGapMd,
                 categoriesAsync.when(
@@ -358,7 +359,7 @@ class _EditRecurringTransactionDialogState
                     );
                   },
                   loading: () => const LinearProgressIndicator(),
-                  error: (e, _) => Text('Categories error: $e'),
+                  error: (e, _) => Text(friendlyError(e)),
                 ),
                 kGapMd,
                 SwitchListTile(

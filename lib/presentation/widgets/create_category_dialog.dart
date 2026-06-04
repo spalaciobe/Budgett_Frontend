@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/data/models/category_model.dart';
@@ -298,7 +299,7 @@ class _CreateCategoryDialogState extends ConsumerState<CreateCategoryDialog> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error creating category: $e')),
+          SnackBar(content: Text(friendlyError(e))),
         );
       }
     } finally {
@@ -341,8 +342,9 @@ class _SavingsTargetAccountField extends ConsumerWidget {
     final accountsAsync = ref.watch(accountsProvider);
     return accountsAsync.when(
       loading: () => const LinearProgressIndicator(minHeight: 2),
-      error: (e, _) => Text('Could not load accounts: $e',
-          style: const TextStyle(fontSize: 12, color: Colors.red)),
+      error: (e, _) => Text(friendlyError(e),
+          style: TextStyle(
+              fontSize: 12, color: Theme.of(context).colorScheme.error)),
       data: (accounts) {
         final List<({String id, String label})> options = [];
         for (final a in accounts) {

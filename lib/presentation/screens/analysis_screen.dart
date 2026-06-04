@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:budgett_frontend/core/responsive.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -132,7 +133,7 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
                   );
                 },
                 loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e,s) => Center(child: Text('Error: $e')),
+                error: (e,s) => Center(child: Text(friendlyError(e))),
               ),
             ),
             kGapXl,
@@ -298,7 +299,7 @@ class _ConsolidatedPortfolioSection extends ConsumerWidget {
       ),
       error: (e, _) => Padding(
         padding: const EdgeInsets.all(16),
-        child: Text('Error loading portfolio: $e'),
+        child: Text(friendlyError(e)),
       ),
       data: (p) {
         if (p.isEmpty) return const _PortfolioEmptyState();

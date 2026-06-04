@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_spacing.dart';
@@ -38,7 +39,7 @@ class CategoriesScreen extends ConsumerWidget {
         },
         child: categoriesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        error: (e, _) => Center(child: Text(friendlyError(e))),
         data: (categories) {
           final income = categories.where((c) => c.type == 'income').toList();
           final expense = categories.where((c) => c.type == 'expense').toList();
@@ -251,7 +252,7 @@ class _CategoryTile extends StatelessWidget {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error deleting: $e')),
+          SnackBar(content: Text(friendlyError(e))),
         );
       }
     }

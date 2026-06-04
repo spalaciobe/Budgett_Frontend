@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 
@@ -90,7 +91,7 @@ class InvestmentDetailsScreen extends ConsumerWidget {
             physics: const AlwaysScrollableScrollPhysics(),
             children: [
               const SizedBox(height: 200),
-              Center(child: Text('Error: $e')),
+              Center(child: Text(friendlyError(e))),
             ],
           ),
           data: (holdings) {
@@ -172,7 +173,7 @@ class _Body extends ConsumerWidget {
           const SizedBox(height: 8),
           txAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Text('Error: $e'),
+            error: (e, _) => Text(friendlyError(e)),
             data: (txs) {
               if (txs.isEmpty) {
                 return const Text('No transactions yet.');
@@ -259,7 +260,7 @@ Future<void> _confirmDeleteSwap(
   } catch (e) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error deleting swap: $e')),
+        SnackBar(content: Text(friendlyError(e))),
       );
     }
   }
@@ -1062,7 +1063,7 @@ class _InvestmentHistoryChartState
                 height: 220,
                 child: Center(child: CircularProgressIndicator()),
               ),
-              error: (e, _) => Text('Error loading history: $e'),
+              error: (e, _) => Text(friendlyError(e)),
               data: (history) {
                 if (isAll) {
                   final currencies =
@@ -1437,7 +1438,7 @@ class InvestmentDetailsBody extends ConsumerWidget {
 
     return holdingsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Error: $e')),
+      error: (e, _) => Center(child: Text(friendlyError(e))),
       data: (holdings) => _Body(
         account: account,
         details: details,
@@ -1519,7 +1520,7 @@ class _UpdatePricesButtonState extends ConsumerState<_UpdatePricesButton> {
           SnackBar(
             duration: const Duration(seconds: 4),
             showCloseIcon: true,
-            content: Text('Updated $updated, skipped: $symbols'),
+            content: Text(friendlyError(symbols)),
             action: SnackBarAction(
               label: 'Edit manually',
               onPressed: () {
@@ -1535,7 +1536,7 @@ class _UpdatePricesButtonState extends ConsumerState<_UpdatePricesButton> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           showCloseIcon: true,
-          content: Text('Failed to fetch prices: $e'),
+          content: Text(friendlyError(e)),
           action: SnackBarAction(
             label: 'Edit manually',
             onPressed: _openManualDialog,

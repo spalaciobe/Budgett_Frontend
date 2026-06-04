@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:budgett_frontend/core/responsive.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
@@ -161,7 +162,7 @@ class BudgetScreen extends ConsumerWidget {
                   );
                 }
               } catch (e) {
-                messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+                messenger.showSnackBar(SnackBar(content: Text(friendlyError(e))));
               }
             },
           ),
@@ -487,11 +488,11 @@ class BudgetScreen extends ConsumerWidget {
               },
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, s) =>
-                  Center(child: Text('Error loading categories: $e')),
+                  Center(child: Text(friendlyError(e))),
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (err, stack) => Center(child: Text('Error: $err')),
+          error: (err, stack) => Center(child: Text(friendlyError(err))),
         ),
       ),
       floatingActionButton: FloatingActionButton(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:budgett_frontend/core/app_theme.dart';
 import 'package:budgett_frontend/data/models/account_model.dart';
@@ -494,7 +495,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   );
                 },
                 loading: () => const LinearProgressIndicator(),
-                error: (err, stack) => Text('Error: $err'),
+                error: (err, stack) => Text(friendlyError(err)),
               ),
             ],
           ),

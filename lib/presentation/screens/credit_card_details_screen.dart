@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -321,7 +322,7 @@ class CreditCardDetailsBody extends ConsumerWidget {
               return Column(children: children);
             },
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, s) => Text('Error: $e'),
+            error: (e, s) => Text(friendlyError(e)),
           ),
         ],
       ),
@@ -440,7 +441,7 @@ class CreditCardDetailsBody extends ConsumerWidget {
         child: Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator())),
       ),
       error: (e, _) => Card(
-        child: Padding(padding: const EdgeInsets.all(16), child: Text('Error loading banks: $e')),
+        child: Padding(padding: const EdgeInsets.all(16), child: Text(friendlyError(e))),
       ),
     );
   }
@@ -805,7 +806,7 @@ class _CreditCardRulesBottomSheetState extends ConsumerState<_CreditCardRulesBot
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(content: Text(friendlyError(e))),
         );
       }
     } finally {
@@ -878,7 +879,7 @@ class _CreditCardRulesBottomSheetState extends ConsumerState<_CreditCardRulesBot
                 validator: (v) => v == null ? 'Select a bank' : null,
               ),
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Text('Error loading banks: $e'),
+              error: (e, _) => Text(friendlyError(e)),
             ),
             kGapXl,
             if (_isRappiCard)
@@ -1132,7 +1133,7 @@ class _BillingCalendarSheetState extends ConsumerState<_BillingCalendarSheet> {
                 },
               ),
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Error: $e')),
+              error: (e, _) => Center(child: Text(friendlyError(e))),
             ),
           ),
         ],
@@ -1175,7 +1176,7 @@ class _BillingCalendarSheetState extends ConsumerState<_BillingCalendarSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: $e')));
+            .showSnackBar(SnackBar(content: Text(friendlyError(e))));
       }
     }
   }
@@ -1217,7 +1218,7 @@ class _BillingCalendarSheetState extends ConsumerState<_BillingCalendarSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: $e')));
+            .showSnackBar(SnackBar(content: Text(friendlyError(e))));
       }
     }
   }

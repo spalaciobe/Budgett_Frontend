@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -442,7 +443,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(content: Text(friendlyError(e))),
         );
       }
     } finally {
@@ -876,7 +877,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                     ],
                   ),
                   loading: () => const CircularProgressIndicator(),
-                  error: (e, s) => Text('Error: $e'),
+                  error: (e, s) => Text(friendlyError(e)),
                 ),
                 const SizedBox(height: 10),
 
@@ -940,7 +941,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                       );
                     },
                     loading: () => const CircularProgressIndicator(),
-                    error: (e, s) => Text('Error: $e'),
+                    error: (e, s) => Text(friendlyError(e)),
                   ),
                 if (_selectedType != 'transfer') const SizedBox(height: 10),
 
@@ -962,7 +963,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                       }),
                     ),
                     loading: () => const CircularProgressIndicator(),
-                    error: (e, s) => Text('Error: $e'),
+                    error: (e, s) => Text(friendlyError(e)),
                   ),
                   const SizedBox(height: 10),
 

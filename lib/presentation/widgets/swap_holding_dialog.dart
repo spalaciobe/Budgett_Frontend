@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_spacing.dart';
@@ -116,7 +117,7 @@ class _SwapHoldingDialogState extends ConsumerState<SwapHoldingDialog> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: $e')));
+            .showSnackBar(SnackBar(content: Text(friendlyError(e))));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);

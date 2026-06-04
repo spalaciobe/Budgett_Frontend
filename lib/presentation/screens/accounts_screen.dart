@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -220,7 +221,7 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
               : _buildMobileList(sorted, reorderable: reorderable);
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('Error: $err')),
+        error: (err, _) => Center(child: Text(friendlyError(err))),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => showDialog(
@@ -1137,7 +1138,7 @@ class _PocketList extends ConsumerWidget {
               } catch (e) {
                 if (ctx.mounted) {
                   ScaffoldMessenger.of(ctx).showSnackBar(
-                    SnackBar(content: Text('Error: $e')),
+                    SnackBar(content: Text(friendlyError(e))),
                   );
                 }
               }

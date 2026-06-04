@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -326,7 +327,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(content: Text(friendlyError(e))),
         );
       }
     } finally {
@@ -544,7 +545,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                     ),
                     loading: () =>
                         const Center(child: CircularProgressIndicator()),
-                    error: (e, _) => Text('Error loading banks: $e'),
+                    error: (e, _) => Text(friendlyError(e)),
                   ),
                   const SizedBox(height: 10),
 
@@ -789,7 +790,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                     loading: () => const Center(
                         child: CircularProgressIndicator()),
                     error: (e, _) =>
-                        Text('Error loading brokers: $e'),
+                        Text(friendlyError(e)),
                   ),
                   const SizedBox(height: 10),
 

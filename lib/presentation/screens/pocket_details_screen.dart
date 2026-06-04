@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
@@ -94,7 +95,7 @@ class PocketDetailsScreen extends ConsumerWidget {
               txAsync.when(
                 loading: () =>
                     const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Text('Error: $e'),
+                error: (e, _) => Text(friendlyError(e)),
                 data: (txs) {
                   if (txs.isEmpty) {
                     return const Text('No transactions yet.');
@@ -353,7 +354,7 @@ class _SetStartDatePrompt extends ConsumerWidget {
                 } catch (e) {
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Error: $e')));
+                        SnackBar(content: Text(friendlyError(e))));
                   }
                 }
               },
