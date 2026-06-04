@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:async';
 
+import 'package:budgett_frontend/core/responsive.dart';
+
 import 'package:budgett_frontend/presentation/screens/home_screen.dart';
 import 'package:budgett_frontend/presentation/screens/accounts_screen.dart';
 import 'package:budgett_frontend/presentation/screens/auth/login_screen.dart';
@@ -139,6 +141,12 @@ final appRouter = GoRouter(
     }
 
     if (path == '/login' || path == '/register') return '/';
+
+    // "/more" is only the mobile bottom-nav overflow; on tablet/desktop all of
+    // its destinations already live in the rail/sidebar, so redirect home.
+    if (path == '/more' && context.formFactor != FormFactor.mobile) {
+      return '/';
+    }
 
     return null;
   },

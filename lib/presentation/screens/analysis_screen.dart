@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/app_theme.dart';
 import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:budgett_frontend/core/responsive.dart';
@@ -524,7 +525,7 @@ class _PortfolioContent extends StatelessWidget {
     final totalPnl = portfolio.totalPnl;
     final pnlPositive = totalPnl >= 0;
     final pnlColor =
-        pnlPositive ? Colors.green.shade600 : theme.colorScheme.error;
+        pnlPositive ? context.semantic.positive : theme.colorScheme.error;
 
     final positionsCard = _buildPositionsCard(context);
     final accountsCard = _buildAccountsCard(context);

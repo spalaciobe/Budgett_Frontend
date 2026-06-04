@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/app_theme.dart';
 import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -99,7 +100,7 @@ Widget? _investmentGainsSubtitle(
       if (accrued <= 0) return null;
       return Text(
         '+${CurrencyFormatter.format(accrued, decimalDigits: 2)} earned',
-        style: baseStyle?.copyWith(color: Colors.green.shade600),
+        style: baseStyle?.copyWith(color: context.semantic.positive),
       );
 
     case InvestmentType.fic:
@@ -114,7 +115,7 @@ Widget? _investmentGainsSubtitle(
       }
       final positive = pnl.pnl >= 0;
       final pnlColor =
-          positive ? Colors.green.shade600 : theme.colorScheme.error;
+          positive ? context.semantic.positive : theme.colorScheme.error;
       return Text(
         '${positive ? '+' : ''}${CurrencyFormatter.format(pnl.pnl, currency: baseCurrency)}'
         '  (${positive ? '+' : ''}${pnl.pnlPct.toStringAsFixed(2)}%)',
@@ -911,7 +912,7 @@ class _InvestmentAccountCard extends ConsumerWidget {
         if (accrued <= 0) return null;
         return Text(
           '+${CurrencyFormatter.format(accrued, decimalDigits: 2)} earned',
-          style: subtitleStyle.copyWith(color: Colors.green.shade600),
+          style: subtitleStyle.copyWith(color: context.semantic.positive),
         );
 
       case InvestmentType.fic:
@@ -926,7 +927,7 @@ class _InvestmentAccountCard extends ConsumerWidget {
         }
         final positive = pnl.pnl >= 0;
         final pnlColor = positive
-            ? Colors.green.shade600
+            ? context.semantic.positive
             : Theme.of(context).colorScheme.error;
         return Text(
           '${positive ? '+' : ''}${CurrencyFormatter.format(pnl.pnl, currency: baseCurrency)}'
@@ -981,12 +982,12 @@ class _SavingsInterestCard extends ConsumerWidget {
                     theme,
                     'APY',
                     '${apyPct.toStringAsFixed(2)}% E.A.',
-                    Colors.green.shade600,
+                    context.semantic.positive,
                   ),
                 ),
                 Expanded(
                   child: _miniStat(theme, 'Daily',
-                      CurrencyFormatter.format(daily), Colors.green.shade600),
+                      CurrencyFormatter.format(daily), context.semantic.positive),
                 ),
                 Expanded(
                   child: _miniStat(theme, 'Annual',
@@ -1000,7 +1001,7 @@ class _SavingsInterestCard extends ConsumerWidget {
                 '+${CurrencyFormatter.format(accrued)} accrued since '
                 '${sid.lastInterestDate!.toIso8601String().split("T")[0]}',
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: Colors.green.shade700,
+                  color: context.semantic.positive,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -1171,7 +1172,7 @@ class _PocketTile extends ConsumerWidget {
         title: Text(pocket.name),
         subtitle: apyPct != null
             ? Text('$apyPct APY',
-                style: TextStyle(color: Colors.green.shade600, fontSize: 12))
+                style: TextStyle(color: context.semantic.positive, fontSize: 12))
             : null,
         trailing: Text(
           CurrencyFormatter.format(pocket.balance),

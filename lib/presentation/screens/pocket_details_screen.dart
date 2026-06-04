@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/app_theme.dart';
 import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -205,14 +206,14 @@ class _InterestSection extends ConsumerWidget {
                       child: _StatItem(
                         label: 'APY',
                         value: '${apyPct.toStringAsFixed(2)}% E.A.',
-                        color: Colors.green.shade600,
+                        color: context.semantic.positive,
                       ),
                     ),
                     Expanded(
                       child: _StatItem(
                         label: 'Daily Earnings',
                         value: CurrencyFormatter.format(daily),
-                        color: Colors.green.shade600,
+                        color: context.semantic.positive,
                       ),
                     ),
                     Expanded(
@@ -235,7 +236,7 @@ class _InterestSection extends ConsumerWidget {
                         child: _StatItem(
                           label: 'Accrued Interest',
                           value: CurrencyFormatter.format(accrued),
-                          color: Colors.green.shade600,
+                          color: context.semantic.positive,
                         ),
                       ),
                       Expanded(
@@ -400,7 +401,7 @@ class _TxTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isPositive = tx.type == 'income';
-    final color = isPositive ? Colors.green.shade600 : theme.colorScheme.error;
+    final color = isPositive ? context.semantic.positive : theme.colorScheme.error;
     final sign = isPositive ? '+' : '-';
     return ListTile(
       dense: true,

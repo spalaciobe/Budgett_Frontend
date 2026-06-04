@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/core/app_theme.dart';
 import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -313,7 +314,7 @@ class _SummaryHeader extends StatelessWidget {
 
     final pnlPositive = pnl.pnl >= 0;
     final pnlColor =
-        pnlPositive ? Colors.green.shade600 : theme.colorScheme.error;
+        pnlPositive ? context.semantic.positive : theme.colorScheme.error;
 
     // Total invested (what the user has actually paid for current positions).
     // CDT → principal; multi-holding → aggregated cost basis.
@@ -511,7 +512,7 @@ class _CdtSection extends ConsumerWidget {
                       child: _StatItem(
                         label: 'Rate',
                         value: '${rate.toStringAsFixed(2)}% E.A.',
-                        color: Colors.green.shade600,
+                        color: context.semantic.positive,
                       ),
                     ),
                     Expanded(
@@ -532,7 +533,7 @@ class _CdtSection extends ConsumerWidget {
                       child: _StatItem(
                         label: 'Accrued Interest',
                         value: CurrencyFormatter.format(accrued),
-                        color: Colors.green.shade600,
+                        color: context.semantic.positive,
                       ),
                     ),
                     Expanded(
@@ -562,7 +563,7 @@ class _CdtSection extends ConsumerWidget {
               icon: const Icon(Icons.account_balance_wallet),
               label: const Text('Collect CDT'),
               style: FilledButton.styleFrom(
-                  backgroundColor: Colors.green.shade600),
+                  backgroundColor: context.semantic.positive),
             ),
           ),
         ],
