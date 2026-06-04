@@ -385,7 +385,7 @@ class BudgetScreen extends ConsumerWidget {
                         Expanded(
                           child: ListView(
                             physics: const AlwaysScrollableScrollPhysics(),
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, kFabSafeBottom),
                             children: [
                               ...activeNonSavings.map(buildRow),
 

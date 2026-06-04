@@ -13,6 +13,10 @@ const double kSpaceLg = 8; // section-internal gaps
 const double kSpaceXl = 12; // between cards / major sections
 const double kSpaceXxl = 16; // screen body padding (was 24)
 
+/// Bottom inset for scrollables that sit under a FloatingActionButton, so the
+/// last row isn't hidden behind it (FAB is ~56px + margin).
+const double kFabSafeBottom = 80;
+
 // ---------------------------------------------------------------------------
 // Pre-built EdgeInsets
 // ---------------------------------------------------------------------------
@@ -20,6 +24,11 @@ const double kSpaceXxl = 16; // screen body padding (was 24)
 /// Standard screen body padding: 16 horizontal, 8 vertical.
 const EdgeInsets kScreenPadding =
     EdgeInsets.symmetric(horizontal: 16, vertical: kSpaceLg);
+
+/// Screen body padding for lists under a FAB: standard top/sides, extra bottom
+/// so the last item clears the floating action button.
+const EdgeInsets kScreenPaddingWithFab =
+    EdgeInsets.fromLTRB(16, kSpaceLg, 16, kFabSafeBottom);
 
 /// Standard card internal padding: 12 all-around.
 const EdgeInsets kCardPadding = EdgeInsets.all(kSpaceXl);

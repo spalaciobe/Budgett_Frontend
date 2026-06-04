@@ -42,7 +42,7 @@ class ExpenseGroupsScreen extends ConsumerWidget {
             }
             return ListView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: kScreenPadding,
+              padding: kScreenPaddingWithFab,
               itemCount: groups.length,
               itemBuilder: (context, index) {
                 return _ExpenseGroupCard(group: groups[index]);

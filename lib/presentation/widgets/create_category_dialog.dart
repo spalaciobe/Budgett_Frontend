@@ -134,7 +134,7 @@ class _CreateCategoryDialogState extends ConsumerState<CreateCategoryDialog> {
                                 decoration: BoxDecoration(
                                   color: color,
                                   shape: BoxShape.circle,
-                                  border: isSelected ? Border.all(color: Colors.black, width: 2) : null,
+                                  border: isSelected ? Border.all(color: Theme.of(context).colorScheme.onSurface, width: 2) : null,
                                 ),
                                 child: isSelected ? const Icon(Icons.check, color: Colors.white, size: 20) : null,
                               ),

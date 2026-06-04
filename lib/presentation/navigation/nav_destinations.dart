@@ -48,14 +48,14 @@ const kNavDestinations = <NavDestination>[
   ),
   NavDestination(
     path: '/analysis',
-    icon: Icons.bar_chart,
+    icon: Icons.bar_chart_outlined,
     selectedIcon: Icons.bar_chart,
     label: 'Analysis',
   ),
   NavDestination(
     path: '/recurring',
     icon: Icons.repeat,
-    selectedIcon: Icons.repeat,
+    selectedIcon: Icons.repeat_on,
     label: 'Recurring',
     dividerBefore: true,
   ),

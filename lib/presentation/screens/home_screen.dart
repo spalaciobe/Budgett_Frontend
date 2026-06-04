@@ -334,7 +334,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: kScreenPadding,
+          padding: kScreenPaddingWithFab,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

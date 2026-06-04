@@ -37,7 +37,7 @@ class GoalsScreen extends ConsumerWidget {
           }
           return ListView.separated(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: kScreenPadding,
+            padding: kScreenPaddingWithFab,
             itemCount: goals.length,
             separatorBuilder: (context, index) => kGapLg,
             itemBuilder: (context, index) {
