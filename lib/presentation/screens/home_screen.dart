@@ -40,6 +40,76 @@ String _buildDetails(
   return accountName;
 }
 
+/// Compact current-month summary (Income / Spent / Net) at the top of Home.
+class _MonthSummaryCard extends ConsumerWidget {
+  const _MonthSummaryCard();
+
+  static const _months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final now = DateTime.now();
+    final data = ref.watch(homeMonthSummaryProvider).valueOrNull;
+    final income = data?.income ?? 0.0;
+    final spent = data?.spent ?? 0.0;
+    final net = income - spent;
+
+    final mutedStyle = theme.textTheme.labelSmall?.copyWith(
+        color: theme.colorScheme.onSurface.withValues(alpha: 0.55));
+
+    Widget metric(String label, double amount, Color color) {
+      return Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: mutedStyle),
+            const SizedBox(height: 2),
+            Text(
+              CurrencyFormatter.format(amount),
+              maxLines: 1,
+              overflow: TextOverflow.fade,
+              style: theme.textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold, color: color),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${_months[now.month - 1]} ${now.year}', style: mutedStyle),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                metric('Income', income, context.semantic.positive),
+                metric('Spent', spent, theme.colorScheme.error),
+                metric(
+                  'Net',
+                  net,
+                  net >= 0
+                      ? context.semantic.positive
+                      : theme.colorScheme.error,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
@@ -338,6 +408,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const _MonthSummaryCard(),
+              const SizedBox(height: 16),
               Text(
                 'Recent Transactions',
                 style: Theme.of(context)
