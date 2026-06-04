@@ -441,8 +441,13 @@ class _PortfolioHistorySectionState
       body = Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Vertical lines on the chart; the consolidated pills below are the
+          // only buy-date chips (chart's own per-purchase chips are hidden).
           PortfolioValueChart(
-              points: points, markers: _dedupeMarkersByDay(markers)),
+            points: points,
+            markers: markers,
+            showMarkerChips: false,
+          ),
           if (markers.isNotEmpty) ...[
             const SizedBox(height: 10),
             Wrap(spacing: 8, runSpacing: 6, children: _markerPills(markers)),
@@ -474,17 +479,6 @@ class _PortfolioHistorySectionState
         ),
       ),
     );
-  }
-
-  List<PortfolioValueMarker> _dedupeMarkersByDay(
-      List<PortfolioValueMarker> markers) {
-    final seen = <DateTime>{};
-    final out = <PortfolioValueMarker>[];
-    for (final m in markers) {
-      final day = DateTime(m.date.year, m.date.month, m.date.day);
-      if (seen.add(day)) out.add(m);
-    }
-    return out;
   }
 
   List<Widget> _markerPills(List<PortfolioValueMarker> markers) {

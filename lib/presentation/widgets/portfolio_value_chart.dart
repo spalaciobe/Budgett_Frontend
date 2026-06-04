@@ -16,12 +16,18 @@ class PortfolioValueChart extends StatelessWidget {
   /// Mapped to the nearest point on the series.
   final List<PortfolioValueMarker> markers;
 
+  /// When false, the buy-date chips below the chart are hidden (the vertical
+  /// lines still show). Use when the caller renders its own pills (e.g. the
+  /// consolidated, collapsed-by-day ones in Analysis) to avoid duplicates.
+  final bool showMarkerChips;
+
   const PortfolioValueChart({
     super.key,
     required this.points,
     this.currency = 'COP',
     this.height = 260,
     this.markers = const [],
+    this.showMarkerChips = true,
   });
 
   /// Index of the first point on/after [date], clamped to the series bounds.
@@ -169,7 +175,7 @@ class PortfolioValueChart extends StatelessWidget {
       ),
     );
 
-    if (sortedMarkers.isEmpty) return chartBox;
+    if (sortedMarkers.isEmpty || !showMarkerChips) return chartBox;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
