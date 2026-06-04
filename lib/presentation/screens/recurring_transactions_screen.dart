@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:budgett_frontend/presentation/widgets/edit_recurring_transaction_dialog.dart';
+import 'package:budgett_frontend/presentation/widgets/empty_state.dart';
 import 'package:intl/intl.dart';
 
 class RecurringTransactionsScreen extends ConsumerWidget {
@@ -24,24 +25,10 @@ class RecurringTransactionsScreen extends ConsumerWidget {
         child: recurringAsync.when(
           data: (transactions) {
             if (transactions.isEmpty) {
-              return LayoutBuilder(
-                builder: (context, constraints) => SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  child: SizedBox(
-                    height: constraints.maxHeight,
-                    child: const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.repeat, size: 64, color: Colors.grey),
-                          SizedBox(height: 16),
-                          Text('No recurring transactions yet.'),
-                          Text('Add one when creating a new transaction.', style: TextStyle(color: Colors.grey)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
+              return const EmptyState(
+                icon: Icons.repeat,
+                title: 'No recurring transactions yet',
+                message: 'Add one when creating a new transaction.',
               );
             }
             return ListView.separated(

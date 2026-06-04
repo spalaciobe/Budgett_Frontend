@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/presentation/widgets/empty_state.dart';
 import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -27,17 +28,10 @@ class ExpenseGroupsScreen extends ConsumerWidget {
         child: expenseGroupsAsync.when(
           data: (groups) {
             if (groups.isEmpty) {
-              return LayoutBuilder(
-                builder: (context, constraints) => SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  child: SizedBox(
-                    height: constraints.maxHeight,
-                    child: const Center(
-                      child: Text('No expense groups.\nCreate one with the + button.',
-                          textAlign: TextAlign.center),
-                    ),
-                  ),
-                ),
+              return const EmptyState(
+                icon: Icons.folder_shared_outlined,
+                title: 'No expense groups',
+                message: 'Create one with the + button to group related spending.',
               );
             }
             return ListView.builder(

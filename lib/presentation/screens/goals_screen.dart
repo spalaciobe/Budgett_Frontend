@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:budgett_frontend/presentation/widgets/empty_state.dart';
 import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -25,14 +26,10 @@ class GoalsScreen extends ConsumerWidget {
         child: goalsAsync.when(
         data: (goals) {
           if (goals.isEmpty) {
-            return LayoutBuilder(
-              builder: (context, constraints) => SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: SizedBox(
-                  height: constraints.maxHeight,
-                  child: const Center(child: Text('No goals set yet. Start dreaming!')),
-                ),
-              ),
+            return const EmptyState(
+              icon: Icons.flag_outlined,
+              title: 'No goals yet',
+              message: 'Set a savings goal with the + button.',
             );
           }
           return ListView.separated(
