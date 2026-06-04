@@ -291,13 +291,17 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                       if (widget.onViewTransactions != null)
                         _viewTransactionsButton(context),
                       const SizedBox(width: 4),
-                      GestureDetector(
-                        onTap: () => setState(() => _expanded = !_expanded),
-                        child: Icon(
-                          _expanded
-                              ? Icons.expand_less
-                              : Icons.expand_more,
-                          size: 20,
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                            minWidth: 44, minHeight: 44),
+                        iconSize: 20,
+                        tooltip: _expanded ? 'Collapse' : 'Expand',
+                        onPressed: () =>
+                            setState(() => _expanded = !_expanded),
+                        icon: Icon(
+                          _expanded ? Icons.expand_less : Icons.expand_more,
                           color: Theme.of(context)
                               .colorScheme
                               .onSurface
@@ -511,34 +515,38 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                   if (hasSubs) ...[
                     const SizedBox(height: kSpaceLg),
                     // Subcategory header with collapse toggle
-                    GestureDetector(
+                    InkWell(
                       onTap: () =>
                           setState(() => _subExpanded = !_subExpanded),
-                      child: Row(
-                        children: [
-                          Text(
-                            'Subcategories',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Row(
+                          children: [
+                            Text(
+                              'Subcategories',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurface
+                                    .withValues(alpha: 0.5),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              _subExpanded
+                                  ? Icons.expand_less
+                                  : Icons.expand_more,
+                              size: 14,
                               color: Theme.of(context)
                                   .colorScheme
                                   .onSurface
-                                  .withValues(alpha: 0.5),
+                                  .withValues(alpha: 0.4),
                             ),
-                          ),
-                          const SizedBox(width: 4),
-                          Icon(
-                            _subExpanded
-                                ? Icons.expand_less
-                                : Icons.expand_more,
-                            size: 14,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withValues(alpha: 0.4),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                     AnimatedCrossFade(

@@ -358,7 +358,7 @@ class _Sidebar extends ConsumerWidget {
                           iconSize: 18,
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(
-                              minWidth: 32, minHeight: 32),
+                              minWidth: 44, minHeight: 44),
                           icon: Icon(Icons.logout,
                               color: theme.colorScheme.error),
                           tooltip: 'Log out',
