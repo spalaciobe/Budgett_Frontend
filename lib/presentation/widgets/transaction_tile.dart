@@ -94,45 +94,59 @@ class TransactionTile extends StatelessWidget {
       ));
     }
 
-    return ListTile(
-      dense: true,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-      onTap: onTap,
-      leading: CircleAvatar(
-        radius: 4,
-        backgroundColor: dotColor,
-      ),
-      title: Text(
-        t.description,
-        style: AppText.tileTitle.copyWith(
-          decoration: isPending ? TextDecoration.lineThrough : null,
-          color: isPending ? Colors.grey : null,
+    final typeWord =
+        isTransfer ? 'Transfer' : (isPositive ? 'Income' : 'Expense');
+    final semanticsLabel = [
+      typeWord,
+      t.description,
+      amountText,
+      if (isPending) 'pending'
+    ].join(', ');
+
+    return Semantics(
+      label: semanticsLabel,
+      button: onTap != null,
+      excludeSemantics: true,
+      child: ListTile(
+        dense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+        onTap: onTap,
+        leading: CircleAvatar(
+          radius: 4,
+          backgroundColor: dotColor,
         ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      trailing: Text(
-        amountText,
-        style: AppText.amount.copyWith(color: amountColor),
-      ),
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Wrap(
-            spacing: 6,
-            runSpacing: 2,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Text(
-                DateFormat('d MMM', 'en').format(t.date),
-                style: AppText.caption,
-              ),
-              if (isPending) const _PendingBadge(),
-            ],
+        title: Text(
+          t.description,
+          style: AppText.tileTitle.copyWith(
+            decoration: isPending ? TextDecoration.lineThrough : null,
+            color: isPending ? Colors.grey : null,
           ),
-          ...extraLines,
-        ],
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        trailing: Text(
+          amountText,
+          style: AppText.amount.copyWith(color: amountColor),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Wrap(
+              spacing: 6,
+              runSpacing: 2,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text(
+                  DateFormat('d MMM', 'en').format(t.date),
+                  style: AppText.caption,
+                ),
+                if (isPending) const _PendingBadge(),
+              ],
+            ),
+            ...extraLines,
+          ],
+        ),
       ),
     );
   }

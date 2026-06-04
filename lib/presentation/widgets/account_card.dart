@@ -37,11 +37,9 @@ class AccountCard extends StatelessWidget {
     final theme = Theme.of(context);
     final acc = account;
 
-    final isUsdInvestment =
-        acc.type == 'investment' &&
+    final isUsdInvestment = acc.type == 'investment' &&
         (acc.investmentDetails?.baseCurrency ?? 'COP') == 'USD';
-    final isSavingsWithPockets =
-        acc.isSavingsParent && acc.pockets.isNotEmpty;
+    final isSavingsWithPockets = acc.isSavingsParent && acc.pockets.isNotEmpty;
 
     final balanceDisplay = balanceText ??
         (isUsdInvestment
@@ -124,38 +122,43 @@ class AccountCard extends StatelessWidget {
       ],
     );
 
-    return Card(
-      elevation: 4,
-      shadowColor: Colors.black12,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: InkWell(
-        onTap: onTap,
-        child: tileLayout
-            ? Container(
-                decoration: gradient,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: kSpaceLg,
+    return Semantics(
+      label: '${acc.name}, balance $balanceDisplay',
+      button: true,
+      excludeSemantics: true,
+      child: Card(
+        elevation: 4,
+        shadowColor: Colors.black12,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: InkWell(
+          onTap: onTap,
+          child: tileLayout
+              ? Container(
+                  decoration: gradient,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: kSpaceLg,
+                  ),
+                  child: Row(
+                    children: [
+                      iconWidget,
+                      const SizedBox(width: 14),
+                      Expanded(child: textContent),
+                    ],
+                  ),
+                )
+              : Container(
+                  width: 170,
+                  decoration: gradient,
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [iconWidget, textContent],
+                  ),
                 ),
-                child: Row(
-                  children: [
-                    iconWidget,
-                    const SizedBox(width: 14),
-                    Expanded(child: textContent),
-                  ],
-                ),
-              )
-            : Container(
-                width: 170,
-                decoration: gradient,
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [iconWidget, textContent],
-                ),
-              ),
+        ),
       ),
     );
   }
