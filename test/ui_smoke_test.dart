@@ -27,6 +27,7 @@ import 'package:budgett_frontend/core/services/update_checker_service.dart';
 import 'package:budgett_frontend/data/models/account_model.dart';
 import 'package:budgett_frontend/data/models/budget_model.dart';
 import 'package:budgett_frontend/data/models/category_model.dart';
+import 'package:budgett_frontend/data/models/category_spending.dart';
 import 'package:budgett_frontend/data/models/expense_group_model.dart';
 import 'package:budgett_frontend/data/models/goal_model.dart';
 import 'package:budgett_frontend/data/models/investment_holding_model.dart';
@@ -38,6 +39,7 @@ import 'package:budgett_frontend/presentation/screens/categories_screen.dart';
 import 'package:budgett_frontend/presentation/screens/expense_groups_screen.dart';
 import 'package:budgett_frontend/presentation/screens/goals_screen.dart';
 import 'package:budgett_frontend/presentation/screens/home_screen.dart';
+import 'package:budgett_frontend/presentation/screens/budget_screen.dart';
 import 'package:budgett_frontend/presentation/screens/recurring_transactions_screen.dart';
 import 'package:budgett_frontend/data/models/sub_category_model.dart';
 import 'package:budgett_frontend/presentation/widgets/account_card.dart';
@@ -202,6 +204,19 @@ class _FakeFinanceRepository extends FinanceRepository {
   @override
   Future<List<Map<String, dynamic>>> getYearlySummary(int year) async =>
       List.generate(12, (i) => {'month': i + 1, 'income': 5_000_000.0, 'expense': 2_500_000.0});
+  @override
+  Future<double> getMonthlyIncome(int month, int year) async => 5_000_000;
+  @override
+  Future<Map<String, CategorySpending>> getSpendingByCategory(
+          int month, int year) async =>
+      {'cat-1': CategorySpending(total: 320_000)};
+  @override
+  Future<Map<String, CategorySpending>> getIncomeByCategory(
+          int month, int year) async =>
+      {'cat-3': CategorySpending(total: 5_000_000)};
+  @override
+  Future<Map<String, double>> getCategoryAccumulatedBalances() async =>
+      const {};
 }
 
 List<Override> _financeOverrides() => [
@@ -326,6 +341,10 @@ final _targets = <String, _Target>{
   ),
   'screen_recurring_transactions': _Target(
     () => const RecurringTransactionsScreen(),
+    overrides: _financeOverrides(),
+  ),
+  'screen_budget': _Target(
+    () => const BudgetScreen(),
     overrides: _financeOverrides(),
   ),
 };

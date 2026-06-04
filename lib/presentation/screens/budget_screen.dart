@@ -16,6 +16,12 @@ import 'package:fl_chart/fl_chart.dart';
 final budgetDateProvider =
     StateProvider.autoDispose<DateTime>((ref) => DateTime.now());
 
+/// Whether the collapsed group of categories with no budget and no activity
+/// this month is expanded. Collapsed by default to keep the list focused on
+/// categories that are actually in use.
+final _showEmptyCategoriesProvider =
+    StateProvider.autoDispose<bool>((ref) => false);
+
 Color _parseColor(String colorStr) {
   try {
     return Color(int.parse(colorStr));
@@ -35,6 +41,7 @@ class BudgetScreen extends ConsumerWidget {
     final categoriesAsync = ref.watch(categoriesProvider);
     final accumulatedBalancesAsync =
         ref.watch(categoryAccumulatedBalancesProvider);
+    final showEmptyCategories = ref.watch(_showEmptyCategoriesProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -269,6 +276,27 @@ class BudgetScreen extends ConsumerWidget {
                     final accumulated =
                         accumulatedBalancesAsync.valueOrNull ?? const {};
 
+                    // A category is "empty" this month when it has no budget and
+                    // no activity (and, for sinking funds, no accumulated
+                    // balance worth surfacing). These are tucked into a
+                    // collapsed group so the list stays focused on what's in use.
+                    bool isEmptyCat(Category cat) {
+                      final b = budgetAmountsMap[cat.id] ?? 0.0;
+                      final actual = cat.type == 'income'
+                          ? (incomeFlows[cat.id]?.total ?? 0.0)
+                          : (spending[cat.id]?.total ?? 0.0);
+                      final accumulatedBal = cat.type == 'savings'
+                          ? (accumulated[cat.id] ?? 0.0)
+                          : 0.0;
+                      return b <= 0 && actual == 0 && accumulatedBal == 0;
+                    }
+
+                    final activeNonSavings = nonSavingsCategories
+                        .where((c) => !isEmptyCat(c))
+                        .toList();
+                    final emptyNonSavings =
+                        nonSavingsCategories.where(isEmptyCat).toList();
+
                     Widget buildRow(Category cat) {
                       final budget = budgets.cast<dynamic>().firstWhere(
                             (b) => b.categoryId == cat.id,
@@ -358,7 +386,68 @@ class BudgetScreen extends ConsumerWidget {
                             physics: const AlwaysScrollableScrollPhysics(),
                             padding: const EdgeInsets.symmetric(horizontal: 16),
                             children: [
-                              ...nonSavingsCategories.map(buildRow),
+                              ...activeNonSavings.map(buildRow),
+
+                              // Collapsed group of categories with no budget and
+                              // no activity this month.
+                              if (emptyNonSavings.isNotEmpty) ...[
+                                InkWell(
+                                  onTap: () => ref
+                                      .read(
+                                          _showEmptyCategoriesProvider.notifier)
+                                      .state = !showEmptyCategories,
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Padding(
+                                    padding:
+                                        const EdgeInsets.fromLTRB(4, 16, 4, 8),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          showEmptyCategories
+                                              ? Icons.expand_less
+                                              : Icons.expand_more,
+                                          size: 18,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface
+                                              .withOpacity(0.7),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          'Other categories (${emptyNonSavings.length})',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w700,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurface
+                                                .withOpacity(0.75),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            showEmptyCategories
+                                                ? ''
+                                                : 'No budget or activity this month',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurface
+                                                  .withOpacity(0.4),
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                if (showEmptyCategories)
+                                  ...emptyNonSavings.map(buildRow),
+                              ],
+
                               if (savingsCategories.isNotEmpty) ...[
                                 Padding(
                                   padding: const EdgeInsets.only(
@@ -585,8 +674,12 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
               : Theme.of(context).colorScheme.primary.withOpacity(0.2),
         ),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      // Wrap (not Row) so the badge can flow onto a second line on narrow
+      // phones instead of overflowing when both figures are long.
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 2,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           Text(
             '${widget.allocationPercentage.toStringAsFixed(1)}% Allocated',
@@ -598,7 +691,6 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
               fontSize: 12,
             ),
           ),
-          const SizedBox(width: 8),
           Text(
             widget.availableToAllocate > 0
                 ? 'Remaining: ${CurrencyFormatter.format(widget.availableToAllocate, decimalDigits: 0)}'
