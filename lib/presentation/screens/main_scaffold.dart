@@ -117,9 +117,10 @@ class _TabletShell extends ConsumerWidget {
     );
   }
 
-  int _selectedIndex(String currentPath) {
-    final idx = kNavDestinations.indexWhere((d) => d.path == currentPath);
-    return idx < 0 ? 0 : idx;
+  int? _selectedIndex(String currentPath) {
+    final idx = kNavDestinations
+        .indexWhere((d) => d.path == navSectionFor(currentPath));
+    return idx < 0 ? null : idx;
   }
 }
 
@@ -223,6 +224,7 @@ class _Sidebar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(userProvider);
+    final section = navSectionFor(GoRouterState.of(context).uri.path);
     final profile = ref.watch(profileProvider).valueOrNull;
     final displayName = (profile?.firstName != null)
         ? [profile!.firstName!, profile?.lastName].whereType<String>().join(' ')
@@ -231,7 +233,6 @@ class _Sidebar extends ConsumerWidget {
         ? displayName[0].toUpperCase()
         : 'U';
     final theme = Theme.of(context);
-    final currentPath = GoRouterState.of(context).uri.path;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
@@ -301,7 +302,7 @@ class _Sidebar extends ConsumerWidget {
                     _SidebarItem(
                       icon: dest.selectedIcon,
                       label: dest.label,
-                      isSelected: currentPath == dest.path,
+                      isSelected: section == dest.path,
                       isExpanded: isExpanded,
                       onTap: () => context.go(dest.path),
                     ),
