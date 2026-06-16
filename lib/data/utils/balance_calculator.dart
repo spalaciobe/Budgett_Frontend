@@ -4,32 +4,46 @@ import '../models/transaction_model.dart';
 /// These are intentionally isolated from Supabase so they can be unit-tested
 /// without network access.
 class BalanceCalculator {
+  static bool _countsAsIncome(Transaction t) {
+    return t.type == 'income' && t.movementType != 'reimbursement';
+  }
+
+  static bool _countsAsExpense(Transaction t) {
+    return t.type == 'expense' && t.movementType != 'savings';
+  }
+
   /// Calculates the net balance (income − expenses) for a list of transactions.
   /// Transfers are ignored.
   static double netBalance(List<Transaction> transactions) {
     double income = 0;
     double expense = 0;
     for (final t in transactions) {
-      if (t.type == 'income') {
+      if (_countsAsIncome(t)) {
         income += t.amount;
-      } else if (t.type == 'expense') {
+      } else if (_countsAsExpense(t)) {
         expense += t.amount;
       }
     }
     return income - expense;
   }
 
-  /// Sums all income transactions.
+  /// Sums real income transactions.
+  ///
+  /// Reimbursements are cash inflows but offset prior spending instead of
+  /// increasing income.
   static double totalIncome(List<Transaction> transactions) {
     return transactions
-        .where((t) => t.type == 'income')
+        .where(_countsAsIncome)
         .fold(0.0, (sum, t) => sum + t.amount);
   }
 
-  /// Sums all expense transactions.
+  /// Sums real expense transactions.
+  ///
+  /// Sinking-fund contributions are cash outflows, but Budgett tracks them as
+  /// savings, not spending.
   static double totalExpenses(List<Transaction> transactions) {
     return transactions
-        .where((t) => t.type == 'expense')
+        .where(_countsAsExpense)
         .fold(0.0, (sum, t) => sum + t.amount);
   }
 
@@ -117,9 +131,9 @@ class BalanceCalculator {
     for (final t in transactions) {
       if (t.date.year != year) continue;
       final m = t.date.month;
-      if (t.type == 'income') {
+      if (_countsAsIncome(t)) {
         monthlyStats[m]!['income'] = monthlyStats[m]!['income']! + t.amount;
-      } else if (t.type == 'expense') {
+      } else if (_countsAsExpense(t)) {
         monthlyStats[m]!['expense'] = monthlyStats[m]!['expense']! + t.amount;
       }
     }
