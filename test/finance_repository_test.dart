@@ -549,6 +549,16 @@ void main() {
       expect(BalanceCalculator.netBalance(txs), 1300000);
     });
 
+    test('ignores reimbursements and savings contributions', () {
+      final txs = [
+        _tx(amount: 3000000, type: 'income'),
+        _tx(amount: 55000, type: 'income', movementType: 'reimbursement'),
+        _tx(amount: 2000000, type: 'expense', movementType: 'savings'),
+        _tx(amount: 8000, type: 'expense'),
+      ];
+      expect(BalanceCalculator.netBalance(txs), 2992000);
+    });
+
     test('ignores transfer type', () {
       final txs = [
         _tx(amount: 1000000, type: 'income'),
@@ -584,6 +594,14 @@ void main() {
       expect(BalanceCalculator.totalIncome(txs), 2500000);
     });
 
+    test('excludes reimbursement inflows from income', () {
+      final txs = [
+        _tx(amount: 2000000, type: 'income'),
+        _tx(amount: 55000, type: 'income', movementType: 'reimbursement'),
+      ];
+      expect(BalanceCalculator.totalIncome(txs), 2000000);
+    });
+
     test('returns 0 when no income', () {
       final txs = [_tx(amount: 500000, type: 'expense')];
       expect(BalanceCalculator.totalIncome(txs), 0.0);
@@ -598,6 +616,14 @@ void main() {
         _tx(amount: 2000000, type: 'income'),
       ];
       expect(BalanceCalculator.totalExpenses(txs), 250000);
+    });
+
+    test('excludes savings contributions from expenses', () {
+      final txs = [
+        _tx(amount: 200000, type: 'expense'),
+        _tx(amount: 2000000, type: 'expense', movementType: 'savings'),
+      ];
+      expect(BalanceCalculator.totalExpenses(txs), 200000);
     });
 
     test('returns 0 when no expenses', () {
@@ -814,6 +840,32 @@ void main() {
       expect(mar['income'], 5000000.0);
       expect(feb['income'], 0.0);
       expect(feb['expense'], 0.0);
+    });
+
+    test('excludes reimbursements and savings contributions from monthly summary', () {
+      final txs = [
+        _tx(id: 'income', amount: 3000000, type: 'income', date: '2026-06-15'),
+        _tx(
+          id: 'reimbursement',
+          amount: 55000,
+          type: 'income',
+          movementType: 'reimbursement',
+          date: '2026-06-15',
+        ),
+        _tx(
+          id: 'savings',
+          amount: 2000000,
+          type: 'expense',
+          movementType: 'savings',
+          date: '2026-06-15',
+        ),
+        _tx(id: 'fee', amount: 8000, type: 'expense', date: '2026-06-15'),
+      ];
+
+      final jun = BalanceCalculator.yearlySummary(txs, 2026)
+          .firstWhere((r) => r['month'] == 6);
+      expect(jun['income'], 3000000.0);
+      expect(jun['expense'], 8000.0);
     });
 
     test('ignores transactions from other years', () {

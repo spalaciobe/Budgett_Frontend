@@ -1786,7 +1786,7 @@ class FinanceRepository {
         final userId = _client.auth.currentUser!.id;
         final result = await _client
             .from('transactions')
-            .select('date, amount, type, currency')
+            .select('date, amount, type, currency, movement_type')
             .eq('user_id', userId)
             .eq('status', 'paid')
             .eq('is_installment_parent', false) // exclude display-only parent rows
@@ -1809,8 +1809,9 @@ class FinanceRepository {
           final amount = (item['amount'] as num).toDouble();
           final type = item['type'] as String;
           final currency = (item['currency'] as String?) ?? 'COP';
+          final movementType = item['movement_type'] as String?;
 
-          if (type == 'income') {
+          if (type == 'income' && movementType != 'reimbursement') {
             if (currency == 'USD') {
               monthlyStats[date.month]!['income_usd'] =
                   monthlyStats[date.month]!['income_usd']! + amount;
@@ -1818,7 +1819,7 @@ class FinanceRepository {
               monthlyStats[date.month]!['income'] =
                   monthlyStats[date.month]!['income']! + amount;
             }
-          } else if (type == 'expense') {
+          } else if (type == 'expense' && movementType != 'savings') {
             if (currency == 'USD') {
               monthlyStats[date.month]!['expense_usd'] =
                   monthlyStats[date.month]!['expense_usd']! + amount;
