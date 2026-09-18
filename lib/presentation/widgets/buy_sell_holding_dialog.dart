@@ -6,6 +6,7 @@ import '../../data/models/investment_holding_model.dart';
 import '../../data/repositories/finance_repository.dart';
 import '../providers/finance_provider.dart';
 import '../utils/currency_formatter.dart';
+import '../../core/app_text.dart';
 
 /// Shared dialog for both Buy and Sell actions.
 /// [isBuy] = true → records expense + increases quantity.
@@ -193,6 +194,7 @@ class _BuySellHoldingDialogState extends ConsumerState<BuySellHoldingDialog> {
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: [CurrencyInputFormatter(currency: currency)],
+                  style: AppText.tabular(22, weight: 700),
                   validator: (v) =>
                       v == null || v.isEmpty ? 'Required' : null,
                 ),
@@ -209,6 +211,7 @@ class _BuySellHoldingDialogState extends ConsumerState<BuySellHoldingDialog> {
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: [CurrencyInputFormatter(currency: currency)],
+                  style: AppText.tabular(22, weight: 700),
                 ),
                 const SizedBox(height: 8),
 

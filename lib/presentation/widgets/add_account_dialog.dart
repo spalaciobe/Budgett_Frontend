@@ -12,6 +12,7 @@ import '../../data/repositories/broker_repository.dart';
 import '../../data/models/bank_model.dart';
 import '../../data/models/broker_model.dart';
 import '../../data/models/investment_details_model.dart';
+import '../../core/app_text.dart';
 
 /// Builds the credit-card rules map for a given bank.
 /// Shared logic used both in [AddAccountDialog] and the onboarding flow.
@@ -560,6 +561,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                     keyboardType: const TextInputType.numberWithOptions(
                         decimal: true),
                     inputFormatters: [const CurrencyInputFormatter()],
+                    style: AppText.tabular(22, weight: 700),
                   ),
                   const SizedBox(height: 10),
 
@@ -587,6 +589,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                     ),
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     inputFormatters: [const CurrencyInputFormatter(currency: 'USD')],
+                    style: AppText.tabular(22, weight: 700),
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
@@ -599,6 +602,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                     keyboardType: const TextInputType.numberWithOptions(
                         decimal: true),
                     inputFormatters: [const CurrencyInputFormatter(currency: 'USD')],
+                    style: AppText.tabular(22, weight: 700),
                   ),
 
                   // RappiCard: auto-rules notice
@@ -806,6 +810,7 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
                       inputFormatters: [const CurrencyInputFormatter()],
+                      style: AppText.tabular(22, weight: 700),
                       validator: (v) =>
                           v == null || v.isEmpty ? 'Required' : null,
                     ),

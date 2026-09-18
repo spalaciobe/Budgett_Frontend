@@ -6,6 +6,7 @@ import '../../data/models/investment_holding_model.dart';
 import '../../data/repositories/finance_repository.dart';
 import '../providers/finance_provider.dart';
 import '../utils/currency_formatter.dart';
+import '../../core/app_text.dart';
 
 class EditHoldingDialog extends ConsumerStatefulWidget {
   final String accountId;
@@ -269,6 +270,7 @@ class _EditHoldingDialogState extends ConsumerState<EditHoldingDialog> {
                   ),
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: [CurrencyInputFormatter(currency: _currency)],
+                  style: AppText.tabular(22, weight: 700),
                   validator: (v) =>
                       v == null || v.isEmpty ? 'Required' : null,
                 ),
@@ -284,6 +286,7 @@ class _EditHoldingDialogState extends ConsumerState<EditHoldingDialog> {
                   ),
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: [CurrencyInputFormatter(currency: _currency)],
+                  style: AppText.tabular(22, weight: 700),
                   validator: (v) =>
                       v == null || v.isEmpty ? 'Required' : null,
                 ),

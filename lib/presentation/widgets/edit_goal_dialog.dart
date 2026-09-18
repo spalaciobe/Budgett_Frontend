@@ -7,6 +7,7 @@ import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/data/models/goal_model.dart';
 import 'package:budgett_frontend/presentation/utils/icon_helper.dart';
 import '../../core/app_theme.dart';
+import '../../core/app_text.dart';
 
 class EditGoalDialog extends ConsumerStatefulWidget {
   final Goal goal;
@@ -260,6 +261,7 @@ class _EditGoalDialogState extends ConsumerState<EditGoalDialog> {
                   ),
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: [CurrencyInputFormatter()],
+                  style: AppText.tabular(22, weight: 700),
                   onChanged: (_) => setState(() {}), // Recalculate
                   validator: (value) {
                     if (value == null || value.isEmpty) return 'Required';
@@ -281,6 +283,7 @@ class _EditGoalDialogState extends ConsumerState<EditGoalDialog> {
                   ),
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: [CurrencyInputFormatter()],
+                  style: AppText.tabular(22, weight: 700),
                   onChanged: (_) => setState(() {}), // Recalculate
                 ),
                 const SizedBox(height: 10),

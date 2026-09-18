@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/data/models/budget_model.dart';
 import 'package:budgett_frontend/presentation/utils/icon_helper.dart';
+import '../../core/app_text.dart';
 
 class EditBudgetDialog extends ConsumerStatefulWidget {
   final String categoryId;
@@ -166,6 +167,7 @@ class _EditBudgetDialogState extends ConsumerState<EditBudgetDialog> {
               ),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               inputFormatters: [CurrencyInputFormatter()],
+              style: AppText.tabular(22, weight: 700),
               autofocus: true,
               validator: (value) {
                 if (value == null || value.isEmpty) return 'Required';

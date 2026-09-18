@@ -9,6 +9,7 @@ import '../../data/models/savings_interest_details_model.dart';
 import '../providers/finance_provider.dart';
 import '../utils/currency_formatter.dart';
 import '../../core/app_theme.dart';
+import '../../core/app_text.dart';
 
 /// Dialog to formally record accrued interest on a savings account (parent
 /// or pocket). Pre-fills the recommended amount using the E.A. compound
@@ -210,6 +211,7 @@ class _SavingsInterestDialogState
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
                 inputFormatters: [const CurrencyInputFormatter()],
+                style: AppText.tabular(22, weight: 700),
               ),
               const SizedBox(height: 12),
               InkWell(

@@ -15,6 +15,7 @@ import '../../data/models/broker_model.dart';
 import '../../data/models/investment_details_model.dart';
 import 'add_account_dialog.dart' show buildInvestmentDetailsMap;
 import '../../core/app_theme.dart';
+import '../../core/app_text.dart';
 
 class EditAccountDialog extends ConsumerStatefulWidget {
   final Account account;
@@ -552,6 +553,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                   keyboardType: TextInputType.numberWithOptions(
                       decimal: true, signed: !isCreditCard),
                   inputFormatters: [const CurrencyInputFormatter()],
+                  style: AppText.tabular(22, weight: 700),
                   validator: (value) {
                     if (value == null || value.isEmpty) return 'Required';
                     if (CurrencyFormatter.parse(value) == 0.0 && value != '0' && value != '0.0') return 'Invalid number';
@@ -674,6 +676,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                     ),
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     inputFormatters: [const CurrencyInputFormatter()],
+                    style: AppText.tabular(22, weight: 700),
                   ),
                   const SizedBox(height: 10),
 
@@ -694,6 +697,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                     ),
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     inputFormatters: [const CurrencyInputFormatter(currency: 'USD')],
+                    style: AppText.tabular(22, weight: 700),
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
@@ -705,6 +709,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                     ),
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     inputFormatters: [const CurrencyInputFormatter(currency: 'USD')],
+                    style: AppText.tabular(22, weight: 700),
                   ),
                   const SizedBox(height: 10),
 
@@ -751,6 +756,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                           keyboardType: const TextInputType.numberWithOptions(
                               decimal: true),
                           inputFormatters: [const CurrencyInputFormatter()],
+                          style: AppText.tabular(22, weight: 700),
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -867,6 +873,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
                       inputFormatters: [const CurrencyInputFormatter()],
+                      style: AppText.tabular(22, weight: 700),
                     ),
                     const SizedBox(height: 12),
                     Row(

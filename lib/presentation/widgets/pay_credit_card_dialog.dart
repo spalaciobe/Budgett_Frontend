@@ -527,6 +527,7 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
                   controller: _settleController,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: [CurrencyInputFormatter(currency: _debtCurrency)],
+                  style: AppText.tabular(22, weight: 700),
                   readOnly: _preset != _PaymentPreset.custom,
                   decoration: InputDecoration(
                     labelText: 'Settle on card',
@@ -544,6 +545,7 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
                     controller: _debitController,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     inputFormatters: [CurrencyInputFormatter(currency: _sourceCurrency)],
+                    style: AppText.tabular(22, weight: 700),
                     decoration: InputDecoration(
                       labelText: 'Debit from source',
                       prefixText: CurrencyFormatter.prefixFor(_sourceCurrency),

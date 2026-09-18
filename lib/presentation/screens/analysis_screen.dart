@@ -528,14 +528,22 @@ class _PortfolioContent extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // A fixed title, a badge and a labelled button in one Row overflowed
+        // the right edge on a phone. The title yields first: it can fade, the
+        // action cannot.
         Row(
           children: [
             const Icon(Icons.pie_chart_outline, size: 20),
             const SizedBox(width: 8),
-            Text(
-              'Consolidated portfolio',
-              style: theme.textTheme.titleMedium
-                  ?.copyWith(fontWeight: FontWeight.bold),
+            Flexible(
+              child: Text(
+                'Consolidated portfolio',
+                style: theme.textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.bold),
+                maxLines: 1,
+                overflow: TextOverflow.fade,
+                softWrap: false,
+              ),
             ),
             if (portfolio.hasFxConversion) ...[
               const SizedBox(width: 8),
@@ -552,7 +560,7 @@ class _PortfolioContent extends StatelessWidget {
                 ),
               ),
             ],
-            const Spacer(),
+            const SizedBox(width: 8),
             const _PortfolioFetchButton(),
           ],
         ),

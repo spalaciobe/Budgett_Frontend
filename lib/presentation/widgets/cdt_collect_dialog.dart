@@ -7,6 +7,7 @@ import '../../data/models/account_model.dart';
 import '../../data/repositories/finance_repository.dart';
 import '../providers/finance_provider.dart';
 import '../utils/currency_formatter.dart';
+import '../../core/app_text.dart';
 
 /// Dialog to collect a matured CDT: creates the interest income transaction
 /// and optionally updates the cash balance.
@@ -126,6 +127,7 @@ class _CdtCollectDialogState extends ConsumerState<CdtCollectDialog> {
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
               inputFormatters: [const CurrencyInputFormatter()],
+              style: AppText.tabular(22, weight: 700),
             ),
             const SizedBox(height: 12),
             InkWell(

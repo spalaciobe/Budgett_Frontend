@@ -54,7 +54,7 @@ class AppText {
   /// that sits above a list has to leave the list visible.
   static final balanceHero = TextStyle(
     fontFamily: figureFamily,
-    fontSize: 30,
+    fontSize: 26,
     height: 1.2,
     letterSpacing: -1.0,
     fontFeatures: _tabular,

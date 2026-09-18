@@ -91,7 +91,7 @@ class _MonthSummaryCard extends ConsumerWidget {
       child: Padding(
         // Tighter than kHeroCardPadding: this card is a summary, and at 20px
         // padding around a 36px figure it was eating a third of the phone.
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -100,19 +100,35 @@ class _MonthSummaryCard extends ConsumerWidget {
               style: AppText.label.copyWith(color: context.muted),
             ),
             kGapSm,
-            Text(
-              CurrencyFormatter.format(net.abs()),
-              maxLines: 1,
-              overflow: TextOverflow.fade,
-              softWrap: false,
-              style: AppText.balanceHero.copyWith(color: netColor),
+            // The verdict sits beside the figure instead of under it: one
+            // line saved is ~20% of this card's height, and the two belong
+            // together anyway ("$136.633 over your income").
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Flexible(
+                  child: Text(
+                    CurrencyFormatter.format(net.abs()),
+                    maxLines: 1,
+                    overflow: TextOverflow.fade,
+                    softWrap: false,
+                    style: AppText.balanceHero.copyWith(color: netColor),
+                  ),
+                ),
+                const SizedBox(width: kSpaceLg),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 3),
+                    child: Text(
+                      overspent ? 'over your income' : 'left this month',
+                      style: AppText.caption.copyWith(color: context.muted),
+                      maxLines: 2,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            kGapXs,
-            Text(
-              overspent ? 'over your income this month' : 'left this month',
-              style: AppText.caption.copyWith(color: context.muted),
-            ),
-            kGapXl,
+            kGapLg,
             _SpendBar(ratio: ratio, overspent: overspent),
             kGapMd,
             Row(

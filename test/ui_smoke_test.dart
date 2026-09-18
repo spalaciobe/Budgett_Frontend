@@ -65,6 +65,7 @@ import 'package:budgett_frontend/presentation/widgets/portfolio_donut_chart.dart
 import 'package:budgett_frontend/presentation/widgets/review_capture_sheet.dart';
 import 'package:budgett_frontend/presentation/widgets/transaction_tile.dart';
 import 'package:budgett_frontend/presentation/widgets/add_transaction_dialog.dart';
+import 'package:budgett_frontend/presentation/widgets/edit_transaction_dialog.dart';
 import 'package:budgett_frontend/presentation/widgets/update_available_dialog.dart';
 
 // Each case is (label, size, dark). The theme matters: until now this
@@ -582,6 +583,12 @@ final _targets = <String, _Target>{
         _capturedMessage(id: 'cap-9', amount: 250000, kind: 'transfer_in'),
       ],
     ),
+  ),
+  'dialog_edit_transaction': _Target(
+    () => Scaffold(
+      body: EditTransactionDialog(transaction: _tx(accountId: 'acc-1')),
+    ),
+    overrides: _financeOverrides(),
   ),
   // The form people use most, and the one that had fourteen fields on screen
   // at once. Captured collapsed (the default) so the shot shows what someone

@@ -41,42 +41,57 @@ class RecurringTransactionsScreen extends ConsumerWidget {
               physics: const AlwaysScrollableScrollPhysics(),
               itemCount: transactions.length,
               padding: kScreenPadding,
-              separatorBuilder: (context, index) => kGapLg,
+              separatorBuilder: (context, index) => kGapMd,
             itemBuilder: (context, index) {
               final item = transactions[index];
               return Card(
                 child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
                   onTap: () => showDialog(
                     context: context,
                     builder: (_) => EditRecurringTransactionDialog(transaction: item),
                   ),
+                  // Two lines, not four. The old row wrapped the name onto a
+                  // second line, then spent two more on "Next: 18/10/2026" and
+                  // "Last: 18/09/2026" — a full date twice, mostly digits the
+                  // eye has to parse. The next run is what matters and it is
+                  // never far away, so it reads as "Monthly · 18 Oct"; the
+                  // last run lives in the edit dialog.
                   leading: CircleAvatar(
-                    backgroundColor: item.type == 'income' 
-                        ? context.positive.withValues(alpha: 0.1) 
-                        : context.negative.withValues(alpha: 0.1),
+                    radius: 16,
+                    backgroundColor: item.type == 'income'
+                        ? context.positive.withValues(alpha: 0.12)
+                        : context.negative.withValues(alpha: 0.12),
                     child: Icon(
                       item.type == 'income' ? Icons.arrow_downward : Icons.arrow_upward,
+                      size: 16,
                       color: item.type == 'income' ? context.positive : context.negative,
                     ),
                   ),
-                  title: Text(item.description, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('${_capitalize(item.frequency)} • Next: ${DateFormat('dd/MM/yyyy').format(item.nextRunDate)}'),
-                      if (item.lastRunDate != null)
-                        Text('Last: ${DateFormat('dd/MM/yyyy').format(item.lastRunDate!)}', style: AppText.badge.copyWith(color: context.muted)),
-                    ],
+                  title: Text(
+                    item.description,
+                    style: AppText.tileTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.fade,
+                    softWrap: false,
+                  ),
+                  subtitle: Text(
+                    '${_capitalize(item.frequency)} · ${DateFormat('d MMM').format(item.nextRunDate)}',
+                    style: AppText.caption.copyWith(color: context.muted),
+                    maxLines: 1,
+                    overflow: TextOverflow.fade,
+                    softWrap: false,
                   ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         CurrencyFormatter.format(item.amount),
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: item.type == 'income' ? context.positive : context.negative,
+                        style: AppText.amount.copyWith(
+                          color: item.type == 'income'
+                              ? context.positive
+                              : context.negative,
                         ),
                       ),
                       PopupMenuButton(

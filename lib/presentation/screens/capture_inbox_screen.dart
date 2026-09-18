@@ -16,6 +16,7 @@ import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:budgett_frontend/presentation/widgets/empty_state.dart';
 import 'package:budgett_frontend/presentation/widgets/review_capture_sheet.dart';
 import '../widgets/skeleton.dart';
+import '../widgets/page_body.dart';
 
 /// The review queue for captured bank messages.
 ///
@@ -242,17 +243,17 @@ class _CaptureList extends ConsumerWidget {
 
         return RefreshIndicator(
           onRefresh: onRefresh,
-          child: Center(
-            child: ConstrainedBox(
-              // Keeps the cards readable on a desktop-width window.
-              constraints: const BoxConstraints(maxWidth: 720),
-              child: ListView.builder(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: kScreenPadding,
-                itemCount: messages.length,
-                itemBuilder: (context, index) =>
-                    CaptureCard(message: messages[index]),
-              ),
+          // PageBody, like every other screen: a bare Center put this list
+          // on a different horizontal grid from the rest of the app, which is
+          // why the inbox read as belonging to another product.
+          child: PageBody(
+            maxWidth: kColumnMaxWidth,
+            child: ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: kScreenPadding,
+              itemCount: messages.length,
+              itemBuilder: (context, index) =>
+                  CaptureCard(message: messages[index]),
             ),
           ),
         );

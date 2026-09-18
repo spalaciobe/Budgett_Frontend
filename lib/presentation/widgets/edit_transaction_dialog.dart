@@ -12,6 +12,7 @@ import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/presentation/widgets/credit_card_billing_simulator.dart';
 import '../../core/app_theme.dart';
 import '../../core/app_text.dart';
+import 'form_fields.dart';
 
 class EditTransactionDialog extends ConsumerStatefulWidget {
   final Transaction transaction;
@@ -616,6 +617,19 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // What kind of transaction: first, because it decides
+                      // which of the fields below apply at all.
+                      TransactionTypeSelector(
+                        value: _selectedType,
+                        onChanged: (v) => setState(() {
+                          _selectedType = v;
+                          if (_selectedType != 'income') {
+                            _isReimbursement = false;
+                          }
+                        }),
+                      ),
+                      const SizedBox(height: kSpaceSection),
+
                       // Currency toggle (CC transactions)
                       Builder(builder: (context) {
                         final accounts = ref.watch(accountsProvider).valueOrNull ?? [];
@@ -643,26 +657,13 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                         );
                       }),
 
-                      // Amount (read-only for installment children)
-                      TextFormField(
+                      AmountField(
                         controller: _amountController,
+                        currency: _currency,
                         enabled: !widget.transaction.isInstallmentChild,
-                        decoration: InputDecoration(
-                          labelText: widget.transaction.isInstallmentChild
-                              ? 'Amount (managed by parent purchase)'
-                              : 'Amount',
-                          prefixText: CurrencyFormatter.prefixFor(_currency),
-                          border: const OutlineInputBorder(),
-                        ),
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        inputFormatters: [CurrencyInputFormatter(currency: _currency)],
-                        validator: (value) {
-                          if (value == null || value.isEmpty) return 'Required';
-                          if (CurrencyFormatter.parse(value, currency: _currency) == 0.0 &&
-                              value != '0' &&
-                              value != '0.0') return 'Invalid number';
-                          return null;
-                        },
+                        label: widget.transaction.isInstallmentChild
+                            ? 'Amount (managed by parent purchase)'
+                            : 'Amount',
                       ),
                       const SizedBox(height: 10),
 
@@ -674,81 +675,6 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                           border: OutlineInputBorder(),
                         ),
                         validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
-                      ),
-                      const SizedBox(height: 10),
-
-                      // Date
-                      InkWell(
-                        onTap: () => _selectDate(context),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Theme.of(context).dividerColor),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Date',
-                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.6),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    _selectedDate.toLocal().toString().split(' ')[0],
-                                    style: Theme.of(context).textTheme.bodyLarge,
-                                  ),
-                                ],
-                              ),
-                              const Icon(Icons.calendar_today),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      
-                      // Status
-                      DropdownButtonFormField<String>(
-                        value: ['paid', 'pending'].contains(_status) ? _status : 'paid',
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Status',
-                          border: OutlineInputBorder(),
-                        ),
-                        items: const [
-                          DropdownMenuItem(value: 'paid', child: Text('Paid')),
-                          DropdownMenuItem(value: 'pending', child: Text('Pending')),
-                        ],
-                        onChanged: (value) => setState(() => _status = value!),
-                      ),
-                      const SizedBox(height: 10),
-
-                      // Type (Disabled for edit to avoid complex logic changes, or re-enabled if needed)
-                      // Allowing type change requires logic to handle "changing from transfer to expense" etc.
-                      // For now, let's allow it but fields will update.
-                      DropdownButtonFormField<String>(
-                        value: _selectedType,
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Type',
-                          border: OutlineInputBorder(),
-                        ),
-                        items: const [
-                          DropdownMenuItem(value: 'income', child: Text('Income')),
-                          DropdownMenuItem(value: 'expense', child: Text('Expense')),
-                          DropdownMenuItem(value: 'transfer', child: Text('Transfer')),
-                        ],
-                        onChanged: (value) => setState(() {
-                          _selectedType = value!;
-                          if (_selectedType != 'income') {
-                            _isReimbursement = false;
-                          }
-                        }),
                       ),
                       const SizedBox(height: 10),
 
@@ -786,22 +712,6 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                         error: (e, s) => Text(friendlyError(e)),
                       ),
                       const SizedBox(height: 10),
-
-                      // Reimbursement toggle (income only).
-                      if (_selectedType == 'income') ...[
-                        SwitchListTile(
-                          title: const Text('Is a reimbursement?'),
-                          subtitle: const Text(
-                              'Offsets the original expense category instead of counting as income'),
-                          value: _isReimbursement,
-                          onChanged: (v) => setState(() {
-                            _isReimbursement = v;
-                            _selectedCategoryId = null;
-                          }),
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                        const SizedBox(height: 10),
-                      ],
 
                       // Category
                       if (_selectedType != 'transfer')
@@ -870,57 +780,13 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                         ),
                       if (_selectedType == 'transfer') const SizedBox(height: 10),
 
-                      // Sinking-fund linkage (Model B): expense → funded by, transfer → contribution.
-                      if (_selectedType == 'expense' || _selectedType == 'transfer')
-                        categoriesAsync.when(
-                          data: (categories) {
-                            final savings = categories
-                                .where((c) => c.isSavings)
-                                .toList();
-                            if (savings.isEmpty) return const SizedBox();
-                            final isExpense = _selectedType == 'expense';
-                            final selected = isExpense
-                                ? _fundedByCategoryId
-                                : _savingsContributionCategoryId;
-                            final exists =
-                                savings.any((c) => c.id == selected);
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
-                              child: DropdownButtonFormField<String?>(
-                                value: exists ? selected : null,
-                                isExpanded: true,
-                                decoration: InputDecoration(
-                                  labelText: isExpense
-                                      ? 'Funded by sinking fund (optional)'
-                                      : 'Contribute to sinking fund (optional)',
-                                  helperText: isExpense
-                                      ? "Subtracts from the fund's accumulated balance instead of the category budget."
-                                      : "Counts as this month's contribution toward the fund's target.",
-                                  border: const OutlineInputBorder(),
-                                ),
-                                items: [
-                                  const DropdownMenuItem<String?>(
-                                      value: null, child: Text('None')),
-                                  ...savings.map((c) =>
-                                      DropdownMenuItem<String?>(
-                                        value: c.id,
-                                        child: Text(c.name,
-                                            overflow: TextOverflow.fade),
-                                      )),
-                                ],
-                                onChanged: (v) => setState(() {
-                                  if (isExpense) {
-                                    _fundedByCategoryId = v;
-                                  } else {
-                                    _savingsContributionCategoryId = v;
-                                  }
-                                }),
-                              ),
-                            );
-                          },
-                          loading: () => const SizedBox(),
-                          error: (_, __) => const SizedBox(),
-                        ),
+                      TransactionDateField(
+                        value: _selectedDate,
+                        onChanged: (d) => setState(() => _selectedDate = d),
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2030),
+                      ),
+                      const SizedBox(height: 10),
 
                       // Installment parent: cuota config fields
                       if (widget.transaction.isInstallmentParent) ...[
@@ -969,50 +835,147 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                         const SizedBox(height: 10),
                       ],
 
-                      // Make recurring (not available for installment parent/child)
-                      if (!widget.transaction.isInstallmentParent &&
-                          !widget.transaction.isInstallmentChild) ...[
-                        const Divider(),
-                        SwitchListTile(
-                          title: const Text('Make recurring?'),
-                          subtitle: const Text(
-                              'Automatically create future transactions from this one'),
-                          value: _isRecurring,
-                          onChanged: (v) => setState(() => _isRecurring = v),
-                          contentPadding: EdgeInsets.zero,
+                      // Status, recurrence, reimbursements, sinking funds and notes:
+                      // the answers most edits never change. One tap away,
+                      // and already open when this transaction uses one.
+                      MoreOptions(
+                        initiallyOpen: _status == 'pending' ||
+                            _isReimbursement ||
+                            _fundedByCategoryId != null ||
+                            _savingsContributionCategoryId != null ||
+                            _isRecurring ||
+                            _notesController.text.isNotEmpty,
+                        children: [
+                        SegmentedButton<String>(
+                          showSelectedIcon: false,
+                          segments: const [
+                            ButtonSegment(value: 'paid', label: Text('Paid')),
+                            ButtonSegment(
+                                value: 'pending', label: Text('Pending')),
+                          ],
+                          selected: {
+                            ['paid', 'pending'].contains(_status) ? _status : 'paid'
+                          },
+                          onSelectionChanged: (v) =>
+                              setState(() => _status = v.first),
                         ),
-                        if (_isRecurring) ...[
-                          const SizedBox(height: 8),
-                          DropdownButtonFormField<String>(
-                            value: _frequency,
-                            isExpanded: true,
-                            decoration: const InputDecoration(
-                              labelText: 'Frequency',
-                              border: OutlineInputBorder(),
+                        const SizedBox(height: 10),
+
+                        // Make recurring (not available for installment parent/child)
+                        if (!widget.transaction.isInstallmentParent &&
+                            !widget.transaction.isInstallmentChild) ...[
+                          const Divider(),
+                          SwitchListTile(
+                            title: const Text('Make recurring?'),
+                            subtitle: const Text(
+                                'Automatically create future transactions from this one'),
+                            value: _isRecurring,
+                            onChanged: (v) => setState(() => _isRecurring = v),
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                          if (_isRecurring) ...[
+                            const SizedBox(height: 8),
+                            DropdownButtonFormField<String>(
+                              value: _frequency,
+                              isExpanded: true,
+                              decoration: const InputDecoration(
+                                labelText: 'Frequency',
+                                border: OutlineInputBorder(),
+                              ),
+                              items: const [
+                                DropdownMenuItem(value: 'daily', child: Text('Daily')),
+                                DropdownMenuItem(value: 'weekly', child: Text('Weekly')),
+                                DropdownMenuItem(value: 'biweekly', child: Text('Biweekly')),
+                                DropdownMenuItem(value: 'monthly', child: Text('Monthly')),
+                                DropdownMenuItem(value: 'yearly', child: Text('Yearly')),
+                              ],
+                              onChanged: (v) => setState(() => _frequency = v!),
                             ),
-                            items: const [
-                              DropdownMenuItem(value: 'daily', child: Text('Daily')),
-                              DropdownMenuItem(value: 'weekly', child: Text('Weekly')),
-                              DropdownMenuItem(value: 'biweekly', child: Text('Biweekly')),
-                              DropdownMenuItem(value: 'monthly', child: Text('Monthly')),
-                              DropdownMenuItem(value: 'yearly', child: Text('Yearly')),
-                            ],
-                            onChanged: (v) => setState(() => _frequency = v!),
+                            const SizedBox(height: 10),
+                          ],
+                        ],
+
+                        // Reimbursement toggle (income only).
+                        if (_selectedType == 'income') ...[
+                          SwitchListTile(
+                            title: const Text('Is a reimbursement?'),
+                            subtitle: const Text(
+                                'Offsets the original expense category instead of counting as income'),
+                            value: _isReimbursement,
+                            onChanged: (v) => setState(() {
+                              _isReimbursement = v;
+                              _selectedCategoryId = null;
+                            }),
+                            contentPadding: EdgeInsets.zero,
                           ),
                           const SizedBox(height: 10),
                         ],
-                      ],
 
-                      // Notes
-                      TextFormField(
-                        controller: _notesController,
-                        decoration: const InputDecoration(
-                          labelText: 'Notes (optional)',
-                          border: OutlineInputBorder(),
+                        // Sinking-fund linkage (Model B): expense → funded by, transfer → contribution.
+                        if (_selectedType == 'expense' || _selectedType == 'transfer')
+                          categoriesAsync.when(
+                            data: (categories) {
+                              final savings = categories
+                                  .where((c) => c.isSavings)
+                                  .toList();
+                              if (savings.isEmpty) return const SizedBox();
+                              final isExpense = _selectedType == 'expense';
+                              final selected = isExpense
+                                  ? _fundedByCategoryId
+                                  : _savingsContributionCategoryId;
+                              final exists =
+                                  savings.any((c) => c.id == selected);
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: DropdownButtonFormField<String?>(
+                                  value: exists ? selected : null,
+                                  isExpanded: true,
+                                  decoration: InputDecoration(
+                                    labelText: isExpense
+                                        ? 'Funded by sinking fund (optional)'
+                                        : 'Contribute to sinking fund (optional)',
+                                    helperText: isExpense
+                                        ? "Subtracts from the fund's accumulated balance instead of the category budget."
+                                        : "Counts as this month's contribution toward the fund's target.",
+                                    border: const OutlineInputBorder(),
+                                  ),
+                                  items: [
+                                    const DropdownMenuItem<String?>(
+                                        value: null, child: Text('None')),
+                                    ...savings.map((c) =>
+                                        DropdownMenuItem<String?>(
+                                          value: c.id,
+                                          child: Text(c.name,
+                                              overflow: TextOverflow.fade),
+                                        )),
+                                  ],
+                                  onChanged: (v) => setState(() {
+                                    if (isExpense) {
+                                      _fundedByCategoryId = v;
+                                    } else {
+                                      _savingsContributionCategoryId = v;
+                                    }
+                                  }),
+                                ),
+                              );
+                            },
+                            loading: () => const SizedBox(),
+                            error: (_, __) => const SizedBox(),
+                          ),
+
+                        // Notes
+                        TextFormField(
+                          controller: _notesController,
+                          decoration: const InputDecoration(
+                            labelText: 'Notes (optional)',
+                            border: OutlineInputBorder(),
+                          ),
+                          maxLines: 2,
+                          // Child transactions: notes are always editable
                         ),
-                        maxLines: 2,
-                        // Child transactions: notes are always editable
+                        ],
                       ),
+                      const SizedBox(height: 16),
                     ],
                   ),
                 ),

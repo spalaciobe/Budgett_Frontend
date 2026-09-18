@@ -17,6 +17,7 @@ import 'package:budgett_frontend/presentation/widgets/discard_guard.dart';
 import 'package:intl/intl.dart';
 import '../../core/app_theme.dart';
 import '../../core/app_text.dart';
+import 'form_fields.dart';
 
 class AddTransactionDialog extends ConsumerStatefulWidget {
   const AddTransactionDialog({super.key});
@@ -699,27 +700,10 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                   const SizedBox(height: 16),
 
                   // Type
-                  SizedBox(
-                    width: double.infinity,
-                    child: SegmentedButton<String>(
-                      showSelectedIcon: false,
-                      segments: const [
-                        ButtonSegment(
-                            value: 'expense',
-                            label: Text('Expense'),
-                            icon: Icon(Icons.arrow_outward, size: 15)),
-                        ButtonSegment(
-                            value: 'income',
-                            label: Text('Income'),
-                            icon: Icon(Icons.south_west, size: 15)),
-                        ButtonSegment(
-                            value: 'transfer',
-                            label: Text('Transfer'),
-                            icon: Icon(Icons.swap_horiz, size: 15)),
-                      ],
-                      selected: {_selectedType},
-                      onSelectionChanged: (selection) => setState(() {
-                      _selectedType = selection.first;
+                  TransactionTypeSelector(
+                    value: _selectedType,
+                    onChanged: (v) => setState(() {
+                      _selectedType = v;
                       // Reset currency, installments and sinking-fund links when changing type
                       if (!_isCreditCardExpense) _currency = 'COP';
                       _isUsdPayment = false;
@@ -728,8 +712,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                       _savingsContributionCategoryId = null;
                       if (_selectedType != 'income') _isReimbursement = false;
                       _selectedCategoryId = null;
-                      }),
-                    ),
+                    }),
                   ),
                   const SizedBox(height: kSpaceSection),
 
@@ -754,43 +737,10 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                   ],
 
                   // Amount
-                  TextFormField(
+                  AmountField(
                     controller: _amountController,
+                    currency: _currency,
                     autofocus: true,
-                    style: AppText.tabular(28, weight: 700),
-                    decoration: InputDecoration(
-                      labelText: 'Amount',
-                      // Trailing space, and the same size as the value: a
-                      // currency mark is part of the number, not a label in
-                      // front of it. It used to be 22px against a 13px hint.
-                      prefixText: '${CurrencyFormatter.prefixFor(_currency)} ',
-                      prefixStyle: AppText.tabular(28, weight: 700).copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                      hintText: '0',
-                      hintStyle: AppText.tabular(28, weight: 700).copyWith(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurfaceVariant
-                            .withValues(alpha: 0.45),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 14),
-                      border: const OutlineInputBorder(),
-                    ),
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    inputFormatters: [
-                      CurrencyInputFormatter(currency: _currency)
-                    ],
-                    validator: (value) {
-                      if (value == null || value.isEmpty) return 'Required';
-                      if (CurrencyFormatter.parse(value, currency: _currency) ==
-                              0.0 &&
-                          value != '0' &&
-                          value != '0.0') return 'Invalid number';
-                      return null;
-                    },
                   ),
                   const SizedBox(height: 10),
 
@@ -966,7 +916,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                   ],
 
                   // Date
-                  _DateField(
+                  TransactionDateField(
                     value: _selectedDate,
                     onChanged: (d) => setState(() => _selectedDate = d),
                   ),
@@ -983,7 +933,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                   // groups and notes. Fourteen fields were visible at once,
                   // which is what made recording a coffee feel like filing a
                   // form. They stay one tap away.
-                  _MoreOptions(
+                  MoreOptions(
                     children: [
                       // Status Toggle
                       SegmentedButton<String>(
@@ -1198,124 +1148,6 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
           ),
         ),
       ),
-    );
-  }
-}
-
-/// The rarely-used half of the transaction form, collapsed by default.
-///
-/// Progressive disclosure: the fields that answer "what did I spend?" stay
-/// visible, and the ones that answer a question most transactions never ask
-/// (is it recurring? does it come out of a sinking fund? is it a
-/// reimbursement?) wait behind one tap.
-class _MoreOptions extends StatefulWidget {
-  final List<Widget> children;
-
-  const _MoreOptions({required this.children});
-
-  @override
-  State<_MoreOptions> createState() => _MoreOptionsState();
-}
-
-class _MoreOptionsState extends State<_MoreOptions> {
-  bool _open = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        InkWell(
-          onTap: () => setState(() => _open = !_open),
-          borderRadius: BorderRadius.circular(8),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            child: Row(
-              children: [
-                Icon(
-                  _open ? Icons.expand_less : Icons.expand_more,
-                  size: 20,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  _open ? 'Fewer options' : 'More options',
-                  style: AppText.cardName
-                      .copyWith(color: Theme.of(context).colorScheme.primary),
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (_open)
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: widget.children,
-          ),
-      ],
-    );
-  }
-}
-
-/// The transaction date as a control rather than a caption.
-///
-/// Replaces "Date: 18/09/2026  [Change]" — a line of text with a button beside
-/// it. Nearly every transaction is entered the day it happened or the day
-/// after, so those two are one tap; anything else opens the calendar.
-class _DateField extends StatelessWidget {
-  final DateTime value;
-  final ValueChanged<DateTime> onChanged;
-
-  const _DateField({required this.value, required this.onChanged});
-
-  bool _isSameDay(DateTime a, DateTime b) =>
-      a.year == b.year && a.month == b.month && a.day == b.day;
-
-  @override
-  Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final yesterday = today.subtract(const Duration(days: 1));
-    final isToday = _isSameDay(value, today);
-    final isYesterday = _isSameDay(value, yesterday);
-
-    return Row(
-      children: [
-        ChoiceChip(
-          label: const Text('Today'),
-          selected: isToday,
-          onSelected: (_) => onChanged(today),
-        ),
-        const SizedBox(width: kSpaceLg),
-        ChoiceChip(
-          label: const Text('Yesterday'),
-          selected: isYesterday,
-          onSelected: (_) => onChanged(yesterday),
-        ),
-        const SizedBox(width: kSpaceLg),
-        Expanded(
-          child: ActionChip(
-            avatar: const Icon(Icons.calendar_today, size: 15),
-            label: Text(
-              isToday || isYesterday
-                  ? 'Another day'
-                  : DateFormat('d MMM yyyy').format(value),
-              maxLines: 1,
-              overflow: TextOverflow.fade,
-              softWrap: false,
-            ),
-            onPressed: () async {
-              final picked = await showDatePicker(
-                context: context,
-                initialDate: value,
-                firstDate: DateTime(2000),
-                lastDate: DateTime(2100),
-              );
-              if (picked != null) onChanged(picked);
-            },
-          ),
-        ),
-      ],
     );
   }
 }
