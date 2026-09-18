@@ -57,6 +57,7 @@ void main() {
     container.listen(homeMonthSummaryProvider, (_, __) {});
 
     await container.read(homeMonthSummaryProvider.future);
+    // Exactly one read each: the provider must not run twice per refresh.
     expect(repo.incomeCalls, 1);
     expect(repo.spendingCalls, 1);
 
@@ -65,6 +66,7 @@ void main() {
     await container.read(homeMonthSummaryProvider.future);
 
     expect(repo.incomeCalls, 2, reason: 'income was not recomputed');
-    expect(repo.spendingCalls, 2, reason: 'spending was not recomputed');
+    expect(repo.spendingCalls, 2,
+        reason: 'spending was not recomputed');
   });
 }

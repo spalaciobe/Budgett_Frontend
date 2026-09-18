@@ -87,11 +87,25 @@ final homeMonthSummaryProvider =
   // Transactions kept showing the figures from before the edit. Depending on
   // the list means a new write path gets this for free instead of having to
   // remember it.
+  //
+  // The three reads all start before any of them is awaited, so the card
+  // catches up in the time of the slowest rather than the sum of the three.
+  // Awaiting the list in sequence — list, then income, then spending — was
+  // long enough after saving to be noticeable, and watching it without
+  // awaiting ran the whole provider twice (once per state the list passes
+  // through), doubling the queries to save the same time.
+  //
+  // Starting the month queries first is safe: the list is only invalidated
+  // once a write has been confirmed, so the figures they read are already the
+  // new ones.
+  final now = DateTime.now();
+  final incomeFuture = repository.getMonthlyIncome(now.month, now.year);
+  final spendingFuture = repository.getSpendingByCategory(now.month, now.year);
+
   await ref.watch(recentTransactionsProvider.future);
 
-  final now = DateTime.now();
-  final income = await repository.getMonthlyIncome(now.month, now.year);
-  final spending = await repository.getSpendingByCategory(now.month, now.year);
+  final income = await incomeFuture;
+  final spending = await spendingFuture;
   final spent = spending.values.fold<double>(0.0, (s, v) => s + v.total);
   return (income: income, spent: spent);
 });

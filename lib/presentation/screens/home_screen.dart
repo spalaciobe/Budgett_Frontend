@@ -78,6 +78,11 @@ class _MonthSummaryCard extends ConsumerWidget {
 
     if (async.isLoading && !async.hasValue) return const SkeletonHeroCard();
 
+    // Refreshing with figures already on screen: keep showing them, dimmed.
+    // Replacing them with a skeleton would make the card flash on every save,
+    // and showing them unchanged made a refresh look like nothing happened.
+    final isRefreshing = async.isLoading && async.hasValue;
+
     final data = async.valueOrNull;
     final income = data?.income ?? 0.0;
     final spent = data?.spent ?? 0.0;
@@ -99,7 +104,10 @@ class _MonthSummaryCard extends ConsumerWidget {
     final onBlock = palette.onBrand;
     final netColor = overspent ? context.negative : onBlock;
 
-    return Card(
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 150),
+      opacity: isRefreshing ? 0.6 : 1,
+      child: Card(
       color: overspent ? null : palette.brand,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(kCardRadius),
@@ -182,6 +190,7 @@ class _MonthSummaryCard extends ConsumerWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }
