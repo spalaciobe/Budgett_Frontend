@@ -267,6 +267,20 @@ class _CaptureList extends ConsumerWidget {
 /// a colour dot, a one-line title, the amount on the right, and muted caption
 /// lines underneath. The inbox adds the review actions and, when present, the
 /// duplicate/error note.
+/// The readable part of a reverse-geocoded address.
+///
+/// These arrive as "25b-15, Carrera 63 25b-15, Portal de Dorado, Bogotá" —
+/// showing the whole thing cut a line off mid-word, and showing the first
+/// fragment often showed a bare house number. The longer of the first two
+/// fragments is the street in practice.
+String _shortPlace(String label) {
+  final parts = label.split(',').map((p) => p.trim()).where((p) => p.isNotEmpty);
+  if (parts.isEmpty) return label;
+  final head = parts.take(2).toList();
+  head.sort((a, b) => b.length.compareTo(a.length));
+  return head.first;
+}
+
 class CaptureCard extends ConsumerWidget {
   final CapturedMessage message;
 
@@ -299,7 +313,7 @@ class CaptureCard extends ConsumerWidget {
     final captionParts = <String>[
       if (issuer.isNotEmpty) issuer else source?.effectiveName ?? message.sourceKey,
       if (message.cardLast4 != null) '•${message.cardLast4}',
-      DateFormat('d MMM, HH:mm', 'en').format(message.occurredAt),
+      DateFormat('d MMM', 'en').format(message.occurredAt),
       // Only when it is not the obvious case — a red minus already reads as
       // "expense", and spelling it out cost the caption a whole extra line.
       if (message.kind != null && message.kind != MessageKind.purchase)
@@ -346,7 +360,7 @@ class CaptureCard extends ConsumerWidget {
                       ),
                       kGapXs,
                       Text(
-                        captionParts.join('  ·  '),
+                        captionParts.join(' · '),
                         style: AppText.caption.copyWith(color: muted),
                         maxLines: 1,
                         overflow: TextOverflow.fade,
@@ -360,9 +374,7 @@ class CaptureCard extends ConsumerWidget {
                             const SizedBox(width: 3),
                             Expanded(
                               child: Text(
-                                // Just the street, not the full reverse-geocoded
-                                // address: the rest was cut off mid-word anyway.
-                                message.locationLabel!.split(',').first,
+                                _shortPlace(message.locationLabel!),
                                 style: AppText.caption.copyWith(color: muted),
                                 maxLines: 1,
                                 overflow: TextOverflow.fade,
@@ -384,11 +396,14 @@ class CaptureCard extends ConsumerWidget {
             // The raw text is the only thing to show when parsing failed.
             if (message.parseStatus == 'unparsed') ...[
               kGapLg,
-              Text(
+              Padding(
+                padding: const EdgeInsets.only(left: 44),
+                child: Text(
                 message.body,
-                style: AppText.caption.copyWith(color: muted),
-                maxLines: 3,
-                overflow: TextOverflow.fade,
+                  style: AppText.caption.copyWith(color: muted),
+                  maxLines: 3,
+                  overflow: TextOverflow.fade,
+                ),
               ),
             ],
 
@@ -397,6 +412,8 @@ class CaptureCard extends ConsumerWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Same text column as everything else in this card.
+                  const SizedBox(width: 44),
                   Icon(Icons.info_outline,
                       size: 13, color: context.semantic.warning),
                   const SizedBox(width: kSpaceMd),
@@ -412,7 +429,13 @@ class CaptureCard extends ConsumerWidget {
             ],
 
             kGapSm,
-            _buildActions(context, ref, theme),
+            // Indented to the text column, not the card edge. The avatar sets
+            // where this row's content begins, and a status chip hanging off
+            // the left margin was the one thing still out of line.
+            Padding(
+              padding: const EdgeInsets.only(left: 44),
+              child: _buildActions(context, ref, theme),
+            ),
           ],
         ),
       ),

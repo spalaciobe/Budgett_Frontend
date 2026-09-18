@@ -1636,7 +1636,10 @@ class _UpdatePricesButtonState extends ConsumerState<_UpdatePricesButton> {
               Icon(Icons.refresh, size: 16, color: theme.colorScheme.primary),
             const SizedBox(width: 6),
             Text(
-              'Update Prices',
+              // Short enough that the three actions share one row at the
+              // default text size; the Wrap below stays as the safety net
+              // for large-text settings.
+              'Prices',
               style: theme.textTheme.labelLarge
                   ?.copyWith(color: theme.colorScheme.primary),
             ),
