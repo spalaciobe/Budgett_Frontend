@@ -79,6 +79,16 @@ final categoriesProvider = FutureProvider<List<Category>>((ref) async {
 final homeMonthSummaryProvider =
     FutureProvider.autoDispose<({double income, double spent})>((ref) async {
   final repository = ref.watch(financeRepositoryProvider);
+
+  // Tied to the transaction list rather than invalidated by hand. Every write
+  // path — the add and edit dialogs, capture ingestion, card payments, pocket
+  // moves, recurring generation, 17 call sites in all — already invalidates
+  // that list; not one of them also invalidated this, so the card on top of
+  // Transactions kept showing the figures from before the edit. Depending on
+  // the list means a new write path gets this for free instead of having to
+  // remember it.
+  await ref.watch(recentTransactionsProvider.future);
+
   final now = DateTime.now();
   final income = await repository.getMonthlyIncome(now.month, now.year);
   final spending = await repository.getSpendingByCategory(now.month, now.year);
