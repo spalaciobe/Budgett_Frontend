@@ -3,6 +3,7 @@ import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
+import '../widgets/screen_title.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -85,7 +86,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     _populate(profileAsync);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Edit Profile')),
+      appBar: AppBar(title: ScreenTitle('Edit Profile')),
       body: profileAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text(friendlyError(e))),

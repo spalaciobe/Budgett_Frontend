@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:budgett_frontend/presentation/navigation/nav_destinations.dart';
 import 'package:budgett_frontend/presentation/providers/logout_action.dart';
 import 'package:budgett_frontend/presentation/providers/message_capture_provider.dart';
+import '../widgets/screen_title.dart';
 
 class MoreScreen extends ConsumerWidget {
   const MoreScreen({super.key});
@@ -17,7 +18,7 @@ class MoreScreen extends ConsumerWidget {
         ref.watch(pendingCaptureCountProvider).valueOrNull ?? 0;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('More')),
+      appBar: AppBar(title: ScreenTitle('More')),
       body: RefreshIndicator(
         onRefresh: () async {},
         child: ListView(

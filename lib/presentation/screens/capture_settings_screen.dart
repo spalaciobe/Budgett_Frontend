@@ -15,6 +15,7 @@ import 'package:budgett_frontend/presentation/providers/message_capture_provider
 import 'package:budgett_frontend/presentation/providers/settings_provider.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import '../../core/app_text.dart';
+import '../widgets/screen_title.dart';
 
 /// Controls for the capture pipeline: what it listens to, how bold it is
 /// allowed to be, and what it has learned so far.
@@ -27,7 +28,7 @@ class CaptureSettingsScreen extends ConsumerWidget {
     final settingsAsync = ref.watch(captureSettingsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Expense capture')),
+      appBar: AppBar(title: ScreenTitle('Expense capture')),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 720),

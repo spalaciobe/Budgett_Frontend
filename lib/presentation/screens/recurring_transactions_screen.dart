@@ -11,6 +11,7 @@ import '../../core/app_theme.dart';
 import '../../core/app_text.dart';
 import '../widgets/page_body.dart';
 import '../widgets/skeleton.dart';
+import '../widgets/screen_title.dart';
 
 class RecurringTransactionsScreen extends ConsumerWidget {
   const RecurringTransactionsScreen({super.key});
@@ -20,7 +21,7 @@ class RecurringTransactionsScreen extends ConsumerWidget {
     final recurringAsync = ref.watch(recurringTransactionsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Recurring Transactions')),
+      appBar: AppBar(title: ScreenTitle('Recurring Transactions')),
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(recurringTransactionsProvider);

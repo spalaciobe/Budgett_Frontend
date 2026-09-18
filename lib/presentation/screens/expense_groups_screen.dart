@@ -10,6 +10,7 @@ import 'package:budgett_frontend/data/models/expense_group_model.dart';
 import '../../core/app_theme.dart';
 import '../widgets/skeleton.dart';
 import '../widgets/page_body.dart';
+import '../widgets/screen_title.dart';
 
 class ExpenseGroupsScreen extends ConsumerWidget {
   const ExpenseGroupsScreen({super.key});
@@ -20,7 +21,7 @@ class ExpenseGroupsScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Expense Groups'),
+        title: ScreenTitle('Expense Groups'),
         centerTitle: true,
       ),
       body: RefreshIndicator(

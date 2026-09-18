@@ -3,6 +3,7 @@ import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/app_text.dart';
+import '../../widgets/screen_title.dart';
 
 // ─── Country data ─────────────────────────────────────────────────────────────
 
@@ -200,7 +201,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Create account')),
+      appBar: AppBar(title: ScreenTitle('Create account')),
       body: Center(
         child: Container(
           constraints: const BoxConstraints(maxWidth: 440),

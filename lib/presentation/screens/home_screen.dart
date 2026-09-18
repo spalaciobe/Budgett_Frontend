@@ -15,6 +15,7 @@ import 'package:budgett_frontend/presentation/widgets/skeleton.dart';
 import 'package:budgett_frontend/presentation/providers/message_capture_provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:budgett_frontend/core/parsing/message_kind.dart';
+import '../widgets/screen_title.dart';
 
 String _formatDate(DateTime date) {
   const months = [
@@ -501,7 +502,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Transactions'),
+        title: ScreenTitle('Transactions'),
       ),
       body: RefreshIndicator(
         onRefresh: () async {

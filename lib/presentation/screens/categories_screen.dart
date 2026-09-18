@@ -13,6 +13,7 @@ import '../../core/app_text.dart';
 import '../widgets/skeleton.dart';
 import '../widgets/page_body.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/screen_title.dart';
 
 class CategoriesScreen extends ConsumerWidget {
   const CategoriesScreen({super.key});
@@ -23,7 +24,7 @@ class CategoriesScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Categories'),
+        title: ScreenTitle('Categories'),
       ),
       body: RefreshIndicator(
         onRefresh: () async {

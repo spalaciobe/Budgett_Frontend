@@ -13,6 +13,7 @@ import 'package:budgett_frontend/presentation/widgets/portfolio_donut_chart.dart
 import 'package:budgett_frontend/presentation/widgets/portfolio_value_chart.dart';
 import '../../core/app_text.dart';
 import '../widgets/skeleton.dart';
+import '../widgets/screen_title.dart';
 
 class AnalysisScreen extends ConsumerStatefulWidget {
   const AnalysisScreen({super.key});
@@ -30,7 +31,7 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Analysis'),
+          title: ScreenTitle('Analysis'),
           bottom: const TabBar(
             tabs: [
               Tab(icon: Icon(Icons.bar_chart), text: 'Cash flow'),

@@ -12,6 +12,7 @@ import '../../core/app_theme.dart';
 import '../../core/app_text.dart';
 import '../widgets/skeleton.dart';
 import '../widgets/page_body.dart';
+import '../widgets/screen_title.dart';
 
 class GoalsScreen extends ConsumerWidget {
   const GoalsScreen({super.key});
@@ -21,7 +22,7 @@ class GoalsScreen extends ConsumerWidget {
     final goalsAsync = ref.watch(goalsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Financial Goals')),
+      appBar: AppBar(title: ScreenTitle('Financial Goals')),
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(goalsProvider);

@@ -24,6 +24,7 @@ import 'package:budgett_frontend/presentation/screens/investment_details_screen.
 import '../../core/app_text.dart';
 import '../widgets/skeleton.dart';
 import '../widgets/page_body.dart';
+import '../widgets/screen_title.dart';
 
 // ── Top-level helpers ─────────────────────────────────────────────────────────
 
@@ -185,7 +186,7 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Accounts'),
+        title: ScreenTitle('Accounts'),
         actions: [
           PopupMenuButton<AccountSortOption>(
             icon: const Icon(Icons.sort),

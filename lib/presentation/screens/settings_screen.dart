@@ -9,6 +9,7 @@ import 'package:budgett_frontend/presentation/providers/logout_action.dart';
 import 'package:budgett_frontend/presentation/providers/fx_rate_provider.dart';
 import 'package:budgett_frontend/presentation/providers/update_provider.dart';
 import 'package:budgett_frontend/presentation/widgets/update_available_dialog.dart';
+import '../widgets/screen_title.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -29,7 +30,7 @@ class SettingsScreen extends ConsumerWidget {
     final isLoading = currencyAsync.isLoading || isDarkAsync.isLoading;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(title: ScreenTitle('Settings')),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(

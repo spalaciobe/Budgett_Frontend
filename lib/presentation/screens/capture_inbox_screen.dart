@@ -17,6 +17,7 @@ import 'package:budgett_frontend/presentation/widgets/empty_state.dart';
 import 'package:budgett_frontend/presentation/widgets/review_capture_sheet.dart';
 import '../widgets/skeleton.dart';
 import '../widgets/page_body.dart';
+import '../widgets/screen_title.dart';
 
 /// The review queue for captured bank messages.
 ///
@@ -49,7 +50,7 @@ class _CaptureInboxScreenState extends ConsumerState<CaptureInboxScreen> {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Expense Inbox'),
+          title: ScreenTitle('Expense Inbox'),
           actions: [
             IconButton(
               tooltip: 'Check for new messages',
@@ -315,11 +316,21 @@ class CaptureCard extends ConsumerWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Same leading avatar as a transaction row: the inbox lists
+                // the same kind of thing (money that moved), so it should
+                // read the same way.
                 Padding(
-                  padding: const EdgeInsets.only(top: 5, right: kSpaceXl),
+                  padding: const EdgeInsets.only(right: kSpaceXl),
                   child: CircleAvatar(
-                    radius: 4,
-                    backgroundColor: accent.withValues(alpha: 0.6),
+                    radius: 16,
+                    backgroundColor: accent.withValues(alpha: 0.12),
+                    child: Icon(
+                      message.channel == 'sms'
+                          ? Icons.sms_outlined
+                          : Icons.notifications_outlined,
+                      size: 16,
+                      color: accent,
+                    ),
                   ),
                 ),
                 Expanded(
@@ -334,31 +345,31 @@ class CaptureCard extends ConsumerWidget {
                         softWrap: false,
                       ),
                       kGapXs,
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 2,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          Icon(
-                            message.channel == 'sms'
-                                ? Icons.sms_outlined
-                                : Icons.notifications_outlined,
-                            size: 12,
-                            color: muted,
-                          ),
-                          for (final part in captionParts)
-                            Text(part,
-                                style: AppText.caption.copyWith(color: muted)),
-                        ],
+                      Text(
+                        captionParts.join('  ·  '),
+                        style: AppText.caption.copyWith(color: muted),
+                        maxLines: 1,
+                        overflow: TextOverflow.fade,
+                        softWrap: false,
                       ),
                       if (message.locationLabel != null) ...[
                         kGapXs,
-                        Text(
-                          message.locationLabel!,
-                          style: AppText.caption.copyWith(color: muted),
-                          maxLines: 1,
-                          overflow: TextOverflow.fade,
-                          softWrap: false,
+                        Row(
+                          children: [
+                            Icon(Icons.place_outlined, size: 12, color: muted),
+                            const SizedBox(width: 3),
+                            Expanded(
+                              child: Text(
+                                // Just the street, not the full reverse-geocoded
+                                // address: the rest was cut off mid-word anyway.
+                                message.locationLabel!.split(',').first,
+                                style: AppText.caption.copyWith(color: muted),
+                                maxLines: 1,
+                                overflow: TextOverflow.fade,
+                                softWrap: false,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ],
