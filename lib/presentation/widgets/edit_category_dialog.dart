@@ -9,6 +9,7 @@ import 'package:budgett_frontend/presentation/utils/icon_helper.dart';
 import 'package:budgett_frontend/presentation/widgets/create_category_dialog.dart'
     show savingsTargetAccountField;
 import '../../core/app_theme.dart';
+import 'package:budgett_frontend/presentation/widgets/form_fields.dart';
 
 
 class EditCategoryDialog extends ConsumerStatefulWidget {
@@ -106,16 +107,16 @@ class _EditCategoryDialogState extends ConsumerState<EditCategoryDialog> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Type Selector
-                      SegmentedButton<String>(
+                      FormSegmentedButton<String>(
                         segments: const [
-                          ButtonSegment(value: 'income', label: Text('Income'), icon: Icon(Icons.arrow_downward)),
-                          ButtonSegment(value: 'expense', label: Text('Expense'), icon: Icon(Icons.arrow_upward)),
-                          ButtonSegment(value: 'savings', label: Text('Savings'), icon: Icon(Icons.savings_outlined)),
+                          ButtonSegment(value: 'income', label: Text('Income'), icon: Icon(Icons.arrow_downward, size: 15)),
+                          ButtonSegment(value: 'expense', label: Text('Expense'), icon: Icon(Icons.arrow_upward, size: 15)),
+                          ButtonSegment(value: 'savings', label: Text('Savings'), icon: Icon(Icons.savings_outlined, size: 15)),
                         ],
                         selected: {_selectedType},
-                        onSelectionChanged: (Set<String> newSelection) {
+                        onChanged: (String newSelection) {
                           setState(() {
-                            _selectedType = newSelection.first;
+                            _selectedType = newSelection;
                             if (_selectedType != 'savings') _targetAccountId = null;
                           });
                         },

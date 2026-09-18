@@ -718,20 +718,13 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
 
                   // Currency toggle (only for CC expense/income)
                   if (_isCreditCardExpense) ...[
-                    SegmentedButton<String>(
+                    FormSegmentedButton<String>(
                       segments: const [
-                        ButtonSegment(
-                            value: 'COP',
-                            label: Text('COP'),
-                            icon:
-                                Icon(Icons.monetization_on_outlined, size: 16)),
-                        ButtonSegment(
-                            value: 'USD',
-                            label: Text('USD'),
-                            icon: Icon(Icons.attach_money, size: 16)),
+                        ButtonSegment(value: 'COP', label: Text('COP')),
+                        ButtonSegment(value: 'USD', label: Text('USD')),
                       ],
                       selected: {_currency},
-                      onSelectionChanged: (s) => _onCurrencyChanged(s.first),
+                      onChanged: _onCurrencyChanged,
                     ),
                     const SizedBox(height: 12),
                   ],
@@ -936,20 +929,19 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                   MoreOptions(
                     children: [
                       // Status Toggle
-                      SegmentedButton<String>(
+                      FormSegmentedButton<String>(
                         segments: const [
                           ButtonSegment(
                               value: 'paid',
                               label: Text('Paid'),
-                              icon: Icon(Icons.check_circle_outline)),
+                              icon: Icon(Icons.check_circle_outline, size: 15)),
                           ButtonSegment(
                               value: 'pending',
                               label: Text('Pending'),
-                              icon: Icon(Icons.pending_outlined)),
+                              icon: Icon(Icons.pending_outlined, size: 15)),
                         ],
                         selected: {_status},
-                        onSelectionChanged: (s) =>
-                            setState(() => _status = s.first),
+                        onChanged: (v) => setState(() => _status = v),
                       ),
                       const SizedBox(height: 10),
 

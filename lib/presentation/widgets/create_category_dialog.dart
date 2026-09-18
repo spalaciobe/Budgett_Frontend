@@ -8,6 +8,7 @@ import 'package:budgett_frontend/data/models/sub_category_model.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/presentation/utils/icon_helper.dart';
 import '../../core/app_theme.dart';
+import 'package:budgett_frontend/presentation/widgets/form_fields.dart';
 
 class CreateCategoryDialog extends ConsumerStatefulWidget {
   const CreateCategoryDialog({super.key});
@@ -90,25 +91,25 @@ class _CreateCategoryDialogState extends ConsumerState<CreateCategoryDialog> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Type Selector
-                        SegmentedButton<String>(
+                        FormSegmentedButton<String>(
                           segments: const [
                             ButtonSegment(
                                 value: 'income',
                                 label: Text('Income'),
-                                icon: Icon(Icons.arrow_downward)),
+                                icon: Icon(Icons.arrow_downward, size: 15)),
                             ButtonSegment(
                                 value: 'expense',
                                 label: Text('Expense'),
-                                icon: Icon(Icons.arrow_upward)),
+                                icon: Icon(Icons.arrow_upward, size: 15)),
                             ButtonSegment(
                                 value: 'savings',
                                 label: Text('Savings'),
-                                icon: Icon(Icons.savings_outlined)),
+                                icon: Icon(Icons.savings_outlined, size: 15)),
                           ],
                           selected: {_selectedType},
-                          onSelectionChanged: (Set<String> newSelection) {
+                          onChanged: (String newSelection) {
                             setState(() {
-                              _selectedType = newSelection.first;
+                              _selectedType = newSelection;
                               if (_selectedType != 'savings')
                                 _targetAccountId = null;
                             });

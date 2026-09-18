@@ -9,6 +9,7 @@ import 'package:budgett_frontend/data/models/recurring_transaction_model.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import '../../core/app_text.dart';
 import '../../core/utils/date_format.dart';
+import 'package:budgett_frontend/presentation/widgets/form_fields.dart';
 
 class EditRecurringTransactionDialog extends ConsumerStatefulWidget {
   final RecurringTransaction transaction;
@@ -198,14 +199,14 @@ class _EditRecurringTransactionDialogState
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                SegmentedButton<String>(
+                FormSegmentedButton<String>(
                   segments: const [
-                    ButtonSegment(value: 'expense', label: Text('Expense'), icon: Icon(Icons.arrow_upward)),
-                    ButtonSegment(value: 'income', label: Text('Income'), icon: Icon(Icons.arrow_downward)),
+                    ButtonSegment(value: 'expense', label: Text('Expense'), icon: Icon(Icons.arrow_upward, size: 15)),
+                    ButtonSegment(value: 'income', label: Text('Income'), icon: Icon(Icons.arrow_downward, size: 15)),
                   ],
                   selected: {_type},
-                  onSelectionChanged: (s) => setState(() {
-                    _type = s.first;
+                  onChanged: (v) => setState(() {
+                    _type = v;
                     // Categories are type-scoped; the prior selection may no
                     // longer be valid after switching income/expense.
                     _selectedCategoryValue = null;

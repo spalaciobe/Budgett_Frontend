@@ -19,6 +19,54 @@ import '../../core/utils/date_format.dart';
 /// It goes first in every form that has it: it decides which of the fields
 /// below are even relevant, so asking it seventh (as the old dialogs did)
 /// meant filling in answers before knowing the question.
+/// A segmented control at form width.
+///
+/// Every other control in these forms runs the full width of the sheet, so a
+/// segmented button sized to its own labels read as a stray chip pinned to the
+/// left margin — most visibly the COP/USD toggle, which sat under a full-width
+/// type selector and above a full-width amount field.
+///
+/// Full width also divides the segments evenly, so they stay the same size
+/// whether the word is "COP" or "Pending", and the selected one no longer
+/// shifts the others as it changes.
+class FormSegmentedButton<T> extends StatelessWidget {
+  final List<ButtonSegment<T>> segments;
+  final Set<T> selected;
+  final ValueChanged<T> onChanged;
+
+  /// The tick Material puts on the selected segment. Off by default: at these
+  /// widths the fill already says which one is chosen, and the tick pushes the
+  /// label off centre.
+  final bool showSelectedIcon;
+
+  final bool emptySelectionAllowed;
+
+  const FormSegmentedButton({
+    super.key,
+    required this.segments,
+    required this.selected,
+    required this.onChanged,
+    this.showSelectedIcon = false,
+    this.emptySelectionAllowed = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: SegmentedButton<T>(
+        showSelectedIcon: showSelectedIcon,
+        segments: segments,
+        selected: selected,
+        emptySelectionAllowed: emptySelectionAllowed,
+        onSelectionChanged: (selection) {
+          if (selection.isNotEmpty) onChanged(selection.first);
+        },
+      ),
+    );
+  }
+}
+
 class TransactionTypeSelector extends StatelessWidget {
   final String value;
   final ValueChanged<String> onChanged;
@@ -31,27 +79,23 @@ class TransactionTypeSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: SegmentedButton<String>(
-        showSelectedIcon: false,
-        segments: const [
-          ButtonSegment(
-              value: 'expense',
-              label: Text('Expense'),
-              icon: Icon(Icons.arrow_outward, size: 15)),
-          ButtonSegment(
-              value: 'income',
-              label: Text('Income'),
-              icon: Icon(Icons.south_west, size: 15)),
-          ButtonSegment(
-              value: 'transfer',
-              label: Text('Transfer'),
-              icon: Icon(Icons.swap_horiz, size: 15)),
-        ],
-        selected: {value},
-        onSelectionChanged: (selection) => onChanged(selection.first),
-      ),
+    return FormSegmentedButton<String>(
+      segments: const [
+        ButtonSegment(
+            value: 'expense',
+            label: Text('Expense'),
+            icon: Icon(Icons.arrow_outward, size: 15)),
+        ButtonSegment(
+            value: 'income',
+            label: Text('Income'),
+            icon: Icon(Icons.south_west, size: 15)),
+        ButtonSegment(
+            value: 'transfer',
+            label: Text('Transfer'),
+            icon: Icon(Icons.swap_horiz, size: 15)),
+      ],
+      selected: {value},
+      onChanged: onChanged,
     );
   }
 }

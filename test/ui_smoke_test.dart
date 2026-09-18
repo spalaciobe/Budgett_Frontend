@@ -71,6 +71,7 @@ import 'package:budgett_frontend/presentation/widgets/add_transaction_dialog.dar
 import 'package:budgett_frontend/presentation/widgets/edit_transaction_dialog.dart';
 import 'package:budgett_frontend/presentation/widgets/update_available_dialog.dart';
 import 'package:budgett_frontend/data/repositories/message_capture_repository.dart';
+import 'package:budgett_frontend/presentation/widgets/form_fields.dart';
 
 // Each case is (label, size, dark). The theme matters: until now this
 // harness rendered every screen with a bare `MaterialApp()`, i.e. Flutter's
@@ -734,6 +735,60 @@ final _targets = <String, _Target>{
     () => const CaptureSettingsScreen(),
     overrides: _captureOverrides(),
   ),
+  // The segmented controls in the forms, at the width they actually get. They
+  // used to size to their own labels and sit pinned to the left margin between
+  // full-width fields; this is what catches that coming back.
+  'form_segmented_controls': _Target(() => _wrap(
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TransactionTypeSelector(value: 'expense', onChanged: (_) {}),
+            const SizedBox(height: 12),
+            FormSegmentedButton<String>(
+              segments: const [
+                ButtonSegment(value: 'COP', label: Text('COP')),
+                ButtonSegment(value: 'USD', label: Text('USD')),
+              ],
+              selected: const {'COP'},
+              onChanged: (_) {},
+            ),
+            const SizedBox(height: 12),
+            FormSegmentedButton<String>(
+              segments: const [
+                ButtonSegment(
+                    value: 'paid',
+                    label: Text('Paid'),
+                    icon: Icon(Icons.check_circle_outline, size: 15)),
+                ButtonSegment(
+                    value: 'pending',
+                    label: Text('Pending'),
+                    icon: Icon(Icons.pending_outlined, size: 15)),
+              ],
+              selected: const {'paid'},
+              onChanged: (_) {},
+            ),
+            const SizedBox(height: 12),
+            FormSegmentedButton<String>(
+              segments: const [
+                ButtonSegment(
+                    value: 'income',
+                    label: Text('Income'),
+                    icon: Icon(Icons.arrow_downward, size: 15)),
+                ButtonSegment(
+                    value: 'expense',
+                    label: Text('Expense'),
+                    icon: Icon(Icons.arrow_upward, size: 15)),
+                ButtonSegment(
+                    value: 'savings',
+                    label: Text('Savings'),
+                    icon: Icon(Icons.savings_outlined, size: 15)),
+              ],
+              selected: const {'expense'},
+              onChanged: (_) {},
+            ),
+          ],
+        ),
+      )),
   'sheet_edit_merchant': _Target(
     // showModalBottomSheet supplies the Material in the app; here it doesn't.
     () => Material(child: EditMerchantSheet(alias: _merchantAliases.first)),

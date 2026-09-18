@@ -13,6 +13,7 @@ import '../../data/models/bank_model.dart';
 import '../../data/models/broker_model.dart';
 import '../../data/models/investment_details_model.dart';
 import '../../core/app_text.dart';
+import 'package:budgett_frontend/presentation/widgets/form_fields.dart';
 
 /// Builds the credit-card rules map for a given bank.
 /// Shared logic used both in [AddAccountDialog] and the onboarding flow.
@@ -639,16 +640,14 @@ class _AddAccountDialogState extends ConsumerState<AddAccountDialog> {
                     Text('Billing Cycle',
                         style: Theme.of(context).textTheme.labelLarge),
                     const SizedBox(height: 8),
-                    SegmentedButton<int>(
+                    FormSegmentedButton<int>(
                       segments: const [
-                        ButtonSegment(value: 15, label: Text('Cycle 15'), icon: Icon(Icons.looks_one_outlined, size: 16)),
-                        ButtonSegment(value: 30, label: Text('Cycle 30'), icon: Icon(Icons.looks_two_outlined, size: 16)),
+                        ButtonSegment(value: 15, label: Text('Cycle 15'), icon: Icon(Icons.looks_one_outlined, size: 15)),
+                        ButtonSegment(value: 30, label: Text('Cycle 30'), icon: Icon(Icons.looks_two_outlined, size: 15)),
                       ],
                       selected: _selectedCycle != null ? {_selectedCycle!} : {},
                       emptySelectionAllowed: true,
-                      onSelectionChanged: (s) {
-                        if (s.isNotEmpty) _onCycleSelected(s.first);
-                      },
+                      onChanged: _onCycleSelected,
                     ),
                     if (_selectedCycle != null) ...[
                       const SizedBox(height: 6),
