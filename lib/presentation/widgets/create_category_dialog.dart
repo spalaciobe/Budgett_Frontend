@@ -40,6 +40,8 @@ class _CreateCategoryDialogState extends ConsumerState<CreateCategoryDialog> {
     '0xFFE91E63', // Pink
     '0xFF3F51B5', // Indigo
     '0xFFFFC107', // Amber
+    '0xFF795548', // Brown
+    '0xFF607D8B', // Slate
   ];
 
   @override

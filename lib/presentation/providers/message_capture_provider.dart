@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -103,11 +104,18 @@ class CaptureIngestController extends AsyncNotifier<CaptureIngestResult?> {
       final banks = await ref.read(banksFutureProvider.future);
       final settings = await ref.read(captureSettingsProvider.future);
 
-      final result = await ref.read(captureIngestServiceProvider).ingest(
+      // Bounded: ingestion reverse-geocodes over the network, and an await
+      // that never returns would leave this notifier in AsyncLoading for the
+      // rest of the session — which is what kept the inbox's sync icon
+      // spinning. Failing here is recoverable; a stuck state is not.
+      final result = await ref
+          .read(captureIngestServiceProvider)
+          .ingest(
             accounts: accounts,
             banks: banks,
             settings: settings,
-          );
+          )
+          .timeout(const Duration(seconds: 90));
 
       if (result.inserted > 0) {
         ref.invalidate(pendingCapturesProvider);

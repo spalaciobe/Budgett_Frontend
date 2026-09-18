@@ -37,6 +37,8 @@ import 'package:budgett_frontend/data/models/category_spending.dart';
 import 'package:budgett_frontend/data/models/expense_group_model.dart';
 import 'package:budgett_frontend/data/models/goal_model.dart';
 import 'package:budgett_frontend/data/models/investment_holding_model.dart';
+import 'package:budgett_frontend/data/models/investment_purchase_event_model.dart';
+import 'package:budgett_frontend/data/models/investment_price_history_model.dart';
 import 'package:budgett_frontend/data/models/merchant_alias_model.dart';
 import 'package:budgett_frontend/data/models/recurring_transaction_model.dart';
 import 'package:budgett_frontend/data/models/transaction_model.dart';
@@ -52,6 +54,7 @@ import 'package:budgett_frontend/presentation/screens/goals_screen.dart';
 import 'package:budgett_frontend/presentation/screens/home_screen.dart';
 import 'package:budgett_frontend/presentation/screens/credit_card_details_screen.dart';
 import 'package:budgett_frontend/presentation/screens/accounts_screen.dart';
+import 'package:budgett_frontend/presentation/screens/investment_details_screen.dart';
 import 'package:budgett_frontend/presentation/screens/budget_screen.dart';
 import 'package:budgett_frontend/presentation/screens/recurring_transactions_screen.dart';
 import 'package:budgett_frontend/data/models/sub_category_model.dart';
@@ -70,13 +73,20 @@ import 'package:budgett_frontend/presentation/widgets/update_available_dialog.da
 // so the PNGs never showed Budgett's own surfaces, and reviewing colour or
 // contrast in them was meaningless. Dark mode gets a pass of its own because
 // the two themes are where this app diverged most.
-const _breakpoints = <(String, Size, bool)>[
-  ('mobile', Size(390, 844), false),
-  ('desktop', Size(1440, 900), false),
+/// (label, size, dark, textScale).
+///
+/// The text scale matters as much as the width: a phone reports ~390dp
+/// whatever the owner's font-size setting, and rows that fit at 1.0 overflow
+/// at 1.3. A 3.4px overflow reported from a real device was invisible here
+/// until this axis existed.
+const _breakpoints = <(String, Size, bool, double)>[
+  ('mobile', Size(390, 844), false, 1.0),
+  ('desktop', Size(1440, 900), false, 1.0),
   // A real monitor, not a small laptop. Layouts that look merely airy at
   // 1440 are half-empty here, and a capped body shows it.
-  ('wide', Size(1920, 1080), false),
-  ('mobile_dark', Size(390, 844), true),
+  ('wide', Size(1920, 1080), false, 1.0),
+  ('mobile_dark', Size(390, 844), true, 1.0),
+  ('mobile_large_text', Size(390, 844), false, 1.3),
 ];
 
 // ─── fixture builders ─────────────────────────────────────────────────────────
@@ -88,6 +98,7 @@ Account _account({
   double balance = 2_500_000,
   double balanceUsd = 0,
   double creditLimit = 0,
+  Map<String, dynamic>? investmentDetails,
 }) =>
     Account.fromJson({
       'id': id,
@@ -96,6 +107,7 @@ Account _account({
       'balance': balance,
       'balance_usd': balanceUsd,
       'credit_limit': creditLimit,
+      if (investmentDetails != null) 'investment_details': investmentDetails,
     });
 
 Transaction _tx({
@@ -161,6 +173,19 @@ class _FakeFinanceRepository extends FinanceRepository {
       balance: -480_000,
       creditLimit: 5_000_000,
     ),
+    // A stock/ETF account, not a CDT: only this layout shows the
+    // Update prices / Swap / Add row that overflowed a phone.
+    _account(
+      id: 'acc-4',
+      name: 'Trii',
+      type: 'investment',
+      balance: 4_804_540,
+      investmentDetails: const {
+        'id': 'inv-4',
+        'account_id': 'acc-4',
+        'investment_type': 'stock_etf',
+      },
+    ),
     _account(
       id: 'acc-3',
       name: 'Tyba CDT',
@@ -209,6 +234,71 @@ class _FakeFinanceRepository extends FinanceRepository {
     RecurringTransaction.fromJson({'id': 'r1', 'description': 'Netflix', 'amount': 49_900.0, 'type': 'expense', 'frequency': 'monthly', 'next_run_date': '2026-05-01', 'is_active': true}),
     RecurringTransaction.fromJson({'id': 'r2', 'description': 'Spotify', 'amount': 16_900.0, 'type': 'expense', 'frequency': 'monthly', 'next_run_date': '2026-05-05', 'is_active': true}),
   ];
+
+  // Two holdings, because the mobile action row only shows all three buttons
+  // (Update prices / Swap / Add) at two or more — which is the combination
+  // that overflowed a phone by 3.4px.
+  static final _holdings = [
+    InvestmentHolding.fromJson({
+      'id': 'h1',
+      'user_id': 'u1',
+      'account_id': 'acc-3',
+      'created_at': '2026-01-10T00:00:00Z',
+      'updated_at': '2026-09-17T00:00:00Z',
+      'symbol': 'IUITCO',
+      'name': 'iShares S&P 500 Tech',
+      'asset_class': 'etf',
+      'currency': 'COP',
+      'quantity': 7.0,
+      'avg_cost': 144_980.0,
+      'current_price': 162_000.0,
+    }),
+    InvestmentHolding.fromJson({
+      'id': 'h2',
+      'user_id': 'u1',
+      'account_id': 'acc-3',
+      'created_at': '2026-01-10T00:00:00Z',
+      'updated_at': '2026-09-17T00:00:00Z',
+      'symbol': 'ICOLCAP',
+      'name': 'iShares COLCAP',
+      'asset_class': 'etf',
+      'currency': 'COP',
+      'quantity': 30.0,
+      'avg_cost': 22_575.0,
+      'current_price': 25_147.0,
+    }),
+  ];
+
+  @override
+  Future<List<InvestmentHolding>> getHoldings(String accountId) async =>
+      _holdings;
+
+  // Anything an investment detail screen reaches for. Without these the screen
+  // renders "Something went wrong", and a screenshot of an error page catches
+  // no layout bugs at all — which is exactly what happened on the first pass.
+  @override
+  Future<List<Transaction>> getTransactionsForAccounts(
+    List<String> accountIds, {
+    int limit = 50,
+  }) async =>
+      _transactions;
+
+  @override
+  Future<double> accountFundedTotal(String accountId) async => 5_000_000;
+
+  @override
+  Future<List<InvestmentPriceHistory>> getInvestmentPriceHistory(
+    String accountId, {
+    int days = 30,
+  }) async =>
+      [];
+
+  @override
+  Future<List<InvestmentPurchaseEvent>> getInvestmentPurchaseEvents(
+    String accountId,
+    List<InvestmentHolding> holdings,
+  ) async =>
+      [];
 
   @override
   Future<List<Account>> getAccounts() async => _accounts;
@@ -259,6 +349,7 @@ CapturedMessage _capturedMessage({
   String? merchantDisplay = 'Exito',
   String? merchantRaw = 'EXITO SUPER CL 80',
   String? locationLabel = 'Calle 80 #45-12, Bogota',
+  String kind = 'purchase',
   String? error,
 }) =>
     CapturedMessage.fromJson({
@@ -281,7 +372,7 @@ CapturedMessage _capturedMessage({
       'amount': amount,
       'currency': 'COP',
       'card_last4': '1234',
-      'kind': 'purchase',
+      'kind': kind,
       'confidence': 0.95,
       'status': status,
       'fingerprint': 'fp-$id',
@@ -481,6 +572,17 @@ final _targets = <String, _Target>{
     () => const HomeScreen(),
     overrides: _financeOverrides(),
   ),
+  // Home when the capture inbox has something waiting: the pill is the only
+  // difference, and it has to stay a single row.
+  'screen_home_inbox_pending': _Target(
+    () => const HomeScreen(),
+    overrides: _captureOverrides(
+      pending: [
+        _capturedMessage(),
+        _capturedMessage(id: 'cap-9', amount: 250000, kind: 'transfer_in'),
+      ],
+    ),
+  ),
   // The form people use most, and the one that had fourteen fields on screen
   // at once. Captured collapsed (the default) so the shot shows what someone
   // actually faces when they tap +.
@@ -512,6 +614,10 @@ final _targets = <String, _Target>{
   ),
   'screen_accounts': _Target(
     () => const AccountsScreen(),
+    overrides: _financeOverrides(),
+  ),
+  'screen_investment_details': _Target(
+    () => const InvestmentDetailsScreen(accountId: 'acc-4'),
     overrides: _financeOverrides(),
   ),
   'screen_budget': _Target(
@@ -643,7 +749,7 @@ void main() {
   });
 
   for (final entry in _targets.entries) {
-    for (final (label, size, dark) in _breakpoints) {
+    for (final (label, size, dark, textScale) in _breakpoints) {
       testWidgets('${entry.key} @ $label', (tester) async {
         tester.view.physicalSize = size;
         tester.view.devicePixelRatio = 1;
@@ -656,6 +762,11 @@ void main() {
             overrides: entry.value.overrides,
             child: MaterialApp(
               theme: dark ? AppTheme.darkTheme : AppTheme.lightTheme,
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(context)
+                    .copyWith(textScaler: TextScaler.linear(textScale)),
+                child: child!,
+              ),
               home: RepaintBoundary(
                 key: captureKey,
                 child: entry.value.builder(),

@@ -24,14 +24,25 @@ import '../widgets/skeleton.dart';
 /// possible duplicate. "History" is the audit trail: every message that was
 /// recorded, deduplicated or dismissed, so an auto-posted expense can always
 /// be traced back to the text that produced it.
-class CaptureInboxScreen extends ConsumerWidget {
+class CaptureInboxScreen extends ConsumerStatefulWidget {
   const CaptureInboxScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CaptureInboxScreen> createState() => _CaptureInboxScreenState();
+}
+
+class _CaptureInboxScreenState extends ConsumerState<CaptureInboxScreen> {
+  /// Set only while *this* screen is running a sync.
+  ///
+  /// Watching the shared ingest state instead meant the toolbar spun for
+  /// every background drain — on launch and on every resume — so the icon
+  /// read as "permanently loading" while nothing was waiting on it.
+  bool _syncing = false;
+
+  @override
+  Widget build(BuildContext context) {
     final statusAsync = ref.watch(captureStatusProvider);
-    final ingestState = ref.watch(captureIngestControllerProvider);
-    final isSyncing = ingestState.isLoading;
+    final isSyncing = _syncing;
 
     return DefaultTabController(
       length: 2,
@@ -101,15 +112,21 @@ class CaptureInboxScreen extends ConsumerWidget {
   }
 
   Future<void> _sync(BuildContext context, WidgetRef ref) async {
-    final result =
-        await ref.read(captureIngestControllerProvider.notifier).run();
-    ref.invalidate(pendingCapturesProvider);
-    ref.invalidate(captureHistoryProvider);
-    if (!context.mounted) return;
-    if (result != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result.summary)),
-      );
+    if (_syncing) return;
+    setState(() => _syncing = true);
+    try {
+      final result =
+          await ref.read(captureIngestControllerProvider.notifier).run();
+      ref.invalidate(pendingCapturesProvider);
+      ref.invalidate(captureHistoryProvider);
+      if (!context.mounted) return;
+      if (result != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result.summary)),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _syncing = false);
     }
   }
 }

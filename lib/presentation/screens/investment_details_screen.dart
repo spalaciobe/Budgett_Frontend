@@ -598,8 +598,16 @@ class _HoldingsListState extends ConsumerState<_HoldingsList> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (context.formFactor == FormFactor.mobile) ...[
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+          // Wrap, not Row: three labelled buttons overflowed a 1080px phone by
+          // 3.4px, and a Row has no answer to that but to paint the stripes.
+          // Wrap, not Row: three labelled buttons overflow a phone — by 3.4px
+          // at the default font size, by 12px at 130% — and a Row's only
+          // answer to that is to paint the stripes.
+          Wrap(
+            alignment: WrapAlignment.end,
+            spacing: kSpaceSm,
+            runSpacing: kSpaceSm,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               if (holdings.isNotEmpty)
                 _UpdatePricesButton(

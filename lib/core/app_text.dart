@@ -26,9 +26,20 @@ import 'package:flutter/material.dart';
 /// The scale is a ~1.2 modular progression (11 · 12 · 13 · 14 · 17 · 22 · 28 ·
 /// 36) instead of the previous 11–18 flat band, so a screen has a clear
 /// entry point: one number dominates, everything else recedes.
+///
+/// **No `height` on the Open Sans roles.** Its own metrics need 1.362em
+/// (ascent 1.069 + descent 0.293); anything lower crops the bottom of the
+/// glyphs, and since this app truncates with `TextOverflow.fade`, the crop
+/// renders as a soft fade across the foot of the text — which is how titles
+/// with descenders ("World cup pool", "Tablet Payment") ended up looking
+/// half-erased while their neighbours were fine. Vertical rhythm is set with
+/// padding, not by squeezing the line box.
 class AppText {
   AppText._();
 
+  // Space Grotesk needs 1.276em and Open Sans 1.362em for a full glyph box.
+  // Figures are boxed at 1.2 because digits sit on the baseline; prose gets
+  // no forced height at all.
   static const String bodyFamily = 'OpenSans';
   static const String figureFamily = 'SpaceGrotesk';
 
@@ -39,11 +50,22 @@ class AppText {
 
   // ── Figures (Space Grotesk) ────────────────────────────────────────────────
 
-  /// The one number that owns the screen: total balance, net worth.
+  /// The figure a summary card leads with. Smaller than [moneyHero]: a card
+  /// that sits above a list has to leave the list visible.
+  static final balanceHero = TextStyle(
+    fontFamily: figureFamily,
+    fontSize: 30,
+    height: 1.2,
+    letterSpacing: -1.0,
+    fontFeatures: _tabular,
+    fontVariations: _wght(700),
+  );
+
+  /// The one number that owns a screen of its own: net worth, a total.
   static final moneyHero = TextStyle(
     fontFamily: figureFamily,
     fontSize: 36,
-    height: 1.05,
+    height: 1.2,
     letterSpacing: -1.2,
     fontFeatures: _tabular,
     fontVariations: _wght(700),
@@ -53,7 +75,7 @@ class AppText {
   static final balance = TextStyle(
     fontFamily: figureFamily,
     fontSize: 22,
-    height: 1.15,
+    height: 1.2,
     letterSpacing: -0.6,
     fontFeatures: _tabular,
     fontVariations: _wght(700),
@@ -93,7 +115,7 @@ class AppText {
   static final screenTitle = TextStyle(
     fontFamily: figureFamily,
     fontSize: 28,
-    height: 1.1,
+    height: 1.2,
     letterSpacing: -0.9,
     fontVariations: _wght(700),
   );
@@ -113,7 +135,6 @@ class AppText {
   static const tileTitle = TextStyle(
     fontFamily: bodyFamily,
     fontSize: 14,
-    height: 1.3,
     fontWeight: FontWeight.w500,
   );
 
@@ -121,7 +142,6 @@ class AppText {
   static const cardName = TextStyle(
     fontFamily: bodyFamily,
     fontSize: 14,
-    height: 1.25,
     fontWeight: FontWeight.w600,
   );
 
@@ -129,21 +149,18 @@ class AppText {
   static const subtitle = TextStyle(
     fontFamily: bodyFamily,
     fontSize: 13,
-    height: 1.35,
   );
 
   /// Secondary line: dates, place, hints.
   static const caption = TextStyle(
     fontFamily: bodyFamily,
     fontSize: 12,
-    height: 1.35,
   );
 
   /// Status pill text.
   static const badge = TextStyle(
     fontFamily: bodyFamily,
     fontSize: 11,
-    height: 1.2,
     fontWeight: FontWeight.w600,
     letterSpacing: 0.1,
   );
@@ -152,7 +169,6 @@ class AppText {
   static const label = TextStyle(
     fontFamily: bodyFamily,
     fontSize: 12,
-    height: 1.3,
     fontWeight: FontWeight.w600,
   );
 

@@ -757,16 +757,25 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
                   TextFormField(
                     controller: _amountController,
                     autofocus: true,
-                    style: AppText.tabular(30, weight: 700),
+                    style: AppText.tabular(28, weight: 700),
                     decoration: InputDecoration(
                       labelText: 'Amount',
-                      prefixText: CurrencyFormatter.prefixFor(_currency),
-                      prefixStyle: AppText.tabular(22, weight: 600).copyWith(
+                      // Trailing space, and the same size as the value: a
+                      // currency mark is part of the number, not a label in
+                      // front of it. It used to be 22px against a 13px hint.
+                      prefixText: '${CurrencyFormatter.prefixFor(_currency)} ',
+                      prefixStyle: AppText.tabular(28, weight: 700).copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                       hintText: '0',
+                      hintStyle: AppText.tabular(28, weight: 700).copyWith(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurfaceVariant
+                            .withValues(alpha: 0.45),
+                      ),
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 16),
+                          horizontal: 14, vertical: 14),
                       border: const OutlineInputBorder(),
                     ),
                     keyboardType:

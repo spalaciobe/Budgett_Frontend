@@ -12,6 +12,9 @@ import 'package:budgett_frontend/presentation/widgets/edit_transaction_dialog.da
 import 'package:budgett_frontend/core/app_text.dart';
 import 'package:budgett_frontend/presentation/widgets/page_body.dart';
 import 'package:budgett_frontend/presentation/widgets/skeleton.dart';
+import 'package:budgett_frontend/presentation/providers/message_capture_provider.dart';
+import 'package:go_router/go_router.dart';
+import 'package:budgett_frontend/core/parsing/message_kind.dart';
 
 String _formatDate(DateTime date) {
   const months = [
@@ -86,7 +89,9 @@ class _MonthSummaryCard extends ConsumerWidget {
 
     return Card(
       child: Padding(
-        padding: kHeroCardPadding,
+        // Tighter than kHeroCardPadding: this card is a summary, and at 20px
+        // padding around a 36px figure it was eating a third of the phone.
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -94,22 +99,22 @@ class _MonthSummaryCard extends ConsumerWidget {
               '${_months[now.month - 1]} ${now.year}',
               style: AppText.label.copyWith(color: context.muted),
             ),
-            kGapLg,
+            kGapSm,
             Text(
               CurrencyFormatter.format(net.abs()),
               maxLines: 1,
               overflow: TextOverflow.fade,
               softWrap: false,
-              style: AppText.moneyHero.copyWith(color: netColor),
+              style: AppText.balanceHero.copyWith(color: netColor),
             ),
-            kGapSm,
+            kGapXs,
             Text(
               overspent ? 'over your income this month' : 'left this month',
               style: AppText.caption.copyWith(color: context.muted),
             ),
-            kGapSection,
+            kGapXl,
             _SpendBar(ratio: ratio, overspent: overspent),
-            kGapLg,
+            kGapMd,
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -594,6 +599,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ],
                 ),
               ),
+              const _InboxPill(),
               const SizedBox(height: 12),
               // Transactions list
               transactionsAsync.when(
@@ -1356,6 +1362,74 @@ class _LoadError extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// One line telling you the capture inbox has something waiting.
+///
+/// Captured messages that couldn't post on their own used to be invisible from
+/// here: you had to remember to open the inbox. This is deliberately a single
+/// 32px row and it renders nothing at all when the queue is empty, so the
+/// screen it sits on is unchanged on an ordinary day.
+class _InboxPill extends ConsumerWidget {
+  const _InboxPill();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final pending = ref.watch(pendingCapturesProvider).valueOrNull;
+    final count = pending?.length ?? 0;
+    if (count == 0) return const SizedBox.shrink();
+
+    final theme = Theme.of(context);
+    // transferIn is the inbox's "money arriving": the one kind worth
+    // calling out separately, because an income you didn't expect matters
+    // more than one more coffee.
+    final incomes =
+        pending!.where((c) => c.kind == MessageKind.transferIn).length;
+
+    final String label;
+    if (incomes > 0 && incomes == count) {
+      label = count == 1 ? '1 income to review' : '$count incomes to review';
+    } else if (incomes > 0) {
+      label = '$count to review · $incomes income';
+    } else {
+      label = count == 1 ? '1 expense to review' : '$count expenses to review';
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: kSpaceLg),
+      child: Material(
+        color: theme.colorScheme.primary.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(9),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(9),
+          onTap: () => context.push('/capture-inbox'),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            child: Row(
+              children: [
+                Icon(Icons.inbox_outlined,
+                    size: 16, color: theme.colorScheme.primary),
+                const SizedBox(width: kSpaceLg),
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.fade,
+                    softWrap: false,
+                    style: AppText.label.copyWith(
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                ),
+                Icon(Icons.chevron_right,
+                    size: 16, color: theme.colorScheme.primary),
+              ],
+            ),
+          ),
         ),
       ),
     );
