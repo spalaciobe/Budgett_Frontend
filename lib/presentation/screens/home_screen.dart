@@ -16,6 +16,7 @@ import 'package:budgett_frontend/presentation/providers/message_capture_provider
 import 'package:go_router/go_router.dart';
 import 'package:budgett_frontend/core/parsing/message_kind.dart';
 import '../widgets/screen_title.dart';
+import 'capture_inbox_screen.dart';
 
 String _formatDate(DateTime date) {
   const months = [
@@ -500,11 +501,40 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ? '${_formatDate(_filterDateRange!.start)} – ${_formatDate(_filterDateRange!.end)}'
         : 'Date';
 
-    return Scaffold(
+    final pendingCount = ref.watch(pendingCaptureCountProvider).valueOrNull ?? 0;
+
+    // Two tabs, not two destinations. A captured message *is* a transaction
+    // that hasn't been confirmed yet, so it belongs beside the confirmed ones.
+    // It used to live under "More", two taps from the list it describes, and
+    // needed a badge there *and* a banner here before anyone noticed it.
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
       appBar: AppBar(
         title: ScreenTitle('Transactions'),
+        bottom: TabBar(
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
+          tabs: [
+            const Tab(text: 'All'),
+            Tab(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('To review'),
+                  if (pendingCount > 0) ...[
+                    const SizedBox(width: kSpaceMd),
+                    Badge(label: Text('$pendingCount')),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
-      body: RefreshIndicator(
+      body: TabBarView(
+        children: [
+          RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(recentTransactionsProvider);
           await ref.read(recentTransactionsProvider.future);
@@ -616,7 +646,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ],
                 ),
               ),
-              const _InboxPill(),
               const SizedBox(height: 12),
               // Transactions list
               transactionsAsync.when(
@@ -675,12 +704,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ),
       ),
+          CaptureList(
+            provider: pendingCapturesProvider,
+            emptyTitle: 'Nothing to review',
+            emptyBody: 'Card purchases captured from your bank notifications '
+                'show up here when they need a decision.',
+            onRefresh: () async {
+              ref.invalidate(pendingCapturesProvider);
+              await ref.read(pendingCapturesProvider.future);
+            },
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => showDialog(
           context: context,
           builder: (_) => const AddTransactionDialog(),
         ),
         child: const Icon(Icons.add),
+      ),
       ),
     );
   }
@@ -1385,70 +1427,3 @@ class _LoadError extends StatelessWidget {
   }
 }
 
-/// One line telling you the capture inbox has something waiting.
-///
-/// Captured messages that couldn't post on their own used to be invisible from
-/// here: you had to remember to open the inbox. This is deliberately a single
-/// 32px row and it renders nothing at all when the queue is empty, so the
-/// screen it sits on is unchanged on an ordinary day.
-class _InboxPill extends ConsumerWidget {
-  const _InboxPill();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final pending = ref.watch(pendingCapturesProvider).valueOrNull;
-    final count = pending?.length ?? 0;
-    if (count == 0) return const SizedBox.shrink();
-
-    final theme = Theme.of(context);
-    // transferIn is the inbox's "money arriving": the one kind worth
-    // calling out separately, because an income you didn't expect matters
-    // more than one more coffee.
-    final incomes =
-        pending!.where((c) => c.kind == MessageKind.transferIn).length;
-
-    final String label;
-    if (incomes > 0 && incomes == count) {
-      label = count == 1 ? '1 income to review' : '$count incomes to review';
-    } else if (incomes > 0) {
-      label = '$count to review · $incomes income';
-    } else {
-      label = count == 1 ? '1 expense to review' : '$count expenses to review';
-    }
-
-    return Padding(
-      padding: const EdgeInsets.only(top: kSpaceLg),
-      child: Material(
-        color: theme.colorScheme.primary.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(9),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(9),
-          onTap: () => context.push('/capture-inbox'),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-            child: Row(
-              children: [
-                Icon(Icons.inbox_outlined,
-                    size: 16, color: theme.colorScheme.primary),
-                const SizedBox(width: kSpaceLg),
-                Expanded(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.fade,
-                    softWrap: false,
-                    style: AppText.label.copyWith(
-                      color: theme.colorScheme.primary,
-                    ),
-                  ),
-                ),
-                Icon(Icons.chevron_right,
-                    size: 16, color: theme.colorScheme.primary),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}

@@ -15,14 +15,18 @@ import '../widgets/page_body.dart';
 import '../widgets/screen_title.dart';
 
 class GoalsScreen extends ConsumerWidget {
-  const GoalsScreen({super.key});
+  /// When true this screen is a tab inside Plan, which supplies the
+  /// AppBar — so it must not draw one of its own.
+  final bool embedded;
+
+  const GoalsScreen({super.key, this.embedded = false});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final goalsAsync = ref.watch(goalsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: ScreenTitle('Financial Goals')),
+      appBar: embedded ? null : AppBar(title: ScreenTitle('Financial Goals')),
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(goalsProvider);

@@ -55,6 +55,8 @@ import 'package:budgett_frontend/presentation/screens/home_screen.dart';
 import 'package:budgett_frontend/presentation/screens/credit_card_details_screen.dart';
 import 'package:budgett_frontend/presentation/screens/accounts_screen.dart';
 import 'package:budgett_frontend/presentation/screens/investment_details_screen.dart';
+import 'package:budgett_frontend/presentation/screens/plan_screen.dart';
+import 'package:budgett_frontend/presentation/screens/more_screen.dart';
 import 'package:budgett_frontend/presentation/screens/budget_screen.dart';
 import 'package:budgett_frontend/presentation/screens/recurring_transactions_screen.dart';
 import 'package:budgett_frontend/data/models/sub_category_model.dart';
@@ -625,6 +627,15 @@ final _targets = <String, _Target>{
   ),
   'screen_investment_details': _Target(
     () => const InvestmentDetailsScreen(accountId: 'acc-4'),
+    overrides: _financeOverrides(),
+  ),
+  // The reworked navigation: Plan's four tabs, and what's left in More.
+  'screen_plan': _Target(
+    () => const PlanScreen(),
+    overrides: _financeOverrides(),
+  ),
+  'screen_more': _Target(
+    () => const MoreScreen(),
     overrides: _financeOverrides(),
   ),
   'screen_budget': _Target(

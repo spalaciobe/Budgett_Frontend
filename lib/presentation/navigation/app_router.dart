@@ -24,6 +24,7 @@ import 'package:budgett_frontend/presentation/screens/credit_card_details_screen
 import 'package:budgett_frontend/presentation/screens/investment_details_screen.dart';
 import 'package:budgett_frontend/presentation/screens/pocket_details_screen.dart';
 import 'package:budgett_frontend/presentation/screens/profile_screen.dart';
+import '../screens/plan_screen.dart';
 
 class _AuthNotifier extends ChangeNotifier {
   late final StreamSubscription<AuthState> _sub;
@@ -73,7 +74,7 @@ final appRouter = GoRouter(
         ),
         GoRoute(
           path: '/budget',
-          builder: (context, state) => const BudgetScreen(),
+          builder: (context, state) => const PlanScreen(),
         ),
         GoRoute(
           path: '/goals',

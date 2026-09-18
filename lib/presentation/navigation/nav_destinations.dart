@@ -6,6 +6,12 @@ class NavDestination {
   final IconData selectedIcon;
   final String label;
   final bool showOnMobile;
+
+  /// Whether mobile's "More" screen lists this destination. False for the
+  /// ones that became tabs elsewhere (Plan's four, Transactions' inbox) —
+  /// they keep their routes for deep links and the desktop sidebar, but
+  /// listing them twice on a phone is how "More" grew to seven items.
+  final bool inMore;
   final bool dividerBefore;
 
   const NavDestination({
@@ -14,6 +20,7 @@ class NavDestination {
     required this.selectedIcon,
     required this.label,
     this.showOnMobile = false,
+    this.inMore = true,
     this.dividerBefore = false,
   });
 }
@@ -61,6 +68,7 @@ const kNavDestinations = <NavDestination>[
     icon: Icons.flag_outlined,
     selectedIcon: Icons.flag,
     label: 'Goals',
+    inMore: false,
   ),
   NavDestination(
     path: '/analysis',
@@ -73,6 +81,7 @@ const kNavDestinations = <NavDestination>[
     icon: Icons.repeat,
     selectedIcon: Icons.repeat_on,
     label: 'Recurring',
+    inMore: false,
     dividerBefore: true,
   ),
   NavDestination(
@@ -80,12 +89,14 @@ const kNavDestinations = <NavDestination>[
     icon: Icons.folder_shared_outlined,
     selectedIcon: Icons.folder_shared,
     label: 'Expense Groups',
+    inMore: false,
   ),
   NavDestination(
     path: '/capture-inbox',
     icon: Icons.move_to_inbox_outlined,
     selectedIcon: Icons.move_to_inbox,
     label: 'Expense Inbox',
+    inMore: false,
   ),
   NavDestination(
     path: '/categories',

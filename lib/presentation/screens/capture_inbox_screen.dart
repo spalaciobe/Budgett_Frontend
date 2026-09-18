@@ -91,14 +91,14 @@ class _CaptureInboxScreenState extends ConsumerState<CaptureInboxScreen> {
             Expanded(
               child: TabBarView(
                 children: [
-                  _CaptureList(
+                  CaptureList(
                     provider: pendingCapturesProvider,
                     emptyTitle: 'Nothing to review',
                     emptyBody:
                         'Captured messages that need a decision show up here.',
                     onRefresh: () => _sync(context, ref),
                   ),
-                  _CaptureList(
+                  CaptureList(
                     provider: captureHistoryProvider,
                     emptyTitle: 'No history yet',
                     emptyBody:
@@ -203,13 +203,19 @@ class _StatusBanner extends StatelessWidget {
   }
 }
 
-class _CaptureList extends ConsumerWidget {
+/// The capture queue as a list, without the screen around it.
+///
+/// Public because Transactions shows the pending queue as its second tab — a
+/// captured message is a transaction that hasn't been confirmed yet, so it
+/// belongs beside the confirmed ones rather than two taps away under "More".
+class CaptureList extends ConsumerWidget {
   final ProviderListenable<AsyncValue<List<CapturedMessage>>> provider;
   final String emptyTitle;
   final String emptyBody;
   final Future<void> Function() onRefresh;
 
-  const _CaptureList({
+  const CaptureList({
+    super.key,
     required this.provider,
     required this.emptyTitle,
     required this.emptyBody,

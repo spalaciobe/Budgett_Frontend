@@ -13,14 +13,18 @@ import '../widgets/page_body.dart';
 import '../widgets/screen_title.dart';
 
 class ExpenseGroupsScreen extends ConsumerWidget {
-  const ExpenseGroupsScreen({super.key});
+  /// When true this screen is a tab inside Plan, which supplies the
+  /// AppBar — so it must not draw one of its own.
+  final bool embedded;
+
+  const ExpenseGroupsScreen({super.key, this.embedded = false});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final expenseGroupsAsync = ref.watch(expenseGroupsProvider);
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: embedded ? null : AppBar(
         title: ScreenTitle('Expense Groups'),
         centerTitle: true,
       ),

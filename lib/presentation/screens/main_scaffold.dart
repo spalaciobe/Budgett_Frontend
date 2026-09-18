@@ -109,12 +109,19 @@ class _MobileShell extends StatelessWidget {
   final Widget child;
   const _MobileShell({required this.child, super.key});
 
-  static const _advancedPaths = {
-    '/more',
+  // Goals, recurring and expense groups are tabs inside Plan now, so those
+  // paths light up Plan rather than More.
+  static const _planPaths = {
+    '/budget',
     '/goals',
-    '/analysis',
     '/recurring',
     '/expense-groups',
+  };
+
+  static const _advancedPaths = {
+    '/more',
+    '/analysis',
+    '/capture-inbox',
     '/categories',
     '/settings',
   };
@@ -154,7 +161,7 @@ class _MobileShell extends StatelessWidget {
             NavigationDestination(
               icon: Icon(Icons.pie_chart_outline),
               selectedIcon: Icon(Icons.pie_chart),
-              label: 'Budget',
+              label: 'Plan',
             ),
             NavigationDestination(
               icon: Icon(Icons.more_horiz),
@@ -170,7 +177,7 @@ class _MobileShell extends StatelessWidget {
     if (path == '/accounts' ||
         path.startsWith('/credit-card/') ||
         path.startsWith('/investment/')) return 1;
-    if (path == '/budget') return 2;
+    if (_planPaths.contains(path)) return 2;
     if (_advancedPaths.contains(path)) return 3;
     return 0;
   }

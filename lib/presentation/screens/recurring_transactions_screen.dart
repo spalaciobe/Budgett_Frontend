@@ -15,14 +15,18 @@ import '../widgets/screen_title.dart';
 import '../../core/utils/date_format.dart';
 
 class RecurringTransactionsScreen extends ConsumerWidget {
-  const RecurringTransactionsScreen({super.key});
+  /// When true this screen is a tab inside Plan, which supplies the
+  /// AppBar — so it must not draw one of its own.
+  final bool embedded;
+
+  const RecurringTransactionsScreen({super.key, this.embedded = false});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final recurringAsync = ref.watch(recurringTransactionsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: ScreenTitle('Recurring Transactions')),
+      appBar: embedded ? null : AppBar(title: ScreenTitle('Recurring Transactions')),
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(recurringTransactionsProvider);
