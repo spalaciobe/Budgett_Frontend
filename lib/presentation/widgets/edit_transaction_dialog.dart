@@ -13,6 +13,9 @@ import 'package:budgett_frontend/presentation/widgets/credit_card_billing_simula
 import '../../core/app_theme.dart';
 import '../../core/app_text.dart';
 import 'form_fields.dart';
+import 'package:budgett_frontend/core/parsing/text_normalizer.dart';
+import 'package:budgett_frontend/presentation/providers/message_capture_provider.dart';
+import 'package:collection/collection.dart';
 
 class EditTransactionDialog extends ConsumerStatefulWidget {
   final Transaction transaction;
@@ -27,6 +30,9 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _amountController;
   late TextEditingController _descriptionController;
+
+  /// Whether saving should also teach the merchant memory this category.
+  bool _rememberCategory = false;
   late TextEditingController _notesController;
   
   late DateTime _selectedDate;
@@ -387,6 +393,8 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
         ref.invalidate(recurringTransactionsProvider);
       }
 
+      if (_rememberCategory) await _teachCategory();
+
       ref.invalidate(recentTransactionsProvider);
       ref.invalidate(accountsProvider);
       ref.invalidate(budgetsProvider);
@@ -409,6 +417,68 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  /// Writes (or updates) the merchant_aliases row behind this description.
+  ///
+  /// The pattern has to be a normalizeMerchant() key — that function's output
+  /// is the stored format for every alias, so writing a raw string here would
+  /// create a rule that never matches anything.
+  Future<void> _teachCategory() async {
+    final name = _descriptionController.text.trim();
+    final categoryId = _selectedCategoryId;
+    if (name.isEmpty || categoryId == null) return;
+
+    final categories = ref.read(categoriesProvider).valueOrNull ?? [];
+    String? parentId;
+    String? subId;
+    for (final c in categories) {
+      if (c.id == categoryId) {
+        parentId = c.id;
+        break;
+      }
+      final sub = c.subCategories?.where((s) => s.id == categoryId).firstOrNull;
+      if (sub != null) {
+        parentId = c.id;
+        subId = sub.id;
+        break;
+      }
+    }
+    if (parentId == null) return;
+
+    try {
+      final repo = ref.read(messageCaptureRepositoryProvider);
+      final aliases = await repo.getAliases();
+
+      // Prefer updating the rule that already exists for this merchant, and
+      // change only its category. Its `pattern` is the bank's raw text
+      // ("NOVAVENTA MEDELLIN C"), which is what future messages match on —
+      // writing a new rule keyed on the friendly name ("Novaventa") would
+      // create one that never fires, and rename the merchant as a side effect.
+      final existing = aliases.firstWhereOrNull(
+        (a) =>
+            a.displayName.toLowerCase() == name.toLowerCase() ||
+            a.pattern == normalizeMerchant(name),
+      );
+
+      if (existing != null) {
+        await repo.updateAlias(existing.id, {
+          'category_id': parentId,
+          'sub_category_id': subId,
+        });
+      } else {
+        await repo.upsertAlias(
+          pattern: normalizeMerchant(name),
+          displayName: name,
+          categoryId: parentId,
+          subCategoryId: subId,
+        );
+      }
+      ref.invalidate(merchantAliasesProvider);
+    } catch (e) {
+      // A failed rule must not lose the edit that was just saved.
+      debugPrint('Could not save merchant rule: $e');
     }
   }
 
@@ -760,6 +830,35 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                           error: (e, s) => Text(friendlyError(e)),
                         ),
                       if (_selectedType != 'transfer') const SizedBox(height: 10),
+
+                      // Teaching the rule where the mistake is visible. The
+                      // merchant memory already existed — it is what made this
+                      // purchase land in a category at all — but the only way
+                      // to correct one was Settings → Capture, a screen away
+                      // from the transaction that looks wrong.
+                      if (_selectedType != 'transfer' &&
+                          _selectedCategoryId != null &&
+                          _descriptionController.text.trim().isNotEmpty) ...[
+                        CheckboxListTile(
+                          value: _rememberCategory,
+                          onChanged: (v) =>
+                              setState(() => _rememberCategory = v ?? false),
+                          contentPadding: EdgeInsets.zero,
+                          controlAffinity: ListTileControlAffinity.leading,
+                          dense: true,
+                          title: Text(
+                            'Always use this category for '
+                            '"${_descriptionController.text.trim()}"',
+                            style: AppText.subtitle,
+                          ),
+                          subtitle: Text(
+                            'Future captured messages from this merchant are '
+                            'filed here automatically.',
+                            style: AppText.caption.copyWith(color: context.muted),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                      ],
 
                       // Target Account
                       if (_selectedType == 'transfer')
