@@ -55,8 +55,10 @@ class CreditCardBillingSubtitle extends ConsumerWidget {
           year = transactionDate.year;
           if (month > 12) { month = 1; year++; }
         }
-        final label = DateFormat('MMMM yyyy', 'es_CO')
-            .format(DateTime(year, month));
+        // 'es_CO' here printed "Billing Cycle: agosto 2026" inside an
+        // otherwise English UI — the project's rule is that every user-facing
+        // string is English, and a locale argument bypasses it quietly.
+        final label = formatMonthYear(DateTime(year, month));
 
         return Padding(
           padding: const EdgeInsets.only(left: 4, top: 4),

@@ -16,6 +16,7 @@ import '../../data/models/investment_details_model.dart';
 import 'add_account_dialog.dart' show buildInvestmentDetailsMap;
 import '../../core/app_theme.dart';
 import '../../core/app_text.dart';
+import '../../core/utils/date_format.dart';
 
 class EditAccountDialog extends ConsumerStatefulWidget {
   final Account account;
@@ -641,8 +642,7 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                       ),
                       child: Text(
                         _savingsLastInterestDate != null
-                            ? DateFormat('dd/MM/yyyy')
-                                .format(_savingsLastInterestDate!)
+                            ? formatFullDate(_savingsLastInterestDate!)
                             : 'Not set',
                         style: _savingsLastInterestDate == null
                             ? Theme.of(context)
