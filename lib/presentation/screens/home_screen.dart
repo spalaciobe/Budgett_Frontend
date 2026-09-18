@@ -903,18 +903,14 @@ class _TransferDetails extends StatelessWidget {
       fontSize: 12,
       color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
     );
+    // Two account names plus a date never fit beside an amount, so both ends
+    // were cut mid-word ("Bancolombi → RappiCuent"). Both accounts already
+    // show their logo here, and on a transfer the destination is the part
+    // that answers "where did it go" — so only that one keeps its name.
     return Row(
       children: [
         Text('$date  ·  ', style: textStyle),
         _buildIcon(sourceIcon),
-        Flexible(
-          child: Text(
-            sourceName,
-            maxLines: 1,
-            overflow: TextOverflow.fade,
-            style: textStyle,
-          ),
-        ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4),
           child: Text('→', style: textStyle),
@@ -924,7 +920,10 @@ class _TransferDetails extends StatelessWidget {
           child: Text(
             targetName,
             maxLines: 1,
-            overflow: TextOverflow.fade,
+            // Ellipsis, not fade: when a name does have to be cut, three dots
+            // say so. A fade just dissolves the last letters and reads like a
+            // rendering fault — which is how it kept being reported.
+            overflow: TextOverflow.ellipsis,
             style: textStyle,
           ),
         ),
@@ -1135,7 +1134,7 @@ class _TransactionListTile extends StatelessWidget {
                   child: Text(
                     '${_formatDate(t.date.toLocal())}  ·  $details',
                     maxLines: 1,
-                    overflow: TextOverflow.fade,
+                    overflow: TextOverflow.ellipsis,
                     softWrap: false,
                     style: TextStyle(
                       fontSize: 12,
