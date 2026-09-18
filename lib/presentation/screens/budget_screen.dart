@@ -755,10 +755,10 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
           spent: widget.expenseSpent,
           savingsBudget: widget.savingsBudget,
           savingsContributed: widget.savingsContributed,
-          incomeColor: const Color(0xFF1ABC9C),
-          budgetColor: const Color(0xFF9b59b6),
-          spentColor: const Color(0xFFFF6F61),
-          savingsColor: const Color(0xFF3498DB),
+          incomeColor: context.positive,
+          budgetColor: AppTheme.palette.transfer,
+          spentColor: context.negative,
+          savingsColor: AppTheme.palette.highlight,
         ),
         kGapXxl,
         Padding(
@@ -772,7 +772,7 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
                   context,
                   label: 'Expected',
                   amount: widget.expectedIncome,
-                  color: const Color(0xFF1ABC9C),
+                  color: context.positive,
                   isHatched: true,
                 ),
               if (widget.monthlyIncome > 0)
@@ -780,21 +780,21 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
                   context,
                   label: 'Actual',
                   amount: widget.monthlyIncome,
-                  color: const Color(0xFF1ABC9C),
+                  color: context.positive,
                 ),
               _buildSummaryColumn(
                 context,
                 label: 'Budget',
                 amount: widget.expenseBudget,
-                color: const Color(0xFF9b59b6),
+                color: AppTheme.palette.transfer,
               ),
               _buildSummaryColumn(
                 context,
                 label: 'Spent',
                 amount: widget.expenseSpent,
                 color: widget.expenseSpent > widget.expenseBudget
-                    ? const Color(0xFFD32F2F)
-                    : const Color(0xFFFF6F61),
+                    ? context.negative
+                    : context.negative,
               ),
               if (widget.savingsBudget > 0 ||
                   widget.savingsContributed > 0) ...[
@@ -802,14 +802,14 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
                   context,
                   label: 'Savings target',
                   amount: widget.savingsBudget,
-                  color: const Color(0xFF3498DB),
+                  color: AppTheme.palette.highlight,
                   isHatched: true,
                 ),
                 _buildSummaryColumn(
                   context,
                   label: 'Saved',
                   amount: widget.savingsContributed,
-                  color: const Color(0xFF3498DB),
+                  color: AppTheme.palette.highlight,
                 ),
               ],
             ],
@@ -850,15 +850,15 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFD32F2F).withValues(alpha: 0.25),
+                  color: context.negative.withValues(alpha: 0.25),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                      color: const Color(0xFFD32F2F).withValues(alpha: 0.7)),
+                      color: context.negative.withValues(alpha: 0.7)),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.warning_amber_rounded,
-                        color: Color(0xFFD32F2F), size: 16),
+                    Icon(Icons.warning_amber_rounded,
+                        color: context.negative, size: 16),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -1153,9 +1153,9 @@ class _FinancialHealthBar extends StatelessWidget {
         final bool overExpenseBudget = spent > budget && budget > 0;
         final bool overPlanned = committed > planned && planned > 0;
         final Color effectiveSpentColor =
-            overExpenseBudget ? const Color(0xFFD32F2F) : spentColor;
+            overExpenseBudget ? context.negative : spentColor;
         final Color effectiveSavingsColor =
-            overPlanned ? const Color(0xFFD32F2F) : savingsColor;
+            overPlanned ? context.negative : savingsColor;
 
         const double barHeight = 36.0;
         const double radius = 8.0;

@@ -90,9 +90,24 @@ class _MonthSummaryCard extends ConsumerWidget {
         : (spent > 0 ? 1.0 : 0.0);
     final percent = (ratio * 100).round();
 
-    final netColor = overspent ? context.negative : context.positive;
+    // The card *is* the accent, the way the reference apps do it: a saturated
+    // block holding the figure, with ink dark enough to read on it. An accent
+    // used only as a thin trim on a dark screen reads as a detail; used as a
+    // surface it becomes the thing the screen is about.
+    final palette = AppTheme.palette;
+    final onBlock = palette.onBrand;
+    final netColor = overspent ? context.negative : onBlock;
 
     return Card(
+      color: overspent ? null : palette.brand,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(kCardRadius),
+        side: BorderSide(
+          color: overspent
+              ? Theme.of(context).colorScheme.outlineVariant
+              : palette.brand,
+        ),
+      ),
       child: Padding(
         // Tighter than kHeroCardPadding: this card is a summary, and at 20px
         // padding around a 36px figure it was eating a third of the phone.
@@ -102,7 +117,11 @@ class _MonthSummaryCard extends ConsumerWidget {
           children: [
             Text(
               '${_months[now.month - 1]} ${now.year}',
-              style: AppText.label.copyWith(color: context.muted),
+              style: AppText.label.copyWith(
+                color: overspent
+                    ? context.muted
+                    : onBlock.withValues(alpha: 0.65),
+              ),
             ),
             kGapSm,
             // The verdict sits beside the figure instead of under it: one
@@ -126,7 +145,11 @@ class _MonthSummaryCard extends ConsumerWidget {
                     padding: const EdgeInsets.only(bottom: 3),
                     child: Text(
                       overspent ? 'over your income' : 'left this month',
-                      style: AppText.caption.copyWith(color: context.muted),
+                      style: AppText.caption.copyWith(
+                        color: overspent
+                            ? context.muted
+                            : onBlock.withValues(alpha: 0.7),
+                      ),
                       maxLines: 2,
                     ),
                   ),
@@ -134,7 +157,7 @@ class _MonthSummaryCard extends ConsumerWidget {
               ],
             ),
             kGapLg,
-            _SpendBar(ratio: ratio, overspent: overspent),
+            _SpendBar(ratio: ratio, overspent: overspent, onBlock: onBlock),
             kGapMd,
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -143,14 +166,14 @@ class _MonthSummaryCard extends ConsumerWidget {
                   child: _Metric(
                     label: 'Income',
                     amount: income,
-                    color: theme.colorScheme.onSurface,
+                    color: overspent ? theme.colorScheme.onSurface : onBlock,
                   ),
                 ),
                 Expanded(
                   child: _Metric(
                     label: '$percent% spent',
                     amount: spent,
-                    color: theme.colorScheme.onSurface,
+                    color: overspent ? theme.colorScheme.onSurface : onBlock,
                     alignEnd: true,
                   ),
                 ),
@@ -167,12 +190,22 @@ class _SpendBar extends StatelessWidget {
   final double ratio;
   final bool overspent;
 
-  const _SpendBar({required this.ratio, required this.overspent});
+  /// Ink for the lime block; null when the card falls back to a plain surface.
+  final Color? onBlock;
+
+  const _SpendBar({
+    required this.ratio,
+    required this.overspent,
+    this.onBlock,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final track = context.muted.withValues(alpha: 0.18);
-    final fill = overspent ? context.negative : context.brand;
+    final ink = onBlock ?? context.muted;
+    final track = overspent
+        ? context.muted.withValues(alpha: 0.18)
+        : ink.withValues(alpha: 0.22);
+    final fill = overspent ? context.negative : ink;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(4),
@@ -208,7 +241,10 @@ class _Metric extends StatelessWidget {
       crossAxisAlignment:
           alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
       children: [
-        Text(label, style: AppText.caption.copyWith(color: context.muted)),
+        Text(
+          label,
+          style: AppText.caption.copyWith(color: color.withValues(alpha: 0.65)),
+        ),
         kGapXs,
         Text(
           CurrencyFormatter.format(amount),

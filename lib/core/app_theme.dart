@@ -39,7 +39,7 @@ class AppTheme {
   ///
   /// Swappable so alternatives can be compared without editing the dozen
   /// places the brand colour appears. Changing this one line changes the app.
-  static AppPalette palette = AppPalette.teal;
+  static AppPalette palette = AppPalette.lime;
 
   static Color get _primary => palette.brand;
   static Color get _onPrimary => palette.onBrand;
@@ -172,8 +172,11 @@ class AppTheme {
         disabledBackgroundColor: _primary.withValues(alpha: 0.35),
         disabledForegroundColor: Colors.white70,
         minimumSize: Size(fullWidth ? double.infinity : 0, 46),
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        padding: const EdgeInsets.symmetric(horizontal: 22),
+        // Pill, not a rounded rectangle: the reference apps use it for every
+        // action, and against a black background a full radius reads as a
+        // deliberate object rather than a panel someone softened.
+        shape: const StadiumBorder(),
         textStyle: AppText.cardName.copyWith(fontSize: 15),
       );
 
@@ -322,8 +325,7 @@ class AppTheme {
           foregroundColor: _primary,
           side: BorderSide(color: _lightOutline),
           minimumSize: const Size(0, 44),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: const StadiumBorder(),
           textStyle: AppText.cardName,
         ),
       ),
@@ -490,8 +492,7 @@ class AppTheme {
           foregroundColor: _primary,
           side: BorderSide(color: _darkOutline),
           minimumSize: const Size(0, 44),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: const StadiumBorder(),
           textStyle: AppText.cardName,
         ),
       ),
@@ -599,14 +600,18 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
   });
 
   /// Darker shades that keep contrast on the light surface (white).
-  static final light = AppSemanticColors(
+  // Getters, not `static final`: a late-initialised field is evaluated once,
+  // so it would freeze whichever palette happened to be active at first use —
+  // which is exactly what made the palette preview render Plan's bar in the
+  // old green while everything else had switched.
+  static AppSemanticColors get light => AppSemanticColors(
     positive: AppTheme.palette.positiveLight,
     warning: AppTheme.palette.warningLight,
     muted: AppTheme.palette.lightOnSurfaceVariant,
   );
 
   /// Lighter shades that keep contrast on the dark surface.
-  static final dark = AppSemanticColors(
+  static AppSemanticColors get dark => AppSemanticColors(
     positive: AppTheme.palette.positiveDark,
     warning: AppTheme.palette.warningDark,
     muted: AppTheme.palette.darkOnSurfaceVariant,
