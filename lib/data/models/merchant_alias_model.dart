@@ -97,6 +97,46 @@ class MerchantAlias {
     return matches.first;
   }
 
+  /// The rule a recorded movement was filed by, or null if none is left.
+  ///
+  /// Order matters, and none of the three steps is redundant:
+  ///
+  /// 1. [aliasId] — the rule stamped on the capture. Only present when a rule
+  ///    already existed when the message arrived.
+  /// 2. [merchantKey] — the bank's own text, normalised. This is what a rule
+  ///    matches on, so it still finds the merchant taught from the review
+  ///    inbox, which writes the rule without stamping the link.
+  /// 3. [recordedName] — the name the movement was *recorded* under, for a
+  ///    movement typed by hand or a capture that can no longer be read.
+  ///
+  /// The name a movement currently shows is never a valid key: it is a copy
+  /// taken at the moment it was recorded, so it goes stale as soon as either
+  /// side is edited, and the edited text matches nothing at all.
+  static MerchantAlias? resolveForMovement(
+    List<MerchantAlias> aliases, {
+    String? aliasId,
+    String? merchantKey,
+    String? recordedName,
+  }) {
+    for (final alias in aliases) {
+      if (aliasId != null && alias.id == aliasId) return alias;
+    }
+
+    final byKey = bestMatch(aliases, merchantKey);
+    if (byKey != null) return byKey;
+
+    final name = recordedName?.trim() ?? '';
+    if (name.isEmpty) return null;
+    final key = normalizeMerchant(name);
+    for (final alias in aliases) {
+      if (alias.displayName.toLowerCase() == name.toLowerCase() ||
+          alias.pattern == key) {
+        return alias;
+      }
+    }
+    return null;
+  }
+
   /// Default friendly name to offer when no alias exists yet.
   static String suggestDisplayName(String? merchantRaw, String? merchantKey) {
     final key = merchantKey ?? '';

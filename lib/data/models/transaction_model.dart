@@ -56,6 +56,12 @@ class Transaction {
   /// history rows carry the unit change, not just the cash amount.
   final double? holdingQtyDelta;
 
+  /// The captured message this movement was recorded from, when it came from
+  /// the message-capture pipeline. It is the only reliable way back to the
+  /// merchant rule behind the row: the friendly name is a copy and can be
+  /// edited on either side.
+  final String? capturedMessageId;
+
   Transaction({
     required this.id,
     required this.accountId,
@@ -91,6 +97,7 @@ class Transaction {
     this.feeCurrency,
     this.swapGroupId,
     this.holdingQtyDelta,
+    this.capturedMessageId,
   });
 
   bool get isCrossCurrencyPayment =>
@@ -147,6 +154,7 @@ class Transaction {
       feeCurrency: json['fee_currency'] as String?,
       swapGroupId: json['swap_group_id'] as String?,
       holdingQtyDelta: (json['holding_qty_delta'] as num?)?.toDouble(),
+      capturedMessageId: json['captured_message_id'] as String?,
     );
   }
 }

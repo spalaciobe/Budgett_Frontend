@@ -202,6 +202,30 @@ class MessageCaptureRepository {
         .eq('user_id', _userId);
   }
 
+  /// What a recorded movement came from: the rule that matched it, and the
+  /// bank's own merchant text.
+  ///
+  /// Both are needed. `matched_alias_id` is only stamped when a rule already
+  /// existed at ingest time, so a merchant taught from the review inbox has
+  /// none — for those the raw text, normalised, is the rule's pattern.
+  Future<({String? aliasId, String? merchantKey})> captureOrigin(
+    String capturedMessageId,
+  ) =>
+      _withRetry(() async {
+        final row = await _client
+            .from('captured_messages')
+            .select('matched_alias_id, merchant_raw')
+            .eq('id', capturedMessageId)
+            .eq('user_id', _userId)
+            .maybeSingle();
+        if (row == null) return (aliasId: null, merchantKey: null);
+        final raw = row['merchant_raw'] as String?;
+        return (
+          aliasId: row['matched_alias_id'] as String?,
+          merchantKey: raw == null ? null : normalizeMerchant(raw),
+        );
+      }, 'Error reading capture origin');
+
   /// How many recorded movements still carry [name] as their merchant.
   ///
   /// Only rows that came from a capture are counted: a manually typed expense

@@ -16,6 +16,7 @@ import 'form_fields.dart';
 import 'package:budgett_frontend/core/parsing/text_normalizer.dart';
 import 'package:budgett_frontend/presentation/providers/message_capture_provider.dart';
 import 'package:collection/collection.dart';
+import 'package:budgett_frontend/data/models/merchant_alias_model.dart';
 
 class EditTransactionDialog extends ConsumerStatefulWidget {
   final Transaction transaction;
@@ -33,6 +34,12 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
 
   /// Whether saving should also teach the merchant memory this category.
   bool _rememberCategory = false;
+
+  /// The description this row arrived with. The merchant rule is found from
+  /// this, never from the edited text: renaming the movement and looking the
+  /// rule up by the new name finds nothing and writes a second rule keyed on
+  /// a name no bank ever sends.
+  late final String _originalDescription = widget.transaction.description.trim();
   late TextEditingController _notesController;
   
   late DateTime _selectedDate;
@@ -420,7 +427,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
     }
   }
 
-  /// Writes (or updates) the merchant_aliases row behind this description.
+  /// Writes (or updates) the merchant rule behind this movement.
   ///
   /// The pattern has to be a normalizeMerchant() key — that function's output
   /// is the stored format for every alias, so writing a raw string here would
@@ -450,26 +457,27 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
     try {
       final repo = ref.read(messageCaptureRepositoryProvider);
       final aliases = await repo.getAliases();
-
-      // Prefer updating the rule that already exists for this merchant, and
-      // change only its category. Its `pattern` is the bank's raw text
-      // ("NOVAVENTA MEDELLIN C"), which is what future messages match on —
-      // writing a new rule keyed on the friendly name ("Novaventa") would
-      // create one that never fires, and rename the merchant as a side effect.
-      final existing = aliases.firstWhereOrNull(
-        (a) =>
-            a.displayName.toLowerCase() == name.toLowerCase() ||
-            a.pattern == normalizeMerchant(name),
-      );
+      final captureId = widget.transaction.capturedMessageId;
+      final origin =
+          captureId == null ? null : await repo.captureOrigin(captureId);
+      final existing = _findRule(aliases, origin);
 
       if (existing != null) {
+        // Only the rule's meaning changes; its `pattern` stays the bank's own
+        // text, which is what future messages are matched on. The name follows
+        // the edit, so renaming the movement renames the merchant.
         await repo.updateAlias(existing.id, {
           'category_id': parentId,
           'sub_category_id': subId,
+          if (name != existing.displayName) 'display_name': name,
         });
       } else {
+        // Key the new rule on the bank's text when we have it. Falling back to
+        // the name only makes sense for a movement typed by hand, where there
+        // is no bank text to match on in the first place.
         await repo.upsertAlias(
-          pattern: normalizeMerchant(name),
+          pattern:
+              origin?.merchantKey ?? normalizeMerchant(_originalDescription),
           displayName: name,
           categoryId: parentId,
           subCategoryId: subId,
@@ -481,6 +489,18 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
       debugPrint('Could not save merchant rule: $e');
     }
   }
+
+  /// The rule this movement was filed by, if there is one.
+  MerchantAlias? _findRule(
+    List<MerchantAlias> aliases,
+    ({String? aliasId, String? merchantKey})? origin,
+  ) =>
+      MerchantAlias.resolveForMovement(
+        aliases,
+        aliasId: origin?.aliasId,
+        merchantKey: origin?.merchantKey,
+        recordedName: _originalDescription,
+      );
 
   Future<void> _deleteTransaction() async {
     final confirm = await showDialog<bool>(
@@ -713,14 +733,14 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                         }
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 12),
-                          child: SegmentedButton<String>(
+                          child: FormSegmentedButton<String>(
                             segments: const [
                               ButtonSegment(value: 'COP', label: Text('COP')),
                               ButtonSegment(value: 'USD', label: Text('USD')),
                             ],
                             selected: {_currency},
-                            onSelectionChanged: (s) => setState(() {
-                              _currency = s.first;
+                            onChanged: (v) => setState(() {
+                              _currency = v;
                               _amountController.clear();
                             }),
                           ),
@@ -847,13 +867,23 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                           controlAffinity: ListTileControlAffinity.leading,
                           dense: true,
                           title: Text(
-                            'Always use this category for '
-                            '"${_descriptionController.text.trim()}"',
+                            _descriptionController.text.trim() ==
+                                    _originalDescription
+                                ? 'Always use this category for '
+                                    '"$_originalDescription"'
+                                : 'Always call this '
+                                    '"${_descriptionController.text.trim()}" '
+                                    'and use this category',
                             style: AppText.subtitle,
                           ),
                           subtitle: Text(
-                            'Future captured messages from this merchant are '
-                            'filed here automatically.',
+                            _descriptionController.text.trim() ==
+                                    _originalDescription
+                                ? 'Future captured messages from this merchant '
+                                    'are filed here automatically.'
+                                : 'Applies to future messages. Movements '
+                                    'already recorded keep their name — '
+                                    'Settings → Capture renames those.',
                             style: AppText.caption.copyWith(color: context.muted),
                           ),
                         ),
@@ -945,8 +975,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                             _isRecurring ||
                             _notesController.text.isNotEmpty,
                         children: [
-                        SegmentedButton<String>(
-                          showSelectedIcon: false,
+                        FormSegmentedButton<String>(
                           segments: const [
                             ButtonSegment(value: 'paid', label: Text('Paid')),
                             ButtonSegment(
@@ -955,8 +984,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                           selected: {
                             ['paid', 'pending'].contains(_status) ? _status : 'paid'
                           },
-                          onSelectionChanged: (v) =>
-                              setState(() => _status = v.first),
+                          onChanged: (v) => setState(() => _status = v),
                         ),
                         const SizedBox(height: 10),
 
