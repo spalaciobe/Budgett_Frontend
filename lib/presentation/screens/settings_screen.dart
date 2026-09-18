@@ -179,6 +179,14 @@ class SettingsScreen extends ConsumerWidget {
                   onTap: () => context.push('/profile'),
                 ),
                 ListTile(
+                  leading: const Icon(Icons.move_to_inbox_outlined),
+                  title: const Text('Expense capture'),
+                  subtitle: const Text(
+                      'Auto-record expenses from bank notifications and SMS'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/capture-settings'),
+                ),
+                ListTile(
                   leading: const Icon(Icons.system_update),
                   title: const Text('Check for updates'),
                   trailing: const Icon(Icons.chevron_right),

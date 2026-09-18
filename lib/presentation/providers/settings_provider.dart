@@ -1,6 +1,8 @@
 import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:shared_preferences/shared_preferences.dart";
 
+import "package:budgett_frontend/core/services/capture_ingest_service.dart";
+
 const _keyCurrency = "settings_currency";
 const _keyDarkMode = "settings_dark_mode";
 const _keyCcNotificationsEnabled = "settings_cc_notifications_enabled";
@@ -116,3 +118,65 @@ final accountSortProvider =
     AsyncNotifierProvider<AccountSortNotifier, AccountSortOption>(
         AccountSortNotifier.new);
 
+
+// ─── message capture ─────────────────────────────────────────────────────────
+
+const _keyCaptureAutoPost = "settings_capture_auto_post";
+const _keyCaptureDedupWindow = "settings_capture_dedup_window_minutes";
+const _keyCaptureMinConfidence = "settings_capture_min_confidence";
+const _keyCaptureMaxAmount = "settings_capture_auto_post_max_amount";
+
+/// Tuning for the notification/SMS capture pipeline.
+///
+/// Only the decision thresholds live here. Whether capture is switched on at
+/// all, and whether SMS and location are included, is stored natively (the
+/// notification listener and SMS receiver read it with no Flutter engine
+/// attached), so `captureStatusProvider` is the source of truth for those.
+class CaptureSettingsNotifier extends AsyncNotifier<CaptureSettings> {
+  @override
+  Future<CaptureSettings> build() async {
+    final prefs = await SharedPreferences.getInstance();
+    return CaptureSettings(
+      autoPostEnabled: prefs.getBool(_keyCaptureAutoPost) ?? true,
+      dedupWindow:
+          Duration(minutes: prefs.getInt(_keyCaptureDedupWindow) ?? 10),
+      minConfidence: prefs.getDouble(_keyCaptureMinConfidence) ?? 0.8,
+      autoPostMaxAmount: prefs.getDouble(_keyCaptureMaxAmount) ?? 0,
+    );
+  }
+
+  Future<void> setAutoPost(bool enabled) async {
+    _apply((current) => current.copyWith(autoPostEnabled: enabled));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyCaptureAutoPost, enabled);
+  }
+
+  Future<void> setDedupWindowMinutes(int minutes) async {
+    _apply((current) =>
+        current.copyWith(dedupWindow: Duration(minutes: minutes)));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_keyCaptureDedupWindow, minutes);
+  }
+
+  Future<void> setMinConfidence(double value) async {
+    _apply((current) => current.copyWith(minConfidence: value));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_keyCaptureMinConfidence, value);
+  }
+
+  Future<void> setAutoPostMaxAmount(double value) async {
+    _apply((current) => current.copyWith(autoPostMaxAmount: value));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_keyCaptureMaxAmount, value);
+  }
+
+  /// Optimistic update — the UI responds before the write lands, matching the
+  /// other notifiers in this file.
+  void _apply(CaptureSettings Function(CaptureSettings current) transform) {
+    state = AsyncData(transform(state.valueOrNull ?? const CaptureSettings()));
+  }
+}
+
+final captureSettingsProvider =
+    AsyncNotifierProvider<CaptureSettingsNotifier, CaptureSettings>(
+        CaptureSettingsNotifier.new);

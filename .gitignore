@@ -45,6 +45,11 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# Gradle output (the root /build/ rule does not reach these)
+/android/build/
+/android/.gradle/
+/android/app/build/
+
 # Local configuration file (sdk path, etc)
 android/local.properties
 

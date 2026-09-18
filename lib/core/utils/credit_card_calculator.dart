@@ -122,4 +122,28 @@ class CreditCardCalculator {
        return "${nextMonthProp.year}-${nextMonthProp.month.toString().padLeft(2, '0')}";
     }
   }
+
+  /// The three billing columns a credit-card transaction carries:
+  /// `periodo_facturacion`, `fecha_corte_calculada`, `fecha_pago_calculada`.
+  ///
+  /// Extracted so callers that build a transaction payload without a form —
+  /// the message-capture pipeline, for one — derive them from the same place
+  /// as the dialogs instead of re-deriving the cycle math.
+  static Map<String, dynamic> billingFieldsFor({
+    required DateTime date,
+    required CreditCardRules rules,
+    required Bank bank,
+  }) {
+    final billingPeriod = determineBillingPeriod(date, rules, bank);
+    final parts = billingPeriod.split('-');
+    final cutoff = calculateCutoffDate(
+        rules, bank, int.parse(parts[0]), int.parse(parts[1]));
+    final payment = calculatePaymentDate(rules, bank, cutoff);
+
+    return {
+      'periodo_facturacion': billingPeriod,
+      'fecha_corte_calculada': cutoff.toIso8601String(),
+      'fecha_pago_calculada': payment.toIso8601String(),
+    };
+  }
 }

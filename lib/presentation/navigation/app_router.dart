@@ -16,6 +16,8 @@ import 'package:budgett_frontend/presentation/screens/main_scaffold.dart';
 import 'package:budgett_frontend/presentation/screens/recurring_transactions_screen.dart';
 import 'package:budgett_frontend/presentation/screens/expense_groups_screen.dart';
 import 'package:budgett_frontend/presentation/screens/settings_screen.dart';
+import 'package:budgett_frontend/presentation/screens/capture_inbox_screen.dart';
+import 'package:budgett_frontend/presentation/screens/capture_settings_screen.dart';
 import 'package:budgett_frontend/presentation/screens/categories_screen.dart';
 import 'package:budgett_frontend/presentation/screens/more_screen.dart';
 import 'package:budgett_frontend/presentation/screens/credit_card_details_screen.dart';
@@ -96,6 +98,14 @@ final appRouter = GoRouter(
         GoRoute(
           path: '/categories',
           builder: (context, state) => const CategoriesScreen(),
+        ),
+        GoRoute(
+          path: '/capture-inbox',
+          builder: (context, state) => const CaptureInboxScreen(),
+        ),
+        GoRoute(
+          path: '/capture-settings',
+          builder: (context, state) => const CaptureSettingsScreen(),
         ),
         GoRoute(
           path: '/more',

@@ -12,6 +12,7 @@ import 'package:budgett_frontend/core/services/update_checker_service.dart';
 import 'package:budgett_frontend/presentation/providers/update_provider.dart';
 import 'package:budgett_frontend/presentation/widgets/update_available_dialog.dart';
 import 'package:budgett_frontend/data/repositories/bank_repository.dart';
+import 'package:budgett_frontend/presentation/providers/message_capture_provider.dart';
 
 /// Emits the current session whenever auth state changes.
 /// Used to gate providers that require authentication.
@@ -98,6 +99,18 @@ final ccAlertSchedulerProvider = FutureProvider<void>((ref) async {
   );
 });
 
+/// Processes anything the notification listener / SMS receiver queued while the
+/// app was closed, once per signed-in session.
+///
+/// Messages are captured natively with no Supabase session available, so this
+/// is the point where they become transactions or inbox items. A second pass
+/// runs whenever the app returns to the foreground — see [BudgettApp].
+final captureIngestBootstrapProvider = FutureProvider<void>((ref) async {
+  final session = ref.watch(_supabaseSessionProvider).valueOrNull;
+  if (session == null) return;
+  await ref.read(captureIngestControllerProvider.notifier).run();
+});
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -114,11 +127,36 @@ Future<void> main() async {
   runApp(const ProviderScope(child: BudgettApp()));
 }
 
-class BudgettApp extends ConsumerWidget {
+class BudgettApp extends ConsumerStatefulWidget {
   const BudgettApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<BudgettApp> createState() => _BudgettAppState();
+}
+
+class _BudgettAppState extends ConsumerState<BudgettApp> {
+  late final AppLifecycleListener _lifecycleListener;
+
+  @override
+  void initState() {
+    super.initState();
+    // Bank messages pile up in the native queue while the app is closed, so
+    // every return to the foreground is a chance to turn them into expenses.
+    _lifecycleListener = AppLifecycleListener(
+      onResume: () {
+        ref.read(captureIngestControllerProvider.notifier).run();
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _lifecycleListener.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final themeModeAsync = ref.watch(themeModeProvider);
     final themeMode = themeModeAsync.when(
       data: (isDark) => isDark == null ? ThemeMode.system : (isDark ? ThemeMode.dark : ThemeMode.light),
@@ -150,6 +188,9 @@ class BudgettApp extends ConsumerWidget {
     ref.watch(ccAlertSchedulerProvider);
     // Catch-up overdue recurring transactions once per session.
     ref.watch(recurringAutoGenProvider);
+
+    // Drains the native message-capture queue once the session is confirmed.
+    ref.watch(captureIngestBootstrapProvider);
 
     // Show an update modal once a session if a newer APK is available on
     // GitHub Releases. Resolves to null on non-Android, when up-to-date, or

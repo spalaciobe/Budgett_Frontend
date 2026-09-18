@@ -65,6 +65,82 @@ Single `GoRouter` with a global redirect: unauthenticated → `/login`; authenti
 
 DB triggers (not Dart code) maintain account balances — check `Budgett_Backend/supabase/migrations/` before writing any Dart that would recompute balances.
 
+## Message capture (auto-recorded expenses)
+
+Reads bank notifications and SMS on Android and turns them into transactions.
+Android-only; every entry point is a no-op elsewhere.
+
+**Flow.** Native components capture and enqueue → Flutter drains, parses and
+decides → either a transaction or an inbox item.
+
+1. `android/.../capture/NotificationCaptureService.kt` (NotificationListener)
+   and `SmsCaptureReceiver.kt` run with no Flutter engine and no Supabase
+   session. They pre-filter with `FinancialTextFilter` (a message must contain
+   both a money amount and a banking action word — this is the privacy gate,
+   not just an optimisation), take a GPS fix via `LocationSnapshot`, and append
+   a JSON line through `CaptureStore`.
+2. `CaptureStore` also holds the native config (on/off, SMS, location, blocked
+   and allowed sources) in its **own** SharedPreferences file, so a change in
+   how the `shared_preferences` plugin stores data cannot silently disable
+   capture. Flutter writes it via `MessageCaptureBridge` (`budgett/message_capture`).
+3. `CaptureIngestService.ingest()` drains the queue on app start
+   (`captureIngestBootstrapProvider` in `main.dart`) and on every resume
+   (`AppLifecycleListener` in `BudgettApp`). Expenses therefore appear when the
+   app next opens, not at the instant of payment.
+
+**Parsing** lives in `core/parsing/`. It is keyword-and-shape driven, never one
+regex per bank, because issuers reword their alerts:
+`expense_message_parser.dart` looks for an ignore reason → an action keyword
+(`MessageKind`) → an amount → a counterparty → card last-4 and a timestamp,
+then scores the result. Confidence below `CaptureSettings.minConfidence` (0.8)
+means review, not failure. `issuer_registry.dart` resolves the bank by
+substring on the package name / sender, so a renamed app keeps working;
+`capture_sources.issuer_key` overrides it.
+
+**The three memories** (this is the feature, not a nicety):
+
+| Table | Remembers |
+|---|---|
+| `capture_sources` | the user's rename of a source, its bank, its default account, its on/off switch |
+| `merchant_aliases` | raw merchant text → friendly name + category / sub-category / expense group / account, and whether it may post unattended |
+| `capture_card_map` | card last-4 → account |
+
+`merchant_aliases.pattern` is always a `normalizeMerchant()` key. **Changing
+that function invalidates every alias the user has taught** — treat it as a
+stored format, not an implementation detail.
+
+**Hybrid posting.** A message posts by itself only when all of these hold (see
+`_canAutoPost`): automation on, kind is `purchase`/`withdrawal`, confidence
+≥ threshold, an account resolved, a matching alias with `auto_post` and a
+category, no duplicate, and under the amount cap. The alias requirement is what
+makes it self-teaching — a merchant is reviewed exactly once.
+
+**Deduplication** (`core/utils/capture_dedup.dart`) is a windowed comparison,
+not a hash: the same payment reaches push and SMS seconds to minutes apart, so
+time cannot go into the key. A duplicate needs an identical amount, closeness
+in time, and one corroborating signal (same card, same merchant, or same issuer
+when one copy omitted the merchant). The bias is deliberately towards NOT
+declaring a duplicate. A collision with a manually entered transaction is never
+conclusive — it only blocks auto-posting and shows a warning.
+
+**Time and place.** `transactions.occurred_at` is the payment instant;
+`date` stays the accounting day and is what every aggregation uses.
+`latitude`/`longitude`/`location_label` come from the native fix, reverse-geocoded
+in Dart. Background location is required because the fix is taken with the app
+closed. `place` remains the merchant name and is independent of `location_label`.
+
+**Permissions.** Notification access has no runtime dialog — the settings
+screen deep-links to system settings and re-reads the status on return. SMS and
+location are requested through `MessageCaptureBridge` rather than a plugin:
+the status checks already had to be native, and `permission_handler`'s Android
+module needs a newer Kotlin Gradle plugin than this project uses. Background
+location cannot be granted from a dialog on Android 11+, so a refused request
+offers a link to app settings.
+
+Tests: `expense_message_parser_test.dart` (add a failing case here first
+whenever a bank reword loses an expense), `capture_dedup_test.dart`,
+`capture_ingest_test.dart` (end-to-end with in-memory fakes).
+
 ## UI language
 
 All user-facing strings in `.dart` files **must be written in English** — labels, button text, dialog titles, snackbar messages, tooltips, placeholder/hint text, empty-state messages, section headers, and any other copy that appears in the UI.

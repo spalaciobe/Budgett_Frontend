@@ -292,6 +292,25 @@ class FinanceRepository {
     });
   }
 
+  /// Same as [addTransaction] but returns the new row's id.
+  ///
+  /// The message-capture pipeline needs it to link `captured_messages` to the
+  /// transaction it produced, which is what makes an auto-registered expense
+  /// traceable back to the bank message that created it.
+  Future<String> addTransactionWithReturn(
+      Map<String, dynamic> transactionData) async {
+    final userId = _client.auth.currentUser!.id;
+    final inserted = await _client
+        .from('transactions')
+        .insert({
+          ...transactionData,
+          'user_id': userId,
+        })
+        .select('id')
+        .single();
+    return inserted['id'] as String;
+  }
+
   /// Posts a credit-card payment: transfers [debitAmount] in [sourceCurrency]
   /// from [sourceAccountId] and credits [settleAmount] in [debtCurrency] to
   /// [cardAccountId]. If the two currencies differ, fx_rate is derived as

@@ -47,6 +47,7 @@ dependencies:
   image: ^4.3.0
   package_info_plus: ^8.1.0
   ota_update: ^7.1.0
+  geocoding: ^5.0.0
 
 dev_dependencies:
   flutter_test:

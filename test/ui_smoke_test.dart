@@ -23,18 +23,27 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:budgett_frontend/core/services/capture_ingest_service.dart';
+import 'package:budgett_frontend/core/services/message_capture_service.dart';
 import 'package:budgett_frontend/core/services/update_checker_service.dart';
 import 'package:budgett_frontend/data/models/account_model.dart';
 import 'package:budgett_frontend/data/models/budget_model.dart';
+import 'package:budgett_frontend/data/models/capture_source_model.dart';
+import 'package:budgett_frontend/data/models/captured_message_model.dart';
 import 'package:budgett_frontend/data/models/category_model.dart';
 import 'package:budgett_frontend/data/models/category_spending.dart';
 import 'package:budgett_frontend/data/models/expense_group_model.dart';
 import 'package:budgett_frontend/data/models/goal_model.dart';
 import 'package:budgett_frontend/data/models/investment_holding_model.dart';
+import 'package:budgett_frontend/data/models/merchant_alias_model.dart';
 import 'package:budgett_frontend/data/models/recurring_transaction_model.dart';
 import 'package:budgett_frontend/data/models/transaction_model.dart';
 import 'package:budgett_frontend/data/repositories/finance_repository.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
+import 'package:budgett_frontend/presentation/providers/message_capture_provider.dart';
+import 'package:budgett_frontend/presentation/providers/settings_provider.dart';
+import 'package:budgett_frontend/presentation/screens/capture_inbox_screen.dart';
+import 'package:budgett_frontend/presentation/screens/capture_settings_screen.dart';
 import 'package:budgett_frontend/presentation/screens/categories_screen.dart';
 import 'package:budgett_frontend/presentation/screens/expense_groups_screen.dart';
 import 'package:budgett_frontend/presentation/screens/goals_screen.dart';
@@ -46,6 +55,7 @@ import 'package:budgett_frontend/presentation/widgets/account_card.dart';
 import 'package:budgett_frontend/presentation/widgets/budget_comparison_widget.dart';
 import 'package:budgett_frontend/presentation/widgets/investment_holding_card.dart';
 import 'package:budgett_frontend/presentation/widgets/portfolio_donut_chart.dart';
+import 'package:budgett_frontend/presentation/widgets/review_capture_sheet.dart';
 import 'package:budgett_frontend/presentation/widgets/transaction_tile.dart';
 import 'package:budgett_frontend/presentation/widgets/update_available_dialog.dart';
 
@@ -223,6 +233,135 @@ List<Override> _financeOverrides() => [
       financeRepositoryProvider.overrideWithValue(_FakeFinanceRepository()),
     ];
 
+// -- message-capture fixtures -------------------------------------------------
+
+CapturedMessage _capturedMessage({
+  String id = 'cap-1',
+  String status = 'pending',
+  String parseStatus = 'parsed',
+  String channel = 'notification',
+  double? amount = 45900,
+  String? merchantDisplay = 'Exito',
+  String? merchantRaw = 'EXITO SUPER CL 80',
+  String? locationLabel = 'Calle 80 #45-12, Bogota',
+  String? error,
+}) =>
+    CapturedMessage.fromJson({
+      'id': id,
+      'source_id': 'src-1',
+      'channel': channel,
+      'source_key': 'com.bancolombia.olimpia',
+      'title': 'Bancolombia',
+      'body': r'Bancolombia le informa Compra por $45.900,00 en '
+          'EXITO SUPER CL 80 17/09/2026 15:44. Tarjeta *1234',
+      'received_at': '2026-09-17T20:44:00Z',
+      'occurred_at': '2026-09-17T20:44:00Z',
+      'latitude': 4.6851,
+      'longitude': -74.0546,
+      'location_label': locationLabel,
+      'parse_status': parseStatus,
+      'issuer_key': 'bancolombia',
+      'merchant_raw': merchantRaw,
+      'merchant_display': merchantDisplay,
+      'amount': amount,
+      'currency': 'COP',
+      'card_last4': '1234',
+      'kind': 'purchase',
+      'confidence': 0.95,
+      'status': status,
+      'fingerprint': 'fp-$id',
+      'error': error,
+    });
+
+final _captureSources = [
+  CaptureSource.fromJson({
+    'id': 'src-1',
+    'channel': 'notification',
+    'source_key': 'com.bancolombia.olimpia',
+    'detected_name': 'Bancolombia',
+    'display_name': 'Bancolombia',
+    'issuer_key': 'bancolombia',
+    'default_account_id': 'acc-1',
+    'is_enabled': true,
+    'message_count': 42,
+    'last_seen_at': '2026-09-17T20:44:00Z',
+  }),
+  CaptureSource.fromJson({
+    'id': 'src-2',
+    'channel': 'sms',
+    'source_key': '890255',
+    'detected_name': '890255',
+    'issuer_key': 'bancolombia',
+    'is_enabled': true,
+    'message_count': 18,
+    'last_seen_at': '2026-09-17T20:47:00Z',
+  }),
+];
+
+final _merchantAliases = [
+  MerchantAlias.fromJson({
+    'id': 'alias-1',
+    'match_type': 'exact',
+    'pattern': 'EXITO SUPER CL 80',
+    'display_name': 'Exito',
+    'category_id': 'cat-1',
+    'auto_post': true,
+    'priority': 100,
+    'hit_count': 12,
+  }),
+  MerchantAlias.fromJson({
+    'id': 'alias-2',
+    'match_type': 'contains',
+    'pattern': 'RAPPI',
+    'display_name': 'Rappi',
+    'category_id': 'cat-1',
+    'auto_post': false,
+    'priority': 90,
+    'hit_count': 3,
+  }),
+];
+
+const _captureStatus = CaptureStatus(
+  enabled: true,
+  smsEnabled: true,
+  locationEnabled: true,
+  notificationAccess: true,
+  smsPermission: true,
+  locationPermission: true,
+  backgroundLocationPermission: true,
+  queued: 0,
+  isSupported: true,
+);
+
+/// Capture providers hit Supabase and the platform channel, so every one the
+/// new screens read is stubbed out here.
+List<Override> _captureOverrides({
+  List<CapturedMessage>? pending,
+  List<CapturedMessage>? history,
+  CaptureStatus status = _captureStatus,
+}) =>
+    [
+      ..._financeOverrides(),
+      captureStatusProvider.overrideWith((ref) async => status),
+      captureSourcesProvider.overrideWith((ref) async => _captureSources),
+      merchantAliasesProvider.overrideWith((ref) async => _merchantAliases),
+      pendingCapturesProvider
+          .overrideWith((ref) async => pending ?? [_capturedMessage()]),
+      captureHistoryProvider.overrideWith((ref) async => history ?? const []),
+      captureSettingsProvider.overrideWith(_StubCaptureSettings.new),
+    ];
+
+/// Keeps `captureSettingsProvider` off SharedPreferences so the screenshot is
+/// deterministic.
+class _StubCaptureSettings extends CaptureSettingsNotifier {
+  @override
+  Future<CaptureSettings> build() async => const CaptureSettings(
+        autoPostEnabled: true,
+        minConfidence: 0.8,
+        autoPostMaxAmount: 500000,
+      );
+}
+
 // ─── targets ──────────────────────────────────────────────────────────────────
 
 class _Target {
@@ -346,6 +485,80 @@ final _targets = <String, _Target>{
   'screen_budget': _Target(
     () => const BudgetScreen(),
     overrides: _financeOverrides(),
+  ),
+  // -- message capture --
+  'capture_card_pending': _Target(
+    () => _wrap(CaptureCard(message: _capturedMessage()), maxWidth: 560),
+    overrides: _captureOverrides(),
+  ),
+  'capture_card_duplicate': _Target(
+    () => _wrap(
+      CaptureCard(
+        message: _capturedMessage(
+          id: 'cap-2',
+          status: 'duplicate',
+          channel: 'sms',
+          error: 'Same card and amount',
+        ),
+      ),
+      maxWidth: 560,
+    ),
+    overrides: _captureOverrides(),
+  ),
+  'capture_card_unparsed': _Target(
+    () => _wrap(
+      CaptureCard(
+        message: _capturedMessage(
+          id: 'cap-3',
+          parseStatus: 'unparsed',
+          amount: null,
+          merchantDisplay: null,
+          merchantRaw: null,
+          locationLabel: null,
+        ),
+      ),
+      maxWidth: 560,
+    ),
+    overrides: _captureOverrides(),
+  ),
+  'review_capture_sheet': _Target(
+    () => ReviewCaptureSheet(message: _capturedMessage()),
+    overrides: _captureOverrides(),
+  ),
+  'screen_capture_inbox': _Target(
+    () => const CaptureInboxScreen(),
+    overrides: _captureOverrides(
+      pending: [
+        _capturedMessage(),
+        _capturedMessage(
+          id: 'cap-4',
+          channel: 'sms',
+          amount: 12000,
+          merchantDisplay: 'Juan Valdez',
+          merchantRaw: 'JUAN VALDEZ CL 93',
+          error: 'An expense with this amount is already recorded today',
+        ),
+      ],
+      history: [
+        _capturedMessage(id: 'cap-5', status: 'posted', locationLabel: null),
+      ],
+    ),
+  ),
+  'screen_capture_inbox_needs_permission': _Target(
+    () => const CaptureInboxScreen(),
+    overrides: _captureOverrides(
+      pending: const [],
+      status: const CaptureStatus(
+        enabled: true,
+        smsEnabled: true,
+        locationEnabled: true,
+        isSupported: true,
+      ),
+    ),
+  ),
+  'screen_capture_settings': _Target(
+    () => const CaptureSettingsScreen(),
+    overrides: _captureOverrides(),
   ),
 };
 

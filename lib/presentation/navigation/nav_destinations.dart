@@ -82,6 +82,12 @@ const kNavDestinations = <NavDestination>[
     label: 'Expense Groups',
   ),
   NavDestination(
+    path: '/capture-inbox',
+    icon: Icons.move_to_inbox_outlined,
+    selectedIcon: Icons.move_to_inbox,
+    label: 'Expense Inbox',
+  ),
+  NavDestination(
     path: '/categories',
     icon: Icons.category_outlined,
     selectedIcon: Icons.category,

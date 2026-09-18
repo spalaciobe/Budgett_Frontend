@@ -31,6 +31,31 @@
             android:name="flutterEmbedding"
             android:value="2" />
 
+        <!-- Message capture: reads bank notifications while the app is closed.
+             Notification access has no runtime dialog — the user grants it in
+             Settings > Notifications > Special app access, which the capture
+             settings screen deep-links to. -->
+        <service
+            android:name=".capture.NotificationCaptureService"
+            android:exported="false"
+            android:label="Budgett expense capture"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService"/>
+            </intent-filter>
+        </service>
+
+        <!-- Message capture: bank SMS alerts. Second source for the same
+             purchase, which is what the deduplicator exists for. -->
+        <receiver
+            android:name=".capture.SmsCaptureReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter android:priority="999">
+                <action android:name="android.provider.Telephony.SMS_RECEIVED"/>
+            </intent-filter>
+        </receiver>
+
         <!-- ota_update plugin: lets the downloaded APK be opened by the
              system installer via a FileProvider URI. -->
         <provider
@@ -56,6 +81,18 @@
         android:maxSdkVersion="32"/>
     <!-- ota_update: download and prompt install of new APK builds -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+
+    <!-- Message capture: read bank SMS alerts. RECEIVE_SMS delivers the
+         broadcast; READ_SMS is not requested because we never read the inbox,
+         only messages as they arrive. -->
+    <uses-permission android:name="android.permission.RECEIVE_SMS"/>
+
+    <!-- Message capture: stamp each captured payment with where it happened.
+         BACKGROUND_LOCATION is required because the fix is taken from a
+         notification listener / broadcast receiver, i.e. with the app closed. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/>
 
     <queries>
         <intent>
