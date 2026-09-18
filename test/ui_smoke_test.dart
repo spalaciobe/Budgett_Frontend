@@ -24,6 +24,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:budgett_frontend/core/app_palette.dart';
 import 'package:budgett_frontend/core/app_theme.dart';
 import 'package:budgett_frontend/core/services/capture_ingest_service.dart';
 import 'package:budgett_frontend/core/services/message_capture_service.dart';
@@ -779,7 +780,9 @@ void main() {
           ProviderScope(
             overrides: entry.value.overrides,
             child: MaterialApp(
-              theme: dark ? AppTheme.darkTheme : AppTheme.lightTheme,
+              theme: dark
+                  ? const AppTheme(AppPalette.lime).dark
+                  : const AppTheme(AppPalette.lime).light,
               builder: (context, child) => MediaQuery(
                 data: MediaQuery.of(context)
                     .copyWith(textScaler: TextScaler.linear(textScale)),

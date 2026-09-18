@@ -16,6 +16,7 @@ import 'package:fl_chart/fl_chart.dart';
 import '../../core/app_theme.dart';
 import '../../core/app_text.dart';
 import '../widgets/skeleton.dart';
+import 'package:budgett_frontend/core/app_palette.dart';
 
 final budgetDateProvider =
     StateProvider.autoDispose<DateTime>((ref) => DateTime.now());
@@ -756,9 +757,9 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
           savingsBudget: widget.savingsBudget,
           savingsContributed: widget.savingsContributed,
           incomeColor: context.positive,
-          budgetColor: AppTheme.palette.transfer,
+          budgetColor: context.palette.transfer,
           spentColor: context.negative,
-          savingsColor: AppTheme.palette.highlight,
+          savingsColor: context.palette.highlight,
         ),
         kGapXxl,
         Padding(
@@ -786,7 +787,7 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
                 context,
                 label: 'Budget',
                 amount: widget.expenseBudget,
-                color: AppTheme.palette.transfer,
+                color: context.palette.transfer,
               ),
               _buildSummaryColumn(
                 context,
@@ -802,14 +803,14 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
                   context,
                   label: 'Savings target',
                   amount: widget.savingsBudget,
-                  color: AppTheme.palette.highlight,
+                  color: context.palette.highlight,
                   isHatched: true,
                 ),
                 _buildSummaryColumn(
                   context,
                   label: 'Saved',
                   amount: widget.savingsContributed,
-                  color: AppTheme.palette.highlight,
+                  color: context.palette.highlight,
                 ),
               ],
             ],

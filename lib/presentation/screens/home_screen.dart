@@ -17,6 +17,7 @@ import 'package:go_router/go_router.dart';
 import 'package:budgett_frontend/core/parsing/message_kind.dart';
 import '../widgets/screen_title.dart';
 import 'capture_inbox_screen.dart';
+import 'package:budgett_frontend/core/app_palette.dart';
 
 String _formatDate(DateTime date) {
   const months = [
@@ -94,7 +95,7 @@ class _MonthSummaryCard extends ConsumerWidget {
     // block holding the figure, with ink dark enough to read on it. An accent
     // used only as a thin trim on a dark screen reads as a detail; used as a
     // surface it becomes the thing the screen is about.
-    final palette = AppTheme.palette;
+    final palette = context.palette;
     final onBlock = palette.onBrand;
     final netColor = overspent ? context.negative : onBlock;
 

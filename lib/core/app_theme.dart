@@ -35,37 +35,52 @@ import 'app_text.dart';
 /// border, in both themes. That hairline is the app's structural device: it
 /// says "this is one object", and it is the only decoration a card gets.
 class AppTheme {
-  /// The palette every theme below is built from.
+  /// The palette this theme is built from.
   ///
-  /// Swappable so alternatives can be compared without editing the dozen
-  /// places the brand colour appears. Changing this one line changes the app.
-  static AppPalette palette = AppPalette.lime;
+  /// An instance field rather than a global: the palette is a user setting
+  /// now, so two themes with different palettes have to be able to exist at
+  /// once (the live app and a preview swatch, for instance).
+  final AppPalette palette;
 
-  static Color get _primary => palette.brand;
-  static Color get _onPrimary => palette.onBrand;
-  static Color get _lavender => palette.transfer;
-  static Color get _peach => palette.highlight;
-  static Color get _error => palette.negative;
+  const AppTheme(this.palette);
 
-  static Color get _lightBackground => palette.lightBackground;
-  static Color get _lightSurface => palette.lightSurface;
-  static Color get _lightSurfaceVariant => palette.lightSurfaceVariant;
-  static Color get _lightOutline => palette.lightOutline;
-  static Color get _lightOnSurface => palette.lightOnSurface;
-  static Color get _lightOnSurfaceVariant => palette.lightOnSurfaceVariant;
+  Color get _primary => palette.brand;
+  Color get _onPrimary => palette.onBrand;
+  Color get _lavender => palette.transfer;
+  Color get _peach => palette.highlight;
+  Color get _error => palette.negative;
 
-  static Color get _darkBackground => palette.darkBackground;
-  static Color get _darkSurface => palette.darkSurface;
-  static Color get _darkSurfaceVariant => palette.darkSurfaceVariant;
-  static Color get _darkOutline => palette.darkOutline;
-  static Color get _darkOnSurface => palette.darkOnSurface;
-  static Color get _darkOnSurfaceVariant => palette.darkOnSurfaceVariant;
+  Color get _lightBackground => palette.lightBackground;
+  Color get _lightSurface => palette.lightSurface;
+  Color get _lightSurfaceVariant => palette.lightSurfaceVariant;
+  Color get _lightOutline => palette.lightOutline;
+  Color get _lightOnSurface => palette.lightOnSurface;
+  Color get _lightOnSurfaceVariant => palette.lightOnSurfaceVariant;
+
+  Color get _darkBackground => palette.darkBackground;
+  Color get _darkSurface => palette.darkSurface;
+  Color get _darkSurfaceVariant => palette.darkSurfaceVariant;
+  Color get _darkOutline => palette.darkOutline;
+  Color get _darkOnSurface => palette.darkOnSurface;
+  Color get _darkOnSurfaceVariant => palette.darkOnSurfaceVariant;
 
   /// One step tighter than Material's default, where it used to be two.
   /// `VisualDensity.compact` (-2) plus 11px body text made rows physically
   /// hard to hit and visually hard to separate.
   static const VisualDensity _density =
       VisualDensity(horizontal: -1, vertical: -1);
+
+  AppSemanticColors get _semanticLight => AppSemanticColors(
+        positive: palette.positiveLight,
+        warning: palette.warningLight,
+        muted: palette.lightOnSurfaceVariant,
+      );
+
+  AppSemanticColors get _semanticDark => AppSemanticColors(
+        positive: palette.positiveDark,
+        warning: palette.warningDark,
+        muted: palette.darkOnSurfaceVariant,
+      );
 
   // ── Text theme ────────────────────────────────────────────────────────────
 
@@ -101,7 +116,7 @@ class AppTheme {
 
   // ── Shared component themes ───────────────────────────────────────────────
 
-  static CardThemeData _cardTheme(Color surface, Color outline) {
+  CardThemeData _cardTheme(Color surface, Color outline) {
     return CardThemeData(
       elevation: 0,
       color: surface,
@@ -114,7 +129,7 @@ class AppTheme {
     );
   }
 
-  static InputDecorationTheme _inputTheme(
+  InputDecorationTheme _inputTheme(
     Color fill,
     Color outline,
     Color hint,
@@ -147,7 +162,7 @@ class AppTheme {
   /// invisible on a white card. The text theme already maps `bodyLarge` and
   /// `bodySmall` to the same roles *with* a colour, which is what ListTile
   /// falls back to.
-  static ListTileThemeData get _listTileTheme => const ListTileThemeData(
+  ListTileThemeData get _listTileTheme => const ListTileThemeData(
         dense: true,
         visualDensity: _density,
         minVerticalPadding: 7,
@@ -164,7 +179,7 @@ class AppTheme {
   /// whatever shares that row — a sibling `Expanded` collapses to zero and its
   /// text renders one letter per line. Width belongs to the call site: wrap a
   /// button in `SizedBox(width: double.infinity)` when a screen wants it wide.
-  static ButtonStyle _buttonStyle({required bool fullWidth}) =>
+  ButtonStyle _buttonStyle({required bool fullWidth}) =>
       ElevatedButton.styleFrom(
         elevation: 0,
         backgroundColor: _primary,
@@ -180,7 +195,7 @@ class AppTheme {
         textStyle: AppText.cardName.copyWith(fontSize: 15),
       );
 
-  static NavigationBarThemeData _navBarTheme(
+  NavigationBarThemeData _navBarTheme(
     Color surface,
     Color onSurfaceVariant,
   ) {
@@ -207,7 +222,7 @@ class AppTheme {
     );
   }
 
-  static NavigationRailThemeData _navRailTheme(
+  NavigationRailThemeData _navRailTheme(
     Color surface,
     Color onSurface,
     Color onSurfaceVariant,
@@ -222,7 +237,7 @@ class AppTheme {
     );
   }
 
-  static SegmentedButtonThemeData _segmentedTheme(Color onSurfaceVariant) {
+  SegmentedButtonThemeData _segmentedTheme(Color onSurfaceVariant) {
     return SegmentedButtonThemeData(
       style: ButtonStyle(
         textStyle: WidgetStatePropertyAll(AppText.label),
@@ -245,7 +260,7 @@ class AppTheme {
 
   // ── Themes ────────────────────────────────────────────────────────────────
 
-  static ThemeData get lightTheme {
+  ThemeData get light {
     final text = _textTheme(_lightOnSurface, _lightOnSurfaceVariant);
 
     return ThemeData(
@@ -253,7 +268,7 @@ class AppTheme {
       brightness: Brightness.light,
       visualDensity: _density,
       scaffoldBackgroundColor: _lightBackground,
-      extensions: <ThemeExtension<dynamic>>[AppSemanticColors.light],
+      extensions: <ThemeExtension<dynamic>>[palette, _semanticLight],
       colorScheme: ColorScheme.light(
         primary: _primary,
         onPrimary: _onPrimary,
@@ -409,7 +424,7 @@ class AppTheme {
     );
   }
 
-  static ThemeData get darkTheme {
+  ThemeData get dark {
     final text = _textTheme(_darkOnSurface, _darkOnSurfaceVariant);
 
     return ThemeData(
@@ -417,7 +432,7 @@ class AppTheme {
       brightness: Brightness.dark,
       visualDensity: _density,
       scaffoldBackgroundColor: _darkBackground,
-      extensions: <ThemeExtension<dynamic>>[AppSemanticColors.dark],
+      extensions: <ThemeExtension<dynamic>>[palette, _semanticDark],
       colorScheme: ColorScheme.dark(
         primary: _primary,
         onPrimary: _onPrimary,
@@ -600,23 +615,6 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
   });
 
   /// Darker shades that keep contrast on the light surface (white).
-  // Getters, not `static final`: a late-initialised field is evaluated once,
-  // so it would freeze whichever palette happened to be active at first use —
-  // which is exactly what made the palette preview render Plan's bar in the
-  // old green while everything else had switched.
-  static AppSemanticColors get light => AppSemanticColors(
-    positive: AppTheme.palette.positiveLight,
-    warning: AppTheme.palette.warningLight,
-    muted: AppTheme.palette.lightOnSurfaceVariant,
-  );
-
-  /// Lighter shades that keep contrast on the dark surface.
-  static AppSemanticColors get dark => AppSemanticColors(
-    positive: AppTheme.palette.positiveDark,
-    warning: AppTheme.palette.warningDark,
-    muted: AppTheme.palette.darkOnSurfaceVariant,
-  );
-
   @override
   AppSemanticColors copyWith({Color? positive, Color? warning, Color? muted}) =>
       AppSemanticColors(
@@ -640,7 +638,12 @@ extension AppSemanticColorsX on BuildContext {
   /// Theme-aware semantic finance colors. Falls back to the dark palette if the
   /// extension somehow isn't registered.
   AppSemanticColors get semantic =>
-      Theme.of(this).extension<AppSemanticColors>() ?? AppSemanticColors.dark;
+      Theme.of(this).extension<AppSemanticColors>() ??
+      AppSemanticColors(
+        positive: palette.positiveDark,
+        warning: palette.warningDark,
+        muted: palette.darkOnSurfaceVariant,
+      );
 
   // Shorthands for the five colours that carry meaning in this app. They exist
   // so that painting a number the right colour is shorter than reaching for a

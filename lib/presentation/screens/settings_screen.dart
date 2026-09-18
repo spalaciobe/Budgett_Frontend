@@ -11,6 +11,10 @@ import 'package:budgett_frontend/presentation/providers/update_provider.dart';
 import 'package:budgett_frontend/presentation/widgets/update_available_dialog.dart';
 import '../widgets/screen_title.dart';
 import '../../core/utils/date_format.dart';
+import 'package:budgett_frontend/core/app_palette.dart';
+import 'package:budgett_frontend/core/app_text.dart';
+import 'package:budgett_frontend/core/app_theme.dart';
+import 'package:budgett_frontend/presentation/providers/palette_provider.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -81,6 +85,7 @@ class SettingsScreen extends ConsumerWidget {
                               .setDarkMode(val);
                         },
                 ),
+                const _PalettePicker(),
                 const Divider(),
                 Padding(
                   padding:
@@ -298,4 +303,109 @@ class SettingsScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// Picking the app's colours, in the app.
+///
+/// These palettes are concepts: deciding between them takes a few days of
+/// real use, and a build per candidate makes that impossible. Each row shows
+/// the three colours that actually carry meaning — brand, income, expense —
+/// on a strip of that palette's own background, because a swatch on the wrong
+/// backdrop tells you nothing about how it will look in use.
+class _PalettePicker extends ConsumerWidget {
+  const _PalettePicker();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selected = ref.watch(paletteProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+          child: Text(
+            'Palette',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+          ),
+        ),
+        for (final palette in AppPalette.all)
+          _PaletteRow(
+            palette: palette,
+            isSelected: palette.name == selected.name,
+            onTap: () => ref.read(paletteProvider.notifier).select(palette),
+          ),
+      ],
+    );
+  }
+}
+
+class _PaletteRow extends StatelessWidget {
+  final AppPalette palette;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _PaletteRow({
+    required this.palette,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      onTap: onTap,
+      leading: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: palette.darkBackground,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: palette.darkOutline),
+        ),
+        child: Center(
+          child: Container(
+            width: 22,
+            height: 22,
+            decoration: BoxDecoration(
+              color: palette.brand,
+              borderRadius: BorderRadius.circular(6),
+            ),
+          ),
+        ),
+      ),
+      title: Text(palette.name, style: AppText.tileTitle),
+      subtitle: Text(
+        palette.note,
+        style: AppText.caption.copyWith(color: context.muted),
+        maxLines: 2,
+      ),
+      trailing: isSelected
+          ? Icon(Icons.check_circle,
+              color: Theme.of(context).colorScheme.primary)
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _Dot(palette.positiveDark),
+                const SizedBox(width: 4),
+                _Dot(palette.negative),
+              ],
+            ),
+    );
+  }
+}
+
+class _Dot extends StatelessWidget {
+  final Color color;
+
+  const _Dot(this.color);
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 10,
+        height: 10,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      );
 }

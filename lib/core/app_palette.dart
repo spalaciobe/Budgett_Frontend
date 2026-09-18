@@ -11,7 +11,7 @@ import 'package:flutter/material.dart';
 /// for transfers, one for goals, income green, expense red, pending amber.
 /// A palette changes the hues, never what they stand for.
 @immutable
-class AppPalette {
+class AppPalette extends ThemeExtension<AppPalette> {
   final String name;
 
   /// One line on why this palette looks the way it does.
@@ -165,5 +165,150 @@ class AppPalette {
     lightOnSurfaceVariant: Color(0xFF5A6572),
   );
 
-  static const all = [teal, lime, limeSlate];
+
+  /// The requested #F0E7FF: a lavender so pale it behaves like paper.
+  ///
+  /// It can't be treated as an accent — at that lightness it disappears as a
+  /// thin line and shouts as a surface. So it *is* the surface: the balance
+  /// block is near-white lavender with near-black ink, the way a paper card
+  /// sits on a dark desk. Income and expense keep saturated hues of their own,
+  /// because nothing that pale can carry a meaning on a dark screen.
+  static const iris = AppPalette(
+    name: 'Iris',
+    note: 'Pale lavender as paper: a near-white block on near-black.',
+    brand: Color(0xFFF0E7FF),
+    onBrand: Color(0xFF16101F),
+    transfer: Color(0xFFA78BFA),
+    highlight: Color(0xFFFFD6A5),
+    negative: Color(0xFFFF6B81),
+    positiveDark: Color(0xFF5CE1A6),
+    positiveLight: Color(0xFF13795A),
+    warningDark: Color(0xFFFFC66B),
+    warningLight: Color(0xFF9A5B00),
+    darkBackground: Color(0xFF07060A),
+    darkSurface: Color(0xFF121016),
+    darkSurfaceVariant: Color(0xFF1D1A24),
+    darkOutline: Color(0xFF2A2633),
+    darkOnSurface: Color(0xFFF2EFF7),
+    darkOnSurfaceVariant: Color(0xFF9A93A8),
+    lightBackground: Color(0xFFF7F4FC),
+    lightSurface: Colors.white,
+    lightSurfaceVariant: Color(0xFFEDE8F6),
+    lightOutline: Color(0xFFE0D9EE),
+    lightOnSurface: Color(0xFF16101F),
+    lightOnSurfaceVariant: Color(0xFF615A70),
+  );
+
+  /// Electric violet on black — the boldest of the set.
+  ///
+  /// Violet is the one saturated hue that means nothing in money, so it can
+  /// carry the brand without ever being mistaken for income or loss.
+  static const ultraviolet = AppPalette(
+    name: 'Ultraviolet',
+    note: 'Electric violet: the one hue that never reads as money.',
+    brand: Color(0xFF7C5CFF),
+    onBrand: Colors.white,
+    transfer: Color(0xFF22D3EE),
+    highlight: Color(0xFFFFB86B),
+    negative: Color(0xFFFF5470),
+    positiveDark: Color(0xFF4ADE80),
+    positiveLight: Color(0xFF15803D),
+    warningDark: Color(0xFFFBBF24),
+    warningLight: Color(0xFFA16207),
+    darkBackground: Color(0xFF05040A),
+    darkSurface: Color(0xFF100E1A),
+    darkSurfaceVariant: Color(0xFF1B1830),
+    darkOutline: Color(0xFF282442),
+    darkOnSurface: Color(0xFFEFEDF7),
+    darkOnSurfaceVariant: Color(0xFF938EAC),
+    lightBackground: Color(0xFFF5F4FB),
+    lightSurface: Colors.white,
+    lightSurfaceVariant: Color(0xFFEBE9F7),
+    lightOutline: Color(0xFFDEDBF0),
+    lightOnSurface: Color(0xFF12101C),
+    lightOnSurfaceVariant: Color(0xFF5D5872),
+  );
+
+  /// Ice blue on charcoal: the calmest way to be vivid.
+  static const arctic = AppPalette(
+    name: 'Arctic',
+    note: 'Ice blue on charcoal — vivid without raising its voice.',
+    brand: Color(0xFF5EEAD4),
+    onBrand: Color(0xFF032420),
+    transfer: Color(0xFF818CF8),
+    highlight: Color(0xFFFCD34D),
+    negative: Color(0xFFFF6B6B),
+    positiveDark: Color(0xFF6EE7A8),
+    positiveLight: Color(0xFF13795A),
+    warningDark: Color(0xFFFBBF24),
+    warningLight: Color(0xFFA16207),
+    darkBackground: Color(0xFF05080A),
+    darkSurface: Color(0xFF0F1417),
+    darkSurfaceVariant: Color(0xFF1A2126),
+    darkOutline: Color(0xFF253036),
+    darkOnSurface: Color(0xFFEDF3F4),
+    darkOnSurfaceVariant: Color(0xFF8B9BA1),
+    lightBackground: Color(0xFFF2F7F7),
+    lightSurface: Colors.white,
+    lightSurfaceVariant: Color(0xFFE7EFEF),
+    lightOutline: Color(0xFFDAE5E5),
+    lightOnSurface: Color(0xFF0C1416),
+    lightOnSurfaceVariant: Color(0xFF55676C),
+  );
+
+  /// Amber on brown-black, the warmest of the set.
+  static const ember = AppPalette(
+    name: 'Ember',
+    note: 'Amber on a warm near-black; the only palette that feels lit.',
+    brand: Color(0xFFFFB800),
+    onBrand: Color(0xFF241800),
+    transfer: Color(0xFF9F8FFF),
+    highlight: Color(0xFFFF9D6B),
+    negative: Color(0xFFFF5A5A),
+    positiveDark: Color(0xFF7BDC8A),
+    positiveLight: Color(0xFF1F7A3A),
+    warningDark: Color(0xFFFFCE5C),
+    warningLight: Color(0xFF9A5B00),
+    darkBackground: Color(0xFF0A0703),
+    darkSurface: Color(0xFF16110A),
+    darkSurfaceVariant: Color(0xFF231C12),
+    darkOutline: Color(0xFF32291B),
+    darkOnSurface: Color(0xFFF6F1E8),
+    darkOnSurfaceVariant: Color(0xFFA2988A),
+    lightBackground: Color(0xFFFAF6F0),
+    lightSurface: Colors.white,
+    lightSurfaceVariant: Color(0xFFF1EADF),
+    lightOutline: Color(0xFFE7DFD1),
+    lightOnSurface: Color(0xFF1A1409),
+    lightOnSurfaceVariant: Color(0xFF6B6154),
+  );
+
+  static const all = [
+    lime,
+    iris,
+    ultraviolet,
+    arctic,
+    ember,
+    limeSlate,
+    teal,
+  ];
+
+  /// Looked up by [name] — what a stored preference round-trips through.
+  static AppPalette byName(String? name) =>
+      all.firstWhere((p) => p.name == name, orElse: () => lime);
+
+  @override
+  AppPalette copyWith() => this;
+
+  /// Palettes don't interpolate: a half-way blend of two identities is a
+  /// third identity nobody chose. Switching is a cut, not a cross-fade.
+  @override
+  AppPalette lerp(ThemeExtension<AppPalette>? other, double t) =>
+      t < 0.5 ? this : (other as AppPalette? ?? this);
+}
+
+extension AppPaletteContext on BuildContext {
+  /// The palette of the theme this widget is painted in.
+  AppPalette get palette =>
+      Theme.of(this).extension<AppPalette>() ?? AppPalette.lime;
 }

@@ -40,13 +40,9 @@ void main() {
     await loadAppFonts();
   });
 
-  tearDownAll(() => AppTheme.palette = AppPalette.teal);
-
   for (final palette in AppPalette.all) {
     for (final entry in _screens.entries) {
       testWidgets('${palette.name} · ${entry.key}', (tester) async {
-        AppTheme.palette = palette;
-
         tester.view.physicalSize = _phone;
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.resetPhysicalSize);
@@ -58,7 +54,7 @@ void main() {
             overrides: financeOverrides(),
             child: MaterialApp(
               // Dark only: this is the mode the palettes are being judged in.
-              theme: AppTheme.darkTheme,
+              theme: AppTheme(palette).dark,
               home: RepaintBoundary(
                 key: captureKey,
                 child: entry.value(),

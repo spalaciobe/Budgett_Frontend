@@ -13,6 +13,7 @@ import 'package:budgett_frontend/presentation/providers/update_provider.dart';
 import 'package:budgett_frontend/presentation/widgets/update_available_dialog.dart';
 import 'package:budgett_frontend/data/repositories/bank_repository.dart';
 import 'package:budgett_frontend/presentation/providers/message_capture_provider.dart';
+import 'presentation/providers/palette_provider.dart';
 
 /// Emits the current session whenever auth state changes.
 /// Used to gate providers that require authentication.
@@ -164,6 +165,8 @@ class _BudgettAppState extends ConsumerState<BudgettApp> {
   @override
   Widget build(BuildContext context) {
     final themeModeAsync = ref.watch(themeModeProvider);
+    // Watched, so picking a palette in Settings repaints the app.
+    final palette = ref.watch(paletteProvider);
     final themeMode = themeModeAsync.when(
       data: (isDark) => isDark == null ? ThemeMode.system : (isDark ? ThemeMode.dark : ThemeMode.light),
       loading: () => ThemeMode.system,
@@ -217,8 +220,8 @@ class _BudgettAppState extends ConsumerState<BudgettApp> {
     return MaterialApp.router(
       debugShowCheckedModeBanner: false,
       title: 'Budgett',
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
+      theme: AppTheme(palette).light,
+      darkTheme: AppTheme(palette).dark,
       themeMode: themeMode,
       routerConfig: appRouter,
     );
