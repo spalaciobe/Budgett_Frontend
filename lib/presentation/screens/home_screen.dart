@@ -229,6 +229,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
+  bool _searchOpen = false;
   final Set<String> _filterTypes = {};
   final Set<String> _filterAccountIds = {};
   DateTimeRange? _filterDateRange;
@@ -277,6 +278,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     setState(() {
       _searchController.clear();
       _searchQuery = '';
+      _searchOpen = false;
       _filterTypes.clear();
       _filterAccountIds.clear();
       _filterDateRange = null;
@@ -512,9 +514,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       child: Scaffold(
       appBar: AppBar(
         title: ScreenTitle('Transactions'),
+        actions: [
+          // Search was a fixed 56px row above the list. On a phone the header
+          // (title, tabs, month summary, search, filter chips) left room for
+          // four transactions — so the field now opens from here and takes no
+          // space until it is asked for.
+          IconButton(
+            tooltip: _searchOpen ? 'Close search' : 'Search transactions',
+            icon: Icon(_searchOpen ? Icons.search_off : Icons.search),
+            onPressed: () => setState(() {
+              _searchOpen = !_searchOpen;
+              if (!_searchOpen) {
+                _searchController.clear();
+                _searchQuery = '';
+              }
+            }),
+          ),
+        ],
         bottom: TabBar(
-          isScrollable: true,
-          tabAlignment: TabAlignment.start,
+          // Not scrollable: with exactly two tabs, left-aligning them leaves
+          // two thirds of the bar empty and the pair reads as misplaced.
+          // Full width also makes each one a much bigger tap target.
           tabs: [
             const Tab(text: 'All'),
             Tab(
@@ -555,7 +575,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               main: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Search bar
+                  // Search bar — only while it is in use.
+              if (_searchOpen || _searchQuery.isNotEmpty) ...[
               TextField(
                 controller: _searchController,
                 decoration: InputDecoration(
@@ -578,9 +599,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   filled: true,
                   contentPadding: const EdgeInsets.symmetric(vertical: 10),
                 ),
+                autofocus: true,
                 onChanged: (v) => setState(() => _searchQuery = v),
               ),
               const SizedBox(height: 8),
+              ],
               // Filter chips row
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
@@ -646,7 +669,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
+              kGapLg,
               // Transactions list
               transactionsAsync.when(
                 data: (transactions) {
@@ -787,12 +810,15 @@ class _SheetHandle extends StatelessWidget {
 }
 
 class _TransferDetails extends StatelessWidget {
+  /// Prefixed to the route, so a transfer row is two lines like every other.
+  final String date;
   final String? sourceIcon;
   final String sourceName;
   final String? targetIcon;
   final String targetName;
 
   const _TransferDetails({
+    required this.date,
     required this.sourceIcon,
     required this.sourceName,
     required this.targetIcon,
@@ -824,6 +850,7 @@ class _TransferDetails extends StatelessWidget {
     );
     return Row(
       children: [
+        Text('$date  ·  ', style: textStyle),
         _buildIcon(sourceIcon),
         Flexible(
           child: Text(
@@ -1025,6 +1052,7 @@ class _TransactionListTile extends StatelessWidget {
         children: [
           if (isTransfer && t.targetAccountId != null)
             _TransferDetails(
+              date: _formatDate(t.date.toLocal()),
               sourceIcon: accountIcon,
               sourceName: sourceAccountName,
               targetIcon: targetAccountIcon,
@@ -1049,9 +1077,10 @@ class _TransactionListTile extends StatelessWidget {
                 ],
                 Expanded(
                   child: Text(
-                    details,
+                    '${_formatDate(t.date.toLocal())}  ·  $details',
                     maxLines: 1,
                     overflow: TextOverflow.fade,
+                    softWrap: false,
                     style: TextStyle(
                       fontSize: 12,
                       color: Theme.of(context)
@@ -1062,33 +1091,28 @@ class _TransactionListTile extends StatelessWidget {
                   ),
                 ),
               ],
+            )
+          else
+            Text(
+              _formatDate(t.date.toLocal()),
+              style: AppText.caption.copyWith(color: context.muted),
             ),
-          const SizedBox(height: 1),
-          Row(
-            children: [
-              Text(
-                _formatDate(t.date.toLocal()),
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withValues(alpha: 0.45),
-                ),
-              ),
-              if (isPending) ...[
-                const SizedBox(width: 6),
-                _Badge(label: 'Pending', color: context.semantic.warning),
+          if (isPending || movementLabel != null) ...[
+            kGapXs,
+            Row(
+              children: [
+                if (isPending)
+                  _Badge(label: 'Pending', color: context.semantic.warning),
+                if (isPending && movementLabel != null)
+                  const SizedBox(width: 6),
+                if (movementLabel != null)
+                  _Badge(
+                    label: movementLabel,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
               ],
-              if (movementLabel != null) ...[
-                const SizedBox(width: 6),
-                _Badge(
-                  label: movementLabel,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-              ],
-            ],
-          ),
+            ),
+          ],
         ],
       ),
       isThreeLine: true,
