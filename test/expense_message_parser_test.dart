@@ -138,6 +138,64 @@ void main() {
     });
   });
 
+  group('real messages from the field', () {
+    // Verbatim Bancolombia SMS. Every wart here was found by running this
+    // exact text, not by imagining a format: "COP" glued to the number, the
+    // "T.Cred" abbreviation, a truncated city tail, and two support phone
+    // numbers that must not be read as amounts.
+    const novaventa =
+        'Bancolombia: Compraste COP2.200,00 en NOVAVENTA MEDELLIN C con tu '
+        'T.Cred *8225, el 17/09/2026 a las 14:56. Si tienes dudas, '
+        'encuentranos aqui: 6045109095 o 018000931987. Estamos cerca.';
+
+    test('parses every field', () {
+      final result = _parse(novaventa,
+          sourceKey: '87400', receivedAt: DateTime(2026, 9, 17, 14, 57));
+
+      expect(result.status, ParseStatus.parsed);
+      expect(result.kind, MessageKind.purchase);
+      expect(result.issuerKey, 'bancolombia');
+      // "COP2.200,00" with no space after the marker.
+      expect(result.amount, 2200.0);
+      expect(result.currency, 'COP');
+      expect(result.cardLast4, '8225');
+      expect(result.occurredAt, DateTime(2026, 9, 17, 14, 56));
+      expect(result.confidence, greaterThanOrEqualTo(0.9));
+    });
+
+    test('the support phone numbers are not read as the amount', () {
+      final result = _parse(novaventa,
+          sourceKey: '87400', receivedAt: DateTime(2026, 9, 17, 14, 57));
+      expect(result.amount, 2200.0);
+      expect(result.amount, isNot(6045109095));
+      expect(result.amount, isNot(18000931987));
+    });
+
+    test('the same shop in another city gives the same alias key', () {
+      // The key IS the alias key. If the truncated city tail survived, the
+      // user would have to teach the same shop once per city.
+      final medellin = _parse(novaventa,
+          sourceKey: '87400', receivedAt: DateTime(2026, 9, 17, 14, 57));
+      final bogota = _parse(
+          'Bancolombia: Compraste COP15.000,00 en NOVAVENTA BOGOTA D con tu '
+          'T.Cred 8225, el 17/09/2026 a las 15:10.',
+          sourceKey: '87400',
+          receivedAt: DateTime(2026, 9, 17, 15, 11));
+
+      expect(medellin.merchantKey, 'NOVAVENTA');
+      expect(bogota.merchantKey, 'NOVAVENTA');
+      // Also proves the abbreviation is read without an asterisk.
+      expect(bogota.cardLast4, '8225');
+    });
+
+    test('a truncated city tail is only stripped after a real city', () {
+      expect(normalizeMerchant('NOVAVENTA MEDELLIN C'), 'NOVAVENTA');
+      // A name that genuinely ends in a letter must survive.
+      expect(normalizeMerchant('PLAN B'), 'PLAN B');
+      expect(normalizeMerchant('VITAMINA C'), 'VITAMINA C');
+    });
+  });
+
   group('other issuers', () {
     test('Nequi outgoing transfer', () {
       final result = _parse(

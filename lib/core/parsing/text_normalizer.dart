@@ -31,6 +31,24 @@ String stripAccents(String input) {
 String normalizeForMatch(String input) =>
     stripAccents(input).toLowerCase().replaceAll(RegExp(r'\s+'), ' ').trim();
 
+/// Cities Colombian acquirers append to the merchant field. Kept as a token
+/// set so both the suffix strip and [_stripTruncatedCityTail] share one list.
+const _cityTokens = {
+  'BOGOTA', 'BOG', 'MEDELLIN', 'MED', 'CALI', 'BARRANQUILLA', 'BAQ',
+  'CARTAGENA', 'CTG', 'BUCARAMANGA', 'BUC', 'PEREIRA', 'MANIZALES', 'CUCUTA',
+  'IBAGUE', 'VILLAVICENCIO', 'NEIVA', 'ARMENIA', 'POPAYAN', 'PASTO',
+  'MONTERIA', 'SINCELEJO', 'TUNJA', 'VALLEDUPAR', 'ENVIGADO', 'ITAGUI',
+  'BELLO', 'SABANETA', 'SOACHA', 'CHIA', 'CAJICA',
+};
+
+/// Trailing city, including the one multi-word name in the list.
+///
+/// Built by concatenation rather than interpolation so the trailing `$` stays
+/// an end-of-string anchor: inside a non-raw Dart string it would have to be
+/// written `\$`, which the regex engine reads as a literal dollar sign.
+final _citySuffix =
+    RegExp(r'\s+(?:SANTA MARTA|' + _cityTokens.join('|') + r')$');
+
 /// Street-type abbreviations. A number right after one of these is an address,
 /// not a store code — "ARA CL 100" keeps its 100.
 const _streetTokens = {
@@ -50,10 +68,7 @@ final _trailingNoise = <RegExp>[
   RegExp(r'\s+#\d{2,}$'),
   RegExp(r'\s+\d{4,}$'),
   // City suffixes Colombian acquirers append.
-  RegExp(r'\s+(BOGOTA|BOG|MEDELLIN|MED|CALI|BARRANQUILLA|BAQ|CARTAGENA|CTG|'
-      r'BUCARAMANGA|BUC|PEREIRA|MANIZALES|CUCUTA|IBAGUE|VILLAVICENCIO|'
-      r'SANTA MARTA|NEIVA|ARMENIA|POPAYAN|PASTO|MONTERIA|SINCELEJO|TUNJA|'
-      r'VALLEDUPAR|ENVIGADO|ITAGUI|BELLO|SABANETA|SOACHA|CHIA|CAJICA)$'),
+  _citySuffix,
   // Country / currency tails: "… CO", "… COL", "… COP"
   RegExp(r'\s+(CO|COL|COLOMBIA|COP)$'),
   // Leftover separators.
@@ -85,9 +100,26 @@ String normalizeMerchant(String input) {
       out = out.replaceFirst(pattern, '').trim();
     }
     out = _stripStoreCode(out);
+    out = _stripTruncatedCityTail(out);
   }
 
   return out;
+}
+
+/// Drops the orphan letter left when an acquirer truncates the city/branch
+/// field: `'NOVAVENTA MEDELLIN C'` → `'NOVAVENTA MEDELLIN'`, which the city
+/// rule then reduces to `'NOVAVENTA'` on the next pass.
+///
+/// Only stripped when the token before it is a known city, so a name that
+/// genuinely ends in a letter ('PLAN B', 'VITAMINA C') survives. This matters
+/// beyond cosmetics: the result is the alias key, so leaving the tail in would
+/// make the same shop in another city a separate rule the user has to teach
+/// all over again.
+String _stripTruncatedCityTail(String input) {
+  final match = RegExp(r'^(.*?)\s+([A-Z]+)\s+[A-Z]$').firstMatch(input);
+  if (match == null) return input;
+  if (!_cityTokens.contains(match.group(2))) return input;
+  return '${match.group(1)} ${match.group(2)}';
 }
 
 /// Removes a trailing 2–3 digit store code, unless it follows a street

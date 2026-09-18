@@ -185,7 +185,8 @@ const _kindRules = <(String, MessageKind)>[
 final _last4Patterns = <RegExp>[
   RegExp(r'(?:terminad[ao]\s+en|termina\s+en|final(?:izad[ao])?\s+en)\s*[*xX]*(\d{3,4})',
       caseSensitive: false),
-  RegExp(r'(?:tarjeta|producto|cuenta|t\.?\s*(?:credito|debito)|tc|td)\s*(?:n[o°.]?\s*)?[*xX#]*(\d{3,4})\b',
+  // Issuers abbreviate heavily: "T.Credito", "T.Cred", "T.Deb", "Tarjeta".
+  RegExp(r'(?:tarjeta|producto|cuenta|t\.?\s*(?:cred(?:ito)?|deb(?:ito)?)|tc|td)\s*(?:n[o°.]?\s*)?[*xX#]*(\d{3,4})\b',
       caseSensitive: false),
   RegExp(r'[*]{1,4}\s?(\d{3,4})\b'),
   RegExp(r'[xX]{2,4}\s?(\d{3,4})\b'),
