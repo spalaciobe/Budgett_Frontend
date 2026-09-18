@@ -33,8 +33,8 @@ class PlanScreen extends StatelessWidget {
         appBar: AppBar(
           title: ScreenTitle('Plan'),
           bottom: const TabBar(
-            isScrollable: true,
-            tabAlignment: TabAlignment.start,
+            // Four short labels fit a phone's width, and sharing it evenly
+            // makes each tab a full-height target instead of a word to aim at.
             tabs: [
               Tab(text: 'Budget'),
               Tab(text: 'Goals'),

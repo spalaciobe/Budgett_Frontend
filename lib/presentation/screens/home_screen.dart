@@ -33,8 +33,9 @@ String _formatDate(DateTime date) {
 String _buildDetails(
   Transaction t,
   Map<String, String> accountMap,
-  Map<String, String> categoryMap,
-) {
+  Map<String, String> categoryMap, {
+  bool hasIcon = false,
+}) {
   final accountName = accountMap[t.accountId] ?? '';
   if (t.type == 'transfer') {
     final target =
@@ -44,8 +45,10 @@ String _buildDetails(
   final catName = t.subCategoryId != null
       ? categoryMap[t.subCategoryId!]
       : (t.categoryId != null ? categoryMap[t.categoryId!] : null);
-  if (catName != null && catName.isNotEmpty) return '$accountName  ·  $catName';
-  return accountName;
+  if (catName == null || catName.isEmpty) return accountName;
+  // With the account's logo right there, its name is the part of this line
+  // worth losing — keeping both made every row truncate mid-word.
+  return hasIcon ? catName : '$accountName  ·  $catName';
 }
 
 /// The month's headline: what's left, and how much of the income it took.
@@ -230,6 +233,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
   bool _searchOpen = false;
+  bool _filtersOpen = false;
   final Set<String> _filterTypes = {};
   final Set<String> _filterAccountIds = {};
   DateTimeRange? _filterDateRange;
@@ -530,6 +534,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               }
             }),
           ),
+          // Same bargain as search: the filter chips were a permanent row for
+          // something rarely on. The dot says filters are active without
+          // having to show them.
+          IconButton(
+            tooltip: _filtersOpen ? 'Hide filters' : 'Filter transactions',
+            icon: Badge(
+              isLabelVisible: _hasActiveFilters,
+              smallSize: 7,
+              child: Icon(
+                  _filtersOpen ? Icons.filter_list_off : Icons.filter_list),
+            ),
+            onPressed: () => setState(() => _filtersOpen = !_filtersOpen),
+          ),
         ],
         bottom: TabBar(
           // Not scrollable: with exactly two tabs, left-aligning them leaves
@@ -604,7 +621,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
               const SizedBox(height: 8),
               ],
-              // Filter chips row
+              // Filter chips row — while open, or while something is filtered.
+              if (_filtersOpen || _hasActiveFilters)
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
@@ -957,8 +975,9 @@ class _TransactionListTile extends StatelessWidget {
             ? Icons.arrow_downward
             : Icons.arrow_upward;
 
-    final details = _buildDetails(t, accountMap, categoryMap);
     final accountIcon = accountIconMap[t.accountId];
+    final details = _buildDetails(t, accountMap, categoryMap,
+        hasIcon: accountIcon != null);
     final targetAccountIcon = isTransfer && t.targetAccountId != null
         ? accountIconMap[t.targetAccountId!]
         : null;
@@ -1097,21 +1116,12 @@ class _TransactionListTile extends StatelessWidget {
               _formatDate(t.date.toLocal()),
               style: AppText.caption.copyWith(color: context.muted),
             ),
-          if (isPending || movementLabel != null) ...[
+          // Only "Pending" earns a line of its own. The movement type
+          // (fixed / variable / savings) was shown on every row and cost one,
+          // for a classification this app's owner doesn't use.
+          if (isPending) ...[
             kGapXs,
-            Row(
-              children: [
-                if (isPending)
-                  _Badge(label: 'Pending', color: context.semantic.warning),
-                if (isPending && movementLabel != null)
-                  const SizedBox(width: 6),
-                if (movementLabel != null)
-                  _Badge(
-                    label: movementLabel,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-              ],
-            ),
+            _Badge(label: 'Pending', color: context.semantic.warning),
           ],
         ],
       ),
