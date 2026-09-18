@@ -99,6 +99,11 @@ flutter:
         - asset: assets/fonts/OpenSans-BoldItalic.ttf
           weight: 700
           style: italic
+    - family: SpaceGrotesk
+      fonts:
+        # Variable font (wght axis). Weights are selected with FontVariation in
+        # AppText, not with fontWeight — see core/app_text.dart.
+        - asset: assets/fonts/SpaceGrotesk-Variable.ttf
 
 flutter_launcher_icons:
   android: true

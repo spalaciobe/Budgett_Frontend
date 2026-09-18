@@ -53,3 +53,34 @@ const Widget kGapMd = SizedBox(height: kSpaceMd);
 const Widget kGapLg = SizedBox(height: kSpaceLg);
 const Widget kGapXl = SizedBox(height: kSpaceXl);
 const Widget kGapXxl = SizedBox(height: kSpaceXxl);
+
+// ---------------------------------------------------------------------------
+// Breathing room
+// ---------------------------------------------------------------------------
+// The scale above is deliberately tight, which is right for long lists and
+// wrong for the places a screen needs a visual entry point. These are the
+// exceptions: use them around the one element that should dominate a screen
+// (a hero balance, a section that starts a new idea), not everywhere.
+
+/// Gap between a screen's hero element and the content under it.
+const double kSpaceSection = 20;
+
+/// Gap that separates two unrelated ideas on the same screen.
+const double kSpaceBlock = 28;
+
+const Widget kGapSection = SizedBox(height: kSpaceSection);
+const Widget kGapBlock = SizedBox(height: kSpaceBlock);
+
+/// Padding for a card that holds a headline number, as opposed to a list row.
+const EdgeInsets kHeroCardPadding = EdgeInsets.all(kSpaceSection);
+
+/// Max line length for readable prose (empty states, explanations). Beyond
+/// ~70 characters the eye loses the start of the next line.
+const double kProseMaxWidth = 560;
+
+/// Max width for a single column of content (forms, review sheets).
+const double kColumnMaxWidth = 720;
+
+/// Max width for a data-dense page body on a wide screen. Wider than this and
+/// a row's label and its amount end up a screen apart.
+const double kPageMaxWidth = 1180;

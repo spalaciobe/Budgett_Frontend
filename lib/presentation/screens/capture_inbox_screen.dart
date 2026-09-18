@@ -4,8 +4,10 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import 'package:budgett_frontend/core/app_spacing.dart';
+import 'package:budgett_frontend/core/app_theme.dart';
 import 'package:budgett_frontend/core/app_text.dart';
 import 'package:budgett_frontend/core/parsing/issuer_registry.dart';
+import 'package:budgett_frontend/core/parsing/message_kind.dart';
 import 'package:budgett_frontend/core/services/message_capture_service.dart';
 import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:budgett_frontend/data/models/captured_message_model.dart';
@@ -241,8 +243,10 @@ class _CaptureList extends ConsumerWidget {
   }
 }
 
-/// One captured message: what it says, where it came from, and what happened
-/// to it.
+/// One captured message, in the same visual language as [TransactionTile]:
+/// a colour dot, a one-line title, the amount on the right, and muted caption
+/// lines underneath. The inbox adds the review actions and, when present, the
+/// duplicate/error note.
 class CaptureCard extends ConsumerWidget {
   final CapturedMessage message;
 
@@ -251,46 +255,54 @@ class CaptureCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final muted = theme.colorScheme.onSurface.withValues(alpha: 0.6);
+
     final sources = ref.watch(captureSourcesProvider).valueOrNull ?? const [];
-    final source =
-        sources.where((s) => s.id == message.sourceId).firstOrNull;
-    final sourceName = source?.effectiveName ?? message.sourceKey;
+    final source = sources.where((s) => s.id == message.sourceId).firstOrNull;
+    final issuer = issuerDisplayName(message.issuerKey);
+
+    final isIncome = message.kind?.transactionType == 'income';
+    final accent = message.isDuplicate
+        ? muted
+        : (isIncome ? context.semantic.positive : theme.colorScheme.error);
 
     final amountLabel = message.amount == null
         ? '—'
-        : CurrencyFormatter.format(
+        : '${isIncome ? '+' : '−'}${CurrencyFormatter.format(
             message.amount!,
             currency: message.currency ?? 'COP',
-            decimalDigits: 0,
-          );
+          )}';
 
-    final subtitleParts = <String>[
-      sourceName,
-      if (message.issuerKey != null &&
-          issuerDisplayName(message.issuerKey) != sourceName)
-        issuerDisplayName(message.issuerKey!),
+    // One compact caption line. The issuer identifies the source better than
+    // the app package does, so the raw source name only appears when no bank
+    // was recognised — otherwise this line wraps and orphans the time.
+    final captionParts = <String>[
+      if (issuer.isNotEmpty) issuer else source?.effectiveName ?? message.sourceKey,
       if (message.cardLast4 != null) '•${message.cardLast4}',
-      DateFormat('dd/MM HH:mm', 'en').format(message.occurredAt),
+      DateFormat('d MMM, HH:mm', 'en').format(message.occurredAt),
+      // Only when it is not the obvious case — a red minus already reads as
+      // "expense", and spelling it out cost the caption a whole extra line.
+      if (message.kind != null && message.kind != MessageKind.purchase)
+        message.kind!.label,
     ];
 
     return Card(
-      margin: const EdgeInsets.only(bottom: kSpaceXl),
+      margin: const EdgeInsets.only(bottom: kSpaceLg),
       child: Padding(
-        padding: kCardPadding,
+        padding: const EdgeInsets.fromLTRB(12, kSpaceXl, 12, kSpaceLg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  message.channel == 'sms'
-                      ? Icons.sms_outlined
-                      : Icons.notifications_outlined,
-                  size: 18,
-                  color: theme.colorScheme.onSurfaceVariant,
+                Padding(
+                  padding: const EdgeInsets.only(top: 5, right: kSpaceXl),
+                  child: CircleAvatar(
+                    radius: 4,
+                    backgroundColor: accent.withValues(alpha: 0.6),
+                  ),
                 ),
-                const SizedBox(width: kSpaceXl),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -298,84 +310,78 @@ class CaptureCard extends ConsumerWidget {
                       Text(
                         message.headline,
                         style: AppText.tileTitle,
-                        maxLines: 2,
+                        maxLines: 1,
                         overflow: TextOverflow.fade,
+                        softWrap: false,
                       ),
-                      kGapSm,
-                      Text(
-                        subtitleParts.join(' · '),
-                        style: AppText.caption
-                            .copyWith(color: theme.colorScheme.onSurfaceVariant),
-                        maxLines: 2,
-                        overflow: TextOverflow.fade,
+                      kGapXs,
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 2,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Icon(
+                            message.channel == 'sms'
+                                ? Icons.sms_outlined
+                                : Icons.notifications_outlined,
+                            size: 12,
+                            color: muted,
+                          ),
+                          for (final part in captionParts)
+                            Text(part,
+                                style: AppText.caption.copyWith(color: muted)),
+                        ],
                       ),
+                      if (message.locationLabel != null) ...[
+                        kGapXs,
+                        Text(
+                          message.locationLabel!,
+                          style: AppText.caption.copyWith(color: muted),
+                          maxLines: 1,
+                          overflow: TextOverflow.fade,
+                          softWrap: false,
+                        ),
+                      ],
                     ],
                   ),
                 ),
                 const SizedBox(width: kSpaceLg),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(amountLabel, style: AppText.amount),
-                    if (message.kind != null) ...[
-                      kGapXs,
-                      Text(
-                        message.kind!.label,
-                        style: AppText.badge
-                            .copyWith(color: theme.colorScheme.onSurfaceVariant),
-                      ),
-                    ],
-                  ],
-                ),
+                Text(amountLabel,
+                    style: AppText.amount.copyWith(color: accent)),
               ],
             ),
-            if (message.locationLabel != null) ...[
-              kGapLg,
-              Row(
-                children: [
-                  Icon(Icons.place_outlined,
-                      size: 14, color: theme.colorScheme.onSurfaceVariant),
-                  const SizedBox(width: kSpaceMd),
-                  Expanded(
-                    child: Text(
-                      message.locationLabel!,
-                      style: theme.textTheme.bodySmall,
-                      maxLines: 1,
-                      overflow: TextOverflow.fade,
-                    ),
-                  ),
-                ],
-              ),
-            ],
+
+            // The raw text is the only thing to show when parsing failed.
             if (message.parseStatus == 'unparsed') ...[
               kGapLg,
               Text(
                 message.body,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+                style: AppText.caption.copyWith(color: muted),
                 maxLines: 3,
                 overflow: TextOverflow.fade,
               ),
             ],
+
             if (message.error != null) ...[
               kGapLg,
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Icon(Icons.info_outline,
-                      size: 14, color: theme.colorScheme.error),
+                      size: 13, color: context.semantic.warning),
                   const SizedBox(width: kSpaceMd),
                   Expanded(
                     child: Text(
                       message.error!,
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: theme.colorScheme.error),
+                      style: AppText.caption
+                          .copyWith(color: context.semantic.warning),
                     ),
                   ),
                 ],
               ),
             ],
-            kGapLg,
+
+            kGapSm,
             _buildActions(context, ref, theme),
           ],
         ),

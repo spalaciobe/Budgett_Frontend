@@ -246,18 +246,32 @@ class MessageCaptureService implements CapturePlatform {
           .placemarkFromCoordinates(latitude, longitude);
       if (placemarks.isEmpty) return null;
       final p = placemarks.first;
-      final street = [p.thoroughfare, p.subThoroughfare]
-          .where((s) => s != null && s.isNotEmpty)
-          .join(' ');
+
+      // Street NAME only. `subThoroughfare` is the house number, which is
+      // noise for "where did I pay" and is also what the geocoder echoes back
+      // in `name`, producing labels like "25b-15, Carrera 63 25b-15, …".
+      final street = (p.thoroughfare?.trim().isNotEmpty ?? false)
+          ? p.thoroughfare!.trim()
+          : (p.name?.trim() ?? '');
+
       final parts = <String>[
-        if (p.name != null && p.name!.isNotEmpty && p.name != street) p.name!,
         if (street.isNotEmpty) street,
-        if (p.subLocality != null && p.subLocality!.isNotEmpty) p.subLocality!,
-        if (p.locality != null && p.locality!.isNotEmpty) p.locality!,
+        if (p.subLocality?.trim().isNotEmpty ?? false) p.subLocality!.trim(),
+        if (p.locality?.trim().isNotEmpty ?? false) p.locality!.trim(),
       ];
-      // De-duplicate while preserving order — geocoders repeat themselves.
-      final seen = <String>{};
-      final label = parts.where(seen.add).join(', ');
+
+      // Drop any part already contained in another — geocoders repeat
+      // themselves, and equality alone does not catch "25b-15" inside
+      // "Carrera 63 25b-15".
+      final kept = <String>[];
+      for (final part in parts) {
+        final lower = part.toLowerCase();
+        final redundant = kept.any((k) =>
+            k.toLowerCase().contains(lower) || lower.contains(k.toLowerCase()));
+        if (!redundant) kept.add(part);
+      }
+
+      final label = kept.join(', ');
       return label.isEmpty ? null : label;
     } catch (e) {
       debugPrint('Reverse geocoding failed: $e');
