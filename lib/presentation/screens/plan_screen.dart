@@ -6,6 +6,7 @@ import 'budget_screen.dart';
 import 'expense_groups_screen.dart';
 import 'goals_screen.dart';
 import 'recurring_transactions_screen.dart';
+import '../../core/app_text.dart';
 
 /// Everything that answers "what do I intend to do with my money?".
 ///
@@ -33,8 +34,12 @@ class PlanScreen extends StatelessWidget {
         appBar: AppBar(
           title: ScreenTitle('Plan'),
           bottom: const TabBar(
-            // Four short labels fit a phone's width, and sharing it evenly
-            // makes each tab a full-height target instead of a word to aim at.
+            // Four labels sharing a phone's width leaves ~97dp each, and
+            // "Recurring" needs every one of them: the default 16px of side
+            // padding per tab was enough to cut it off.
+            labelPadding: EdgeInsets.symmetric(horizontal: 4),
+            labelStyle: AppText.cardName,
+            unselectedLabelStyle: AppText.cardName,
             tabs: [
               Tab(text: 'Budget'),
               Tab(text: 'Goals'),

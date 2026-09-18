@@ -81,8 +81,14 @@ final captureIngestServiceProvider = Provider<CaptureIngestService>((ref) {
 /// spinner and so overlapping runs are impossible — draining the native queue
 /// twice concurrently would process the same messages in both passes.
 class CaptureIngestController extends AsyncNotifier<CaptureIngestResult?> {
+  /// Synchronous on purpose. With `async` the notifier stays uninitialised
+  /// until its future resolves, and the `state = AsyncLoading()` in [run]
+  /// throws "Tried to update the state of an uninitialized provider". That
+  /// assignment sits before the try block, so the error vanished into an
+  /// unobserved future and ingestion silently never ran: a captured purchase
+  /// stayed in the native queue with nothing in the app to show for it.
   @override
-  Future<CaptureIngestResult?> build() async => null;
+  FutureOr<CaptureIngestResult?> build() => null;
 
   bool _running = false;
 
@@ -98,8 +104,9 @@ class CaptureIngestController extends AsyncNotifier<CaptureIngestResult?> {
     if (!service.isSupported) return null;
 
     _running = true;
-    state = const AsyncLoading<CaptureIngestResult?>().copyWithPrevious(state);
     try {
+      state =
+          const AsyncLoading<CaptureIngestResult?>().copyWithPrevious(state);
       final accounts = await ref.read(accountsProvider.future);
       final banks = await ref.read(banksFutureProvider.future);
       final settings = await ref.read(captureSettingsProvider.future);

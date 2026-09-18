@@ -102,7 +102,7 @@ final appRouter = GoRouter(
         ),
         GoRoute(
           path: '/capture-inbox',
-          builder: (context, state) => const CaptureInboxScreen(),
+          builder: (context, state) => const CaptureInboxScreen(initialTab: 1),
         ),
         GoRoute(
           path: '/capture-settings',

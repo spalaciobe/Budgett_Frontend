@@ -95,8 +95,10 @@ const kNavDestinations = <NavDestination>[
     path: '/capture-inbox',
     icon: Icons.move_to_inbox_outlined,
     selectedIcon: Icons.move_to_inbox,
-    label: 'Expense Inbox',
-    inMore: false,
+    // The review queue is a tab in Transactions now, but the history — the
+    // audit trail of everything the capture pipeline recorded, deduplicated
+    // or dismissed — lives only here. Removing this entry took it with it.
+    label: 'Capture history',
   ),
   NavDestination(
     path: '/categories',

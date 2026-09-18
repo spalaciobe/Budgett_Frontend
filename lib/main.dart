@@ -108,6 +108,12 @@ final ccAlertSchedulerProvider = FutureProvider<void>((ref) async {
 final captureIngestBootstrapProvider = FutureProvider<void>((ref) async {
   final session = ref.watch(_supabaseSessionProvider).valueOrNull;
   if (session == null) return;
+  // Yield first. Riverpod forbids modifying another provider while this one
+  // builds, and ingestion sets the controller's state on its first line — so
+  // calling it directly threw "modified ... while building" and the queued
+  // purchases stayed in the native file. The assert only fires in debug, so
+  // release builds ingested fine and this never surfaced.
+  await Future<void>.delayed(Duration.zero);
   await ref.read(captureIngestControllerProvider.notifier).run();
 });
 

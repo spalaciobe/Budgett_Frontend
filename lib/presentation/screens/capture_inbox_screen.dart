@@ -28,7 +28,11 @@ import '../../core/utils/date_format.dart';
 /// recorded, deduplicated or dismissed, so an auto-posted expense can always
 /// be traced back to the text that produced it.
 class CaptureInboxScreen extends ConsumerStatefulWidget {
-  const CaptureInboxScreen({super.key});
+  /// Which tab opens first. Reached from More it means "show me the history",
+  /// because reviewing happens in Transactions now.
+  final int initialTab;
+
+  const CaptureInboxScreen({super.key, this.initialTab = 0});
 
   @override
   ConsumerState<CaptureInboxScreen> createState() => _CaptureInboxScreenState();
@@ -49,6 +53,7 @@ class _CaptureInboxScreenState extends ConsumerState<CaptureInboxScreen> {
 
     return DefaultTabController(
       length: 2,
+      initialIndex: widget.initialTab,
       child: Scaffold(
         appBar: AppBar(
           title: ScreenTitle('Expense Inbox'),

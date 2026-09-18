@@ -28,6 +28,7 @@ class MoreScreen extends ConsumerWidget {
     '/analysis': 'Cash flow over time and your consolidated portfolio',
     '/categories': 'The buckets your spending is grouped into',
     '/settings': 'Account, capture, notifications and updates',
+    '/capture-inbox': 'Every message the capture pipeline has processed',
   };
 
   @override
