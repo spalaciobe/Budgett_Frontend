@@ -23,6 +23,7 @@ import 'package:budgett_frontend/presentation/screens/credit_card_details_screen
 import 'package:budgett_frontend/presentation/screens/investment_details_screen.dart';
 import '../../core/app_text.dart';
 import '../widgets/skeleton.dart';
+import '../widgets/page_body.dart';
 
 // ── Top-level helpers ─────────────────────────────────────────────────────────
 
@@ -394,14 +395,17 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
                   ),
           ),
         ),
-        // Right panel: detail
+        // Right panel: detail. Capped like every other body — uncapped, the
+        // balance sat ~1500px from the account name it belongs to.
         Expanded(
-          child: selected != null
+          child: PageBody(
+            child: selected != null
               ? _AccountDetailPanel(
                   key: ValueKey(selected.id),
                   account: selected,
                 )
               : const SizedBox.shrink(),
+          ),
         ),
       ],
     );

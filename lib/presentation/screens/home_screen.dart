@@ -490,13 +490,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: kScreenPaddingWithFab,
-          // 1000 rather than the full viewport: the list is two columns
-          // (description, amount), and at 1440px those two ended up a screen
-          // apart. On desktop the month summary moves into the aside, so the
-          // width that's left goes to the rows instead of to empty space.
+          // The list is two columns (description, amount), so it gets a
+          // ceiling rather than the whole viewport. The first attempt capped
+          // it at 1000, which on a 1920 monitor left ~800px of nothing to the
+          // right of the summary. The pane widths below spend that width
+          // instead: tabular figures keep a wider row readable, because the
+          // amounts still line up in a column.
           child: PageBody(
-            maxWidth: 1000,
             child: TwoPaneLayout(
+              asideWidth: 420,
               aside: const _MonthSummaryCard(),
               main: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

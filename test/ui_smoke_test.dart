@@ -50,6 +50,8 @@ import 'package:budgett_frontend/presentation/screens/categories_screen.dart';
 import 'package:budgett_frontend/presentation/screens/expense_groups_screen.dart';
 import 'package:budgett_frontend/presentation/screens/goals_screen.dart';
 import 'package:budgett_frontend/presentation/screens/home_screen.dart';
+import 'package:budgett_frontend/presentation/screens/credit_card_details_screen.dart';
+import 'package:budgett_frontend/presentation/screens/accounts_screen.dart';
 import 'package:budgett_frontend/presentation/screens/budget_screen.dart';
 import 'package:budgett_frontend/presentation/screens/recurring_transactions_screen.dart';
 import 'package:budgett_frontend/data/models/sub_category_model.dart';
@@ -71,6 +73,9 @@ import 'package:budgett_frontend/presentation/widgets/update_available_dialog.da
 const _breakpoints = <(String, Size, bool)>[
   ('mobile', Size(390, 844), false),
   ('desktop', Size(1440, 900), false),
+  // A real monitor, not a small laptop. Layouts that look merely airy at
+  // 1440 are half-empty here, and a capped body shows it.
+  ('wide', Size(1920, 1080), false),
   ('mobile_dark', Size(390, 844), true),
 ];
 
@@ -497,6 +502,16 @@ final _targets = <String, _Target>{
   ),
   'screen_recurring_transactions': _Target(
     () => const RecurringTransactionsScreen(),
+    overrides: _financeOverrides(),
+  ),
+  // Account detail screens were never rendered here, which is how a title
+  // collapsed to one letter per line and reached production unseen.
+  'screen_credit_card_details': _Target(
+    () => const CreditCardDetailsScreen(accountId: 'acc-2'),
+    overrides: _financeOverrides(),
+  ),
+  'screen_accounts': _Target(
+    () => const AccountsScreen(),
     overrides: _financeOverrides(),
   ),
   'screen_budget': _Target(

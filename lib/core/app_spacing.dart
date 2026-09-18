@@ -81,6 +81,10 @@ const double kProseMaxWidth = 560;
 /// Max width for a single column of content (forms, review sheets).
 const double kColumnMaxWidth = 720;
 
-/// Max width for a data-dense page body on a wide screen. Wider than this and
-/// a row's label and its amount end up a screen apart.
-const double kPageMaxWidth = 1180;
+/// Max width for a data-dense page body on a wide screen.
+///
+/// This is a ceiling, not a target: it exists so a row's label and its amount
+/// don't end up a screen apart. Set against a 1920px monitor rather than a
+/// 1440px laptop — at 1180 a third of a real screen sat empty, which reads as
+/// a layout that forgot to finish rather than as breathing room.
+const double kPageMaxWidth = 1500;

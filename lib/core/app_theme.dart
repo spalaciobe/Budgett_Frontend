@@ -151,13 +151,24 @@ class AppTheme {
         contentPadding: EdgeInsets.symmetric(horizontal: 14),
       );
 
-  static ButtonStyle get _primaryButtonStyle => ElevatedButton.styleFrom(
+  /// [fullWidth] drives the one property a theme should be careful with:
+  /// `minimumSize.width`.
+  ///
+  /// `ElevatedButton` has always been full-width in this app, and screens rely
+  /// on it. `FilledButton` has not: it is the button that sits *inside* rows,
+  /// next to a title or at the end of a card. Handing it
+  /// `Size(double.infinity, …)` makes it demand the entire row, which starves
+  /// whatever shares that row — a sibling `Expanded` collapses to zero and its
+  /// text renders one letter per line. Width belongs to the call site: wrap a
+  /// button in `SizedBox(width: double.infinity)` when a screen wants it wide.
+  static ButtonStyle _buttonStyle({required bool fullWidth}) =>
+      ElevatedButton.styleFrom(
         elevation: 0,
         backgroundColor: _primary,
         foregroundColor: Colors.white,
         disabledBackgroundColor: _primary.withValues(alpha: 0.35),
         disabledForegroundColor: Colors.white70,
-        minimumSize: const Size(double.infinity, 46),
+        minimumSize: Size(fullWidth ? double.infinity : 0, 46),
         padding: const EdgeInsets.symmetric(horizontal: 20),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         textStyle: AppText.cardName.copyWith(fontSize: 15),
@@ -299,8 +310,10 @@ class AppTheme {
         Colors.transparent,
         _lightOnSurfaceVariant,
       ),
-      elevatedButtonTheme: ElevatedButtonThemeData(style: _primaryButtonStyle),
-      filledButtonTheme: FilledButtonThemeData(style: _primaryButtonStyle),
+      elevatedButtonTheme:
+          ElevatedButtonThemeData(style: _buttonStyle(fullWidth: true)),
+      filledButtonTheme:
+          FilledButtonThemeData(style: _buttonStyle(fullWidth: false)),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: _primary,
@@ -465,8 +478,10 @@ class AppTheme {
         Colors.transparent,
         _darkOnSurfaceVariant,
       ),
-      elevatedButtonTheme: ElevatedButtonThemeData(style: _primaryButtonStyle),
-      filledButtonTheme: FilledButtonThemeData(style: _primaryButtonStyle),
+      elevatedButtonTheme:
+          ElevatedButtonThemeData(style: _buttonStyle(fullWidth: true)),
+      filledButtonTheme:
+          FilledButtonThemeData(style: _buttonStyle(fullWidth: false)),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: _primary,

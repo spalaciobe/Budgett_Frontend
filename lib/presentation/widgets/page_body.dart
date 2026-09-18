@@ -3,20 +3,22 @@ import 'package:flutter/material.dart';
 import '../../core/app_spacing.dart';
 import '../../core/responsive.dart';
 
-/// Caps how wide a screen's content is allowed to get, and keeps it aligned to
-/// the navigation instead of centring it.
+/// Caps how wide a screen's content is allowed to get, and decides where the
+/// leftover width goes.
 ///
-/// A previous attempt at this capped the body and centred it, and was reverted
-/// (`ecae618`) — correctly, because a centred column next to a left-hand
-/// sidebar reads as a floating slab with a gutter on the wrong side. The
-/// content is left-aligned here, so the sidebar, the screen title and the rows
-/// share one left edge, and the spare width falls away on the right where
-/// nothing needs it.
+/// Both extremes are wrong. Uncapped, a row's label and its amount end up a
+/// screen apart. Capped and pinned left, every pixel of slack piles up in one
+/// block on the right, which reads as a layout that stopped halfway — the
+/// complaint that produced this version.
+///
+/// So: left-aligned while the slack is small enough to pass for a margin, and
+/// centred once it isn't. On a 1440px laptop the content fills the width and
+/// nothing moves; on a 1920px monitor the leftover ~320px becomes two calm
+/// margins instead of one conspicuous void.
 ///
 /// Width is a content decision, so pass the one that matches what's inside:
 /// [kColumnMaxWidth] for a form or a single column of prose, [kPageMaxWidth]
-/// for a grid or a table. Leaving a list at full width is what put a row's
-/// label and its amount a screen apart.
+/// for a grid or a table.
 class PageBody extends StatelessWidget {
   final Widget child;
 
@@ -40,12 +42,22 @@ class PageBody extends StatelessWidget {
 
     if (context.formFactor == FormFactor.mobile) return body;
 
-    return Align(
-      alignment: Alignment.topLeft,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        child: body,
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final slack = constraints.maxWidth - maxWidth;
+        // Below this, splitting the slack would produce two margins too thin
+        // to read as deliberate, and shifting the content off the navigation's
+        // left edge costs more than it gains.
+        final centred = slack > 240;
+
+        return Align(
+          alignment: centred ? Alignment.topCenter : Alignment.topLeft,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxWidth),
+            child: body,
+          ),
+        );
+      },
     );
   }
 }

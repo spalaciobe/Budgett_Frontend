@@ -20,6 +20,7 @@ import '../../presentation/widgets/transaction_tile.dart';
 import '../../presentation/widgets/pay_credit_card_dialog.dart';
 import '../../core/app_text.dart';
 import '../widgets/skeleton.dart';
+import '../widgets/page_body.dart';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 final _monthNames = [
@@ -83,7 +84,8 @@ class CreditCardDetailsBody extends ConsumerWidget {
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: kScreenPadding,
-      child: Column(
+      child: PageBody(
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -113,14 +115,19 @@ class CreditCardDetailsBody extends ConsumerWidget {
             _NextPaymentBanner(date: nextPaymentDate),
           ],
           const SizedBox(height: 8),
-          CreditCardBillingSimulator(
-            account: freshAccount,
-            transactionDate: DateTime.now(),
+          SizedBox(
+            width: double.infinity,
+            child: CreditCardBillingSimulator(
+              account: freshAccount,
+              transactionDate: DateTime.now(),
+            ),
           ),
           const SizedBox(height: 16),
           _buildRulesSection(context, ref, freshAccount),
           const SizedBox(height: 16),
-          Row(
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640),
+            child: Row(
             children: [
               Expanded(
                 child: _buildStatCard(
@@ -137,6 +144,7 @@ class CreditCardDetailsBody extends ConsumerWidget {
                 ),
               ),
             ],
+          ),
           ),
           if (freshAccount.creditLimitUsd > 0 || freshAccount.balanceUsd != 0) ...[
             const SizedBox(height: 12),
@@ -339,6 +347,7 @@ class CreditCardDetailsBody extends ConsumerWidget {
           ),
         ],
       ),
+      ),
     );
   }
 
@@ -358,7 +367,11 @@ class CreditCardDetailsBody extends ConsumerWidget {
         .valueOrNull ?? {};
 
     if (rules == null) {
-      return Card(
+      // The parent Column cross-aligns to start, so this card would otherwise
+      // size to its text and sit as a 330px box in a 1440px row.
+      return SizedBox(
+        width: double.infinity,
+        child: Card(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -381,6 +394,7 @@ class CreditCardDetailsBody extends ConsumerWidget {
               ),
             ],
           ),
+        ),
         ),
       );
     }
