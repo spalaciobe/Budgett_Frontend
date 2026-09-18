@@ -95,6 +95,18 @@ jobs:
           path: test/screenshots/**
           if-no-files-found: ignore
 
+      # Compile gate, not a deploy: Vercel builds and serves the web app
+      # itself (see vercel.json). This runs first because it is the cheaper
+      # build, and because a web-only break used to reach the deploy
+      # unnoticed — `flutter analyze` does not catch dart2js errors and the
+      # tests run on the VM, so nothing here exercised the web target.
+      #
+      # `--release` on purpose: it compiles with dart2js, which is what
+      # rejects code the VM accepts (64-bit int literals, for one). A debug
+      # web build uses DDC and would not catch the same class of error.
+      - name: Build web (compile check)
+        run: flutter build web --release
+
       - name: Build release APK
         run: flutter build apk --release
 
