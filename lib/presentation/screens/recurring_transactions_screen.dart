@@ -7,6 +7,10 @@ import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:budgett_frontend/presentation/widgets/edit_recurring_transaction_dialog.dart';
 import 'package:budgett_frontend/presentation/widgets/empty_state.dart';
 import 'package:intl/intl.dart';
+import '../../core/app_theme.dart';
+import '../../core/app_text.dart';
+import '../widgets/page_body.dart';
+import '../widgets/skeleton.dart';
 
 class RecurringTransactionsScreen extends ConsumerWidget {
   const RecurringTransactionsScreen({super.key});
@@ -31,7 +35,9 @@ class RecurringTransactionsScreen extends ConsumerWidget {
                 message: 'Add one when creating a new transaction.',
               );
             }
-            return ListView.separated(
+            return PageBody(
+              maxWidth: kColumnMaxWidth,
+              child: ListView.separated(
               physics: const AlwaysScrollableScrollPhysics(),
               itemCount: transactions.length,
               padding: kScreenPadding,
@@ -39,9 +45,6 @@ class RecurringTransactionsScreen extends ConsumerWidget {
             itemBuilder: (context, index) {
               final item = transactions[index];
               return Card(
-                elevation: 2,
-                shadowColor: Colors.black12,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 child: ListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   onTap: () => showDialog(
@@ -50,11 +53,11 @@ class RecurringTransactionsScreen extends ConsumerWidget {
                   ),
                   leading: CircleAvatar(
                     backgroundColor: item.type == 'income' 
-                        ? Colors.green.withValues(alpha: 0.1) 
-                        : Colors.red.withValues(alpha: 0.1),
+                        ? context.positive.withValues(alpha: 0.1) 
+                        : context.negative.withValues(alpha: 0.1),
                     child: Icon(
                       item.type == 'income' ? Icons.arrow_downward : Icons.arrow_upward,
-                      color: item.type == 'income' ? Colors.green : Colors.red,
+                      color: item.type == 'income' ? context.positive : context.negative,
                     ),
                   ),
                   title: Text(item.description, style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -63,7 +66,7 @@ class RecurringTransactionsScreen extends ConsumerWidget {
                     children: [
                       Text('${_capitalize(item.frequency)} • Next: ${DateFormat('dd/MM/yyyy').format(item.nextRunDate)}'),
                       if (item.lastRunDate != null)
-                        Text('Last: ${DateFormat('dd/MM/yyyy').format(item.lastRunDate!)}', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                        Text('Last: ${DateFormat('dd/MM/yyyy').format(item.lastRunDate!)}', style: AppText.badge.copyWith(color: context.muted)),
                     ],
                   ),
                   trailing: Row(
@@ -73,7 +76,7 @@ class RecurringTransactionsScreen extends ConsumerWidget {
                         CurrencyFormatter.format(item.amount),
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: item.type == 'income' ? Colors.green : Colors.red,
+                          color: item.type == 'income' ? context.positive : context.negative,
                         ),
                       ),
                       PopupMenuButton(
@@ -98,13 +101,13 @@ class RecurringTransactionsScreen extends ConsumerWidget {
                               ],
                             ),
                           ),
-                          const PopupMenuItem(
+                          PopupMenuItem(
                             value: 'delete',
                             child: Row(
                               children: [
-                                Icon(Icons.delete, color: Colors.red, size: 18),
+                                Icon(Icons.delete, color: context.negative, size: 18),
                                 SizedBox(width: 8),
-                                Text('Delete', style: TextStyle(color: Colors.red)),
+                                Text('Delete', style: TextStyle(color: context.negative)),
                               ],
                             ),
                           ),
@@ -124,7 +127,7 @@ class RecurringTransactionsScreen extends ConsumerWidget {
                                 actions: [
                                   TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
                                   FilledButton(
-                                    style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                                    style: FilledButton.styleFrom(backgroundColor: context.negative),
                                     onPressed: () => Navigator.pop(context, true), 
                                     child: const Text('Delete')
                                   ),
@@ -163,9 +166,10 @@ class RecurringTransactionsScreen extends ConsumerWidget {
                 ),
               );
             },
+          ),
           );
         },
-          loading: () => const Center(child: CircularProgressIndicator()),
+          loading: () => const SkeletonCards(),
           error: (e, s) => Center(child: Text(friendlyError(e))),
         ),
       ),

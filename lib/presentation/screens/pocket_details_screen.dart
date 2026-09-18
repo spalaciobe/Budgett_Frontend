@@ -102,7 +102,6 @@ class PocketDetailsScreen extends ConsumerWidget {
                     return const Text('No transactions yet.');
                   }
                   return Card(
-                    elevation: 1,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
                     child: ListView.separated(
@@ -134,8 +133,6 @@ class _BalanceHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
@@ -193,7 +190,6 @@ class _InterestSection extends ConsumerWidget {
     return Column(
       children: [
         Card(
-          elevation: 1,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           child: Padding(

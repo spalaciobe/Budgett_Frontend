@@ -11,6 +11,8 @@ import 'package:budgett_frontend/presentation/providers/fx_rate_provider.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:budgett_frontend/presentation/widgets/portfolio_donut_chart.dart';
 import 'package:budgett_frontend/presentation/widgets/portfolio_value_chart.dart';
+import '../../core/app_text.dart';
+import '../widgets/skeleton.dart';
 
 class AnalysisScreen extends ConsumerStatefulWidget {
   const AnalysisScreen({super.key});
@@ -66,7 +68,7 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
                   icon: const Icon(Icons.arrow_back_ios, size: 16),
                   onPressed: () => setState(() => _selectedYear--),
                 ),
-                Text('$_selectedYear', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                Text('$_selectedYear', style: AppText.balance),
                 IconButton(
                   icon: const Icon(Icons.arrow_forward_ios, size: 16),
                   onPressed: () => setState(() => _selectedYear++),
@@ -102,7 +104,7 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
                             getTitlesWidget: (value, meta) {
                               const months = ['J','F','M','A','M','J','J','A','S','O','N','D'];
                               if (value >= 1 && value <= 12) {
-                                return Text(months[value.toInt() - 1], style: const TextStyle(fontSize: 10));
+                                return Text(months[value.toInt() - 1], style: AppText.badge);
                               }
                               return const Text('');
                             },
@@ -120,12 +122,12 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
                           barRods: [
                             BarChartRodData(
                               toY: (d['income'] as num).toDouble(),
-                              color: Colors.green,
+                              color: context.positive,
                               width: 8,
                             ),
                             BarChartRodData(
                               toY: (d['expense'] as num).toDouble(),
-                              color: Colors.red,
+                              color: context.negative,
                               width: 8,
                             ),
                           ],
@@ -134,17 +136,17 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
                     ),
                   );
                 },
-                loading: () => const Center(child: CircularProgressIndicator()),
+                loading: () => const SkeletonList(),
                 error: (e,s) => Center(child: Text(friendlyError(e))),
               ),
             ),
             kGapXl,
-            const Row(
+            Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.circle, size: 12, color: Colors.green), SizedBox(width: 4), Text('Income'),
+                Icon(Icons.circle, size: 12, color: context.positive), SizedBox(width: 4), Text('Income'),
                 SizedBox(width: 16),
-                Icon(Icons.circle, size: 12, color: Colors.red), SizedBox(width: 4), Text('Expense'),
+                Icon(Icons.circle, size: 12, color: context.negative), SizedBox(width: 4), Text('Expense'),
               ],
             ),
             kGapXxl,
@@ -178,7 +180,7 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 const Text('Total Income'),
-                                Text(CurrencyFormatter.format(totalInc), style: const TextStyle(color: Colors.green)),
+                                Text(CurrencyFormatter.format(totalInc), style: TextStyle(color: context.positive)),
                               ],
                             ),
                             const SizedBox(height: 8),
@@ -186,7 +188,7 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 const Text('Total Expenses'),
-                                Text(CurrencyFormatter.format(totalExp), style: const TextStyle(color: Colors.red)),
+                                Text(CurrencyFormatter.format(totalExp), style: TextStyle(color: context.negative)),
                               ],
                             ),
                             const Divider(),
@@ -215,14 +217,14 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: Colors.blue.withValues(alpha: 0.12),
+                                      color: context.brand.withValues(alpha: 0.12),
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: Text('USD',
                                         style: TextStyle(
                                           fontSize: 11,
                                           fontWeight: FontWeight.bold,
-                                          color: Colors.blue.shade700,
+                                          color: context.brand,
                                         )),
                                   ),
                                 ],
@@ -233,7 +235,7 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
                                 children: [
                                   const Text('Total Income USD'),
                                   Text(CurrencyFormatter.format(totalIncUsd, currency: 'USD'),
-                                      style: const TextStyle(color: Colors.green)),
+                                      style: TextStyle(color: context.positive)),
                                 ],
                               ),
                               const SizedBox(height: 8),
@@ -242,7 +244,7 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
                                 children: [
                                   const Text('Total Expenses USD'),
                                   Text(CurrencyFormatter.format(totalExpUsd, currency: 'USD'),
-                                      style: const TextStyle(color: Colors.red)),
+                                      style: TextStyle(color: context.negative)),
                                 ],
                               ),
                             ],
@@ -457,7 +459,6 @@ class _PortfolioHistorySectionState
     }
 
     return Card(
-      elevation: 1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -547,7 +548,7 @@ class _PortfolioContent extends StatelessWidget {
                     color: theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: const Text('≈', style: TextStyle(fontSize: 11)),
+                  child: const Text('≈', style: AppText.caption),
                 ),
               ),
             ],
@@ -559,7 +560,6 @@ class _PortfolioContent extends StatelessWidget {
 
         // Summary card: total + P&L
         Card(
-          elevation: 1,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -675,7 +675,6 @@ class _PortfolioContent extends StatelessWidget {
     }
 
     return Card(
-      elevation: 1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -715,7 +714,6 @@ class _PortfolioContent extends StatelessWidget {
     }
 
     return Card(
-      elevation: 1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),

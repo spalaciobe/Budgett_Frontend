@@ -6,6 +6,8 @@ import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:budgett_frontend/presentation/widgets/transaction_tile.dart';
+import '../../core/app_theme.dart';
+import '../../core/app_text.dart';
 
 /// Lists the transactions that make up a category's total for a given month,
 /// opened from the magnifying-glass button on each Budget-screen category card.
@@ -70,7 +72,7 @@ class CategoryTransactionsDialog extends ConsumerWidget {
                       ),
                       Text(
                         '${_months[month - 1]} $year',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[400]),
+                        style: AppText.caption.copyWith(color: context.muted),
                       ),
                     ],
                   ),
@@ -93,11 +95,11 @@ class CategoryTransactionsDialog extends ConsumerWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(Icons.receipt_long_outlined,
-                                size: 48, color: Colors.grey[600]),
+                                size: 48, color: context.muted),
                             kGapMd,
                             Text(
                               'No transactions this month',
-                              style: TextStyle(color: Colors.grey[400]),
+                              style: TextStyle(color: context.muted),
                             ),
                           ],
                         ),

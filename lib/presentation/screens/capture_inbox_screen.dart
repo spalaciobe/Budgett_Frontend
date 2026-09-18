@@ -15,6 +15,7 @@ import 'package:budgett_frontend/presentation/providers/message_capture_provider
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:budgett_frontend/presentation/widgets/empty_state.dart';
 import 'package:budgett_frontend/presentation/widgets/review_capture_sheet.dart';
+import '../widgets/skeleton.dart';
 
 /// The review queue for captured bank messages.
 ///
@@ -200,7 +201,7 @@ class _CaptureList extends ConsumerWidget {
     final async = ref.watch(provider);
 
     return async.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => const SkeletonList(),
       error: (error, _) => Center(
         child: Padding(
           padding: kScreenPadding,

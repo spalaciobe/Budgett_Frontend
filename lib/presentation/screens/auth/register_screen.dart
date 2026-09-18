@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/app_text.dart';
 
 // ─── Country data ─────────────────────────────────────────────────────────────
 
@@ -322,7 +323,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             children: [
                               Text(
                                 _selectedCountry.flag,
-                                style: const TextStyle(fontSize: 20),
+                                style: AppText.balance,
                               ),
                               const SizedBox(width: 6),
                               Text(
@@ -459,7 +460,7 @@ class _CountryPickerSheetState extends State<_CountryPickerSheet> {
                   return ListTile(
                     leading: Text(
                       country.flag,
-                      style: const TextStyle(fontSize: 24),
+                      style: AppText.balance,
                     ),
                     title: Text(country.name),
                     trailing: Text(

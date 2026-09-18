@@ -13,6 +13,9 @@ import 'package:budgett_frontend/presentation/widgets/edit_category_dialog.dart'
 import 'package:budgett_frontend/data/models/category_model.dart';
 import 'package:budgett_frontend/data/models/category_spending.dart';
 import 'package:fl_chart/fl_chart.dart';
+import '../../core/app_theme.dart';
+import '../../core/app_text.dart';
+import '../widgets/skeleton.dart';
 
 final budgetDateProvider =
     StateProvider.autoDispose<DateTime>((ref) => DateTime.now());
@@ -23,11 +26,11 @@ final budgetDateProvider =
 final _showEmptyCategoriesProvider =
     StateProvider.autoDispose<bool>((ref) => false);
 
-Color _parseColor(String colorStr) {
+Color _parseColor(String colorStr, BuildContext context) {
   try {
     return Color(int.parse(colorStr));
   } catch (_) {
-    return Colors.grey;
+    return context.muted;
   }
 }
 
@@ -317,7 +320,7 @@ class BudgetScreen extends ConsumerWidget {
                         budgetAmount: budgetAmount,
                         spentAmount: actualSpent,
                         color:
-                            cat.color != null ? _parseColor(cat.color!) : null,
+                            cat.color != null ? _parseColor(cat.color!, context) : null,
                         iconName: cat.icon,
                         isIncome: cat.type == 'income',
                         isSavings: cat.type == 'savings',
@@ -486,12 +489,12 @@ class BudgetScreen extends ConsumerWidget {
                   },
                 );
               },
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const SkeletonList(),
               error: (e, s) =>
                   Center(child: Text(friendlyError(e))),
             );
           },
-          loading: () => const Center(child: CircularProgressIndicator()),
+          loading: () => const SkeletonList(),
           error: (err, stack) => Center(child: Text(friendlyError(err))),
         ),
       ),
@@ -599,7 +602,7 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
                     SegmentedButton<int>(
                       style: SegmentedButton.styleFrom(
                         visualDensity: VisualDensity.compact,
-                        textStyle: const TextStyle(fontSize: 12),
+                        textStyle: AppText.caption,
                       ),
                       segments: const [
                         ButtonSegment(
@@ -629,7 +632,7 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
                   child: SegmentedButton<int>(
                     style: SegmentedButton.styleFrom(
                       visualDensity: VisualDensity.compact,
-                      textStyle: const TextStyle(fontSize: 12),
+                      textStyle: AppText.caption,
                     ),
                     segments: const [
                       ButtonSegment(
@@ -666,12 +669,12 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: widget.allocationPercentage > 100
-            ? Colors.red.withValues(alpha: 0.1)
+            ? context.negative.withValues(alpha: 0.1)
             : Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: widget.allocationPercentage > 100
-              ? Colors.red.withValues(alpha: 0.2)
+              ? context.negative.withValues(alpha: 0.2)
               : Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
         ),
       ),
@@ -686,7 +689,7 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
             '${widget.allocationPercentage.toStringAsFixed(1)}% Allocated',
             style: TextStyle(
               color: widget.allocationPercentage > 100
-                  ? Colors.red
+                  ? context.negative
                   : Theme.of(context).colorScheme.onPrimaryContainer,
               fontWeight: FontWeight.bold,
               fontSize: 12,
@@ -698,7 +701,7 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
                 : 'Over: ${CurrencyFormatter.format(widget.availableToAllocate.abs(), decimalDigits: 0)}',
             style: TextStyle(
               color: widget.allocationPercentage > 100
-                  ? Colors.red
+                  ? context.negative
                   : Theme.of(context).colorScheme.onPrimaryContainer,
               fontSize: 12,
             ),
@@ -794,13 +797,13 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.05),
+                  color: context.negative.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red.withValues(alpha: 0.1)),
+                  border: Border.all(color: context.negative.withValues(alpha: 0.1)),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.trending_down, color: Colors.red[400], size: 16),
+                    Icon(Icons.trending_down, color: context.negative, size: 16),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -808,7 +811,7 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
                         style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: Colors.red[200]),
+                            color: context.negative),
                       ),
                     ),
                   ],
@@ -836,7 +839,7 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
                         style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: Colors.red[200]),
+                            color: context.negative),
                       ),
                     ),
                   ],
@@ -852,7 +855,7 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
     return SegmentedButton<int>(
       style: SegmentedButton.styleFrom(
         visualDensity: VisualDensity.compact,
-        textStyle: const TextStyle(fontSize: 11),
+        textStyle: AppText.caption,
         minimumSize: const Size(0, 28),
       ),
       segments: const [
@@ -887,7 +890,7 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
       final value = isBudgetMode
           ? (widget.budgetAmounts[c.id] ?? 0.0)
           : (widget.spending[c.id] as CategorySpending).total;
-      final color = c.color != null ? _parseColor(c.color!) : Colors.grey;
+      final color = c.color != null ? _parseColor(c.color!, context) : context.muted;
       return PieChartSectionData(
           value: value, color: color, radius: 44, title: '');
     }).toList();
@@ -909,7 +912,7 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 24),
             child:
-                Text(emptyMessage, style: const TextStyle(color: Colors.grey)),
+                Text(emptyMessage, style: TextStyle(color: context.muted)),
           )
         else ...[
           SizedBox(
@@ -958,7 +961,7 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
                   : (widget.spending[c.id] as CategorySpending).total;
               final pct = totalRef > 0 ? (value / totalRef * 100) : 0.0;
               final color =
-                  c.color != null ? _parseColor(c.color!) : Colors.grey;
+                  c.color != null ? _parseColor(c.color!, context) : context.muted;
               return Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -973,7 +976,7 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
                     constraints: const BoxConstraints(maxWidth: 180),
                     child: Text(
                       '${c.name}  ${pct.toStringAsFixed(0)}%',
-                      style: const TextStyle(fontSize: 11),
+                      style: AppText.caption,
                       overflow: TextOverflow.fade,
                     ),
                   ),
@@ -1026,7 +1029,7 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
             const SizedBox(width: 6),
             Text(label,
                 style:
-                    const TextStyle(fontSize: 11, fontWeight: FontWeight.w500)),
+                    AppText.badge),
           ],
         ),
         const SizedBox(height: 2),
@@ -1484,7 +1487,7 @@ class _MonthPickerDialogState extends State<_MonthPickerDialog> {
                   border: Border.all(
                     color: isSelected
                         ? Theme.of(context).primaryColor
-                        : Colors.grey.withValues(alpha: 0.3),
+                        : context.muted.withValues(alpha: 0.3),
                   ),
                 ),
                 alignment: Alignment.center,

@@ -9,6 +9,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/presentation/widgets/add_transaction_dialog.dart';
 import 'package:budgett_frontend/presentation/widgets/edit_transaction_dialog.dart';
+import 'package:budgett_frontend/core/app_text.dart';
+import 'package:budgett_frontend/presentation/widgets/page_body.dart';
+import 'package:budgett_frontend/presentation/widgets/skeleton.dart';
 
 String _formatDate(DateTime date) {
   const months = [
@@ -40,7 +43,16 @@ String _buildDetails(
   return accountName;
 }
 
-/// Compact current-month summary (Income / Spent / Net) at the top of Home.
+/// The month's headline: what's left, and how much of the income it took.
+///
+/// This is the screen's entry point, and the only element on Home allowed to
+/// shout. It used to be three equal-weight metrics in a row, which meant Home
+/// opened with nothing to look at first — every figure was 17px and none of
+/// them answered "am I fine this month?".
+///
+/// The bar is not decoration: it is spent-over-income, so the answer is
+/// legible before any number is read. Income and spent stay underneath as the
+/// supporting detail they are.
 class _MonthSummaryCard extends ConsumerWidget {
   const _MonthSummaryCard();
 
@@ -53,59 +65,133 @@ class _MonthSummaryCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final now = DateTime.now();
-    final data = ref.watch(homeMonthSummaryProvider).valueOrNull;
+    final async = ref.watch(homeMonthSummaryProvider);
+
+    if (async.isLoading && !async.hasValue) return const SkeletonHeroCard();
+
+    final data = async.valueOrNull;
     final income = data?.income ?? 0.0;
     final spent = data?.spent ?? 0.0;
     final net = income - spent;
+    final overspent = net < 0;
 
-    final mutedStyle = theme.textTheme.labelSmall?.copyWith(
-        color: theme.colorScheme.onSurface.withValues(alpha: 0.55));
+    // Share of income already spent. With no income recorded yet, any spending
+    // is the whole of it.
+    final ratio = income > 0
+        ? (spent / income).clamp(0.0, 1.0)
+        : (spent > 0 ? 1.0 : 0.0);
+    final percent = (ratio * 100).round();
 
-    Widget metric(String label, double amount, Color color) {
-      return Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: mutedStyle),
-            const SizedBox(height: 2),
-            Text(
-              CurrencyFormatter.format(amount),
-              maxLines: 1,
-              overflow: TextOverflow.fade,
-              style: theme.textTheme.titleMedium
-                  ?.copyWith(fontWeight: FontWeight.bold, color: color),
-            ),
-          ],
-        ),
-      );
-    }
+    final netColor = overspent ? context.negative : context.positive;
 
     return Card(
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: kHeroCardPadding,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${_months[now.month - 1]} ${now.year}', style: mutedStyle),
-            const SizedBox(height: 10),
+            Text(
+              '${_months[now.month - 1]} ${now.year}',
+              style: AppText.label.copyWith(color: context.muted),
+            ),
+            kGapLg,
+            Text(
+              CurrencyFormatter.format(net.abs()),
+              maxLines: 1,
+              overflow: TextOverflow.fade,
+              softWrap: false,
+              style: AppText.moneyHero.copyWith(color: netColor),
+            ),
+            kGapSm,
+            Text(
+              overspent ? 'over your income this month' : 'left this month',
+              style: AppText.caption.copyWith(color: context.muted),
+            ),
+            kGapSection,
+            _SpendBar(ratio: ratio, overspent: overspent),
+            kGapLg,
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                metric('Income', income, context.semantic.positive),
-                metric('Spent', spent, theme.colorScheme.error),
-                metric(
-                  'Net',
-                  net,
-                  net >= 0
-                      ? context.semantic.positive
-                      : theme.colorScheme.error,
+                Expanded(
+                  child: _Metric(
+                    label: 'Income',
+                    amount: income,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+                Expanded(
+                  child: _Metric(
+                    label: '$percent% spent',
+                    amount: spent,
+                    color: theme.colorScheme.onSurface,
+                    alignEnd: true,
+                  ),
                 ),
               ],
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _SpendBar extends StatelessWidget {
+  final double ratio;
+  final bool overspent;
+
+  const _SpendBar({required this.ratio, required this.overspent});
+
+  @override
+  Widget build(BuildContext context) {
+    final track = context.muted.withValues(alpha: 0.18);
+    final fill = overspent ? context.negative : context.brand;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(4),
+      child: Stack(
+        children: [
+          Container(height: 7, color: track),
+          FractionallySizedBox(
+            widthFactor: ratio,
+            child: Container(height: 7, color: fill),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Metric extends StatelessWidget {
+  final String label;
+  final double amount;
+  final Color color;
+  final bool alignEnd;
+
+  const _Metric({
+    required this.label,
+    required this.amount,
+    required this.color,
+    this.alignEnd = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment:
+          alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      children: [
+        Text(label, style: AppText.caption.copyWith(color: context.muted)),
+        kGapXs,
+        Text(
+          CurrencyFormatter.format(amount),
+          maxLines: 1,
+          overflow: TextOverflow.fade,
+          softWrap: false,
+          style: AppText.moneyMedium.copyWith(color: color),
+        ),
+      ],
     );
   }
 }
@@ -396,7 +482,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       appBar: AppBar(
         title: const Text('Transactions'),
       ),
-      backgroundColor: Theme.of(context).colorScheme.surface,
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(recentTransactionsProvider);
@@ -405,20 +490,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: kScreenPaddingWithFab,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const _MonthSummaryCard(),
-              const SizedBox(height: 16),
-              Text(
-                'Recent Transactions',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleLarge
-                    ?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 12),
-              // Search bar
+          // 1000 rather than the full viewport: the list is two columns
+          // (description, amount), and at 1440px those two ended up a screen
+          // apart. On desktop the month summary moves into the aside, so the
+          // width that's left goes to the rows instead of to empty space.
+          child: PageBody(
+            maxWidth: 1000,
+            child: TwoPaneLayout(
+              aside: const _MonthSummaryCard(),
+              main: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Search bar
               TextField(
                 controller: _searchController,
                 decoration: InputDecoration(
@@ -515,36 +598,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 data: (transactions) {
                   final filtered = _applyFilters(transactions);
                   if (filtered.isEmpty) {
-                    return Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 32),
-                        child: Text(
-                          _hasActiveFilters
-                              ? 'No transactions match your filters.'
-                              : 'No recent transactions.',
-                          style: TextStyle(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withValues(alpha: 0.5),
-                          ),
-                        ),
-                      ),
+                    // An empty screen is an invitation to act, so each case
+                    // says what to do next rather than only what is missing.
+                    return _EmptyTransactions(
+                      filtered: _hasActiveFilters,
+                      onClearFilters: _clearFilters,
                     );
                   }
                   final rows = _buildRows(filtered);
                   return Card(
-                    elevation: 2,
-                    shadowColor: Colors.black12,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16)),
+                    // No elevation override: the card theme's hairline is the
+                    // app's one structural device, and a drop shadow here made
+                    // this the only raised surface in the app.
                     child: ListView.separated(
                       padding: EdgeInsets.zero,
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: rows.length,
                       separatorBuilder: (_, __) => const Divider(
-                          height: 1, indent: 72, endIndent: 16),
+                          height: 1, indent: 56, endIndent: 14),
                       itemBuilder: (context, index) {
                         final row = rows[index];
                         if (row is _HomeRowGroup) {
@@ -566,10 +638,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                   );
                 },
-                loading: () => const LinearProgressIndicator(),
-                error: (err, stack) => Text(friendlyError(err)),
+                loading: () => const SkeletonList(
+                  rows: 7,
+                  padding: EdgeInsets.symmetric(vertical: kSpaceXl),
+                ),
+                error: (err, stack) => _LoadError(message: friendlyError(err)),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -634,7 +711,7 @@ class _SheetHandle extends StatelessWidget {
         width: 36,
         height: 4,
         decoration: BoxDecoration(
-          color: Colors.grey.withValues(alpha: 0.3),
+          color: context.muted.withValues(alpha: 0.3),
           borderRadius: BorderRadius.circular(2),
         ),
       ),
@@ -842,7 +919,7 @@ class _TransactionListTile extends StatelessWidget {
                 fontSize: 14,
                 decoration:
                     isPending ? TextDecoration.lineThrough : null,
-                color: isPending ? Colors.grey : null,
+                color: isPending ? context.muted : null,
               ),
             ),
           ),
@@ -1153,7 +1230,7 @@ class _InstallmentGroupTileState extends State<_InstallmentGroupTile> {
                   ),
                   if (isUsd) ...[
                     const SizedBox(width: 6),
-                    _Badge(label: 'USD', color: Colors.blue.shade400),
+                    _Badge(label: 'USD', color: context.brand),
                   ],
                   const Spacer(),
                   Icon(
@@ -1187,6 +1264,98 @@ class _InstallmentGroupTileState extends State<_InstallmentGroupTile> {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// Empty list, with a way out of it.
+///
+/// "No recent transactions." named the absence and left the person there. Each
+/// case now offers the action that resolves it.
+class _EmptyTransactions extends StatelessWidget {
+  /// Whether the list is empty because filters hid everything.
+  final bool filtered;
+  final VoidCallback onClearFilters;
+
+  const _EmptyTransactions({
+    required this.filtered,
+    required this.onClearFilters,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: kProseMaxWidth),
+            child: Column(
+              children: [
+                Icon(
+                  filtered ? Icons.filter_alt_off_outlined : Icons.receipt_long,
+                  size: 40,
+                  color: context.muted,
+                ),
+                kGapXl,
+                Text(
+                  filtered
+                      ? 'No transactions match these filters'
+                      : 'No transactions yet',
+                  textAlign: TextAlign.center,
+                  style: AppText.sectionTitle,
+                ),
+                kGapSm,
+                Text(
+                  filtered
+                      ? 'Widen the date range or clear the filters to see everything again.'
+                      : 'Add one with the + button, or turn on message capture to record card purchases automatically.',
+                  textAlign: TextAlign.center,
+                  style: AppText.subtitle.copyWith(color: context.muted),
+                ),
+                if (filtered) ...[
+                  kGapSection,
+                  OutlinedButton.icon(
+                    onPressed: onClearFilters,
+                    icon: const Icon(Icons.close, size: 16),
+                    label: const Text('Clear filters'),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A load failure that stays inside the card it replaces, instead of a bare
+/// line of red text at the edge of the screen.
+class _LoadError extends StatelessWidget {
+  final String message;
+
+  const _LoadError({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: kCardPadding,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.error_outline, size: 20, color: context.negative),
+            const SizedBox(width: kSpaceXl),
+            Expanded(
+              child: Text(
+                message,
+                style: AppText.subtitle,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

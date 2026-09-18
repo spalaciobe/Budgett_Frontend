@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/data/models/goal_model.dart';
 import 'package:budgett_frontend/presentation/utils/icon_helper.dart';
+import '../../core/app_theme.dart';
 
 class EditGoalDialog extends ConsumerStatefulWidget {
   final Goal goal;
@@ -220,7 +221,7 @@ class _EditGoalDialogState extends ConsumerState<EditGoalDialog> {
                           border: Border.all(
                             color: isSelected 
                               ? Theme.of(context).colorScheme.primary 
-                              : Colors.grey.shade300,
+                              : context.muted.withValues(alpha: 0.18),
                             width: isSelected ? 2 : 1,
                           ),
                           borderRadius: BorderRadius.circular(8),
@@ -228,7 +229,7 @@ class _EditGoalDialogState extends ConsumerState<EditGoalDialog> {
                         child: Center(
                           child: Icon(
                             IconHelper.getIcon(icon),
-                            color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey,
+                            color: isSelected ? Theme.of(context).colorScheme.primary : context.muted,
                             size: 24,
                           ),
                         ),
@@ -361,8 +362,8 @@ class _EditGoalDialogState extends ConsumerState<EditGoalDialog> {
                   children: [
                     TextButton.icon(
                       onPressed: _isLoading ? null : _deleteGoal,
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      label: const Text('Delete', style: TextStyle(color: Colors.red)),
+                      icon: Icon(Icons.delete, color: context.negative),
+                      label: Text('Delete', style: TextStyle(color: context.negative)),
                     ),
                     Row(
                       mainAxisSize: MainAxisSize.min,

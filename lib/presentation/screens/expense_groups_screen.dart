@@ -7,6 +7,9 @@ import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:budgett_frontend/presentation/utils/icon_helper.dart';
 import 'package:budgett_frontend/data/models/expense_group_model.dart';
+import '../../core/app_theme.dart';
+import '../widgets/skeleton.dart';
+import '../widgets/page_body.dart';
 
 class ExpenseGroupsScreen extends ConsumerWidget {
   const ExpenseGroupsScreen({super.key});
@@ -34,38 +37,19 @@ class ExpenseGroupsScreen extends ConsumerWidget {
                 message: 'Create one with the + button to group related spending.',
               );
             }
-            return LayoutBuilder(
-              builder: (context, constraints) {
-                // Two columns on wide screens, one on mobile, so cards don't
-                // stretch across the whole (capped) width.
-                final twoCols = constraints.maxWidth >= 720;
-                if (!twoCols) {
-                  return ListView.builder(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: kScreenPaddingWithFab,
-                    itemCount: groups.length,
-                    itemBuilder: (context, index) =>
-                        _ExpenseGroupCard(group: groups[index]),
-                  );
-                }
-                const gap = 12.0;
-                final itemW = (constraints.maxWidth - 32 - gap) / 2;
-                return SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: kScreenPaddingWithFab,
-                  child: Wrap(
-                    spacing: gap,
-                    children: [
-                      for (final g in groups)
-                        SizedBox(
-                            width: itemW, child: _ExpenseGroupCard(group: g)),
-                    ],
-                  ),
-                );
-              },
+            return SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: kScreenPaddingWithFab,
+              child: PageBody(
+                child: ContentGrid(
+                  children: [
+                    for (final g in groups) _ExpenseGroupCard(group: g),
+                  ],
+                ),
+              ),
             );
           },
-          loading: () => const Center(child: CircularProgressIndicator()),
+          loading: () => const SkeletonCards(),
           error: (e, s) => Center(child: Text(friendlyError(e))),
         ),
       ),
@@ -323,8 +307,8 @@ class _ExpenseGroupCard extends ConsumerWidget {
                 if (group.budgetAmount > 0) ...[
                   LinearProgressIndicator(
                     value: progress.clamp(0.0, 1.0),
-                    backgroundColor: Colors.grey[200],
-                    color: progress > 1 ? Colors.red : Theme.of(context).primaryColor,
+                    backgroundColor: context.muted.withValues(alpha: 0.18),
+                    color: progress > 1 ? context.negative : Theme.of(context).primaryColor,
                   ),
                   kGapMd,
                   Row(

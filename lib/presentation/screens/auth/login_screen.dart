@@ -3,6 +3,9 @@ import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/app_text.dart';
+import '../../../core/app_theme.dart';
+import '../../../core/app_spacing.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -15,6 +18,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
+  bool _showPassword = false;
 
   Future<void> _signIn() async {
     setState(() => _isLoading = true);
@@ -56,7 +60,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Welcome to Budgett')),
+      appBar: AppBar(automaticallyImplyLeading: false),
       body: Center(
         child: Container(
           constraints: const BoxConstraints(maxWidth: 400),
@@ -67,20 +71,46 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                Icon(Icons.account_balance_wallet, size: 64, color: Theme.of(context).colorScheme.primary),
-                const SizedBox(height: 20),
+                Image.asset('assets/app_icon.png', width: 64, height: 64),
+                kGapSection,
+                Text('Budgett', style: AppText.screenTitle, textAlign: TextAlign.center),
+                kGapSm,
+                Text(
+                  'Your money, in one place.',
+                  textAlign: TextAlign.center,
+                  style: AppText.subtitle.copyWith(color: context.muted),
+                ),
+                kGapBlock,
                 TextField(
                   controller: _emailController,
                   decoration: const InputDecoration(labelText: 'Email', border: OutlineInputBorder()),
                   keyboardType: TextInputType.emailAddress,
                   autofillHints: const [AutofillHints.email],
+                  textInputAction: TextInputAction.next,
                 ),
                 const SizedBox(height: 10),
                 TextField(
                   controller: _passwordController,
-                  decoration: const InputDecoration(labelText: 'Password', border: OutlineInputBorder()),
-                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: 'Password',
+                    border: const OutlineInputBorder(),
+                    // Typing a password blind on a phone keyboard is the most
+                    // common reason a correct password gets rejected.
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _showPassword
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        size: 20,
+                      ),
+                      tooltip: _showPassword ? 'Hide password' : 'Show password',
+                      onPressed: () =>
+                          setState(() => _showPassword = !_showPassword),
+                    ),
+                  ),
+                  obscureText: !_showPassword,
                   autofillHints: const [AutofillHints.password],
+                  textInputAction: TextInputAction.done,
                   onSubmitted: (_) => _signIn(),
                 ),
               const SizedBox(height: 16),

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/data/models/goal_model.dart';
 import 'package:budgett_frontend/presentation/utils/icon_helper.dart';
+import '../../core/app_theme.dart';
 
 class AddGoalDialog extends ConsumerStatefulWidget {
   const AddGoalDialog({super.key});
@@ -146,7 +147,7 @@ class _AddGoalDialogState extends ConsumerState<AddGoalDialog> {
                           border: Border.all(
                             color: isSelected 
                               ? Theme.of(context).colorScheme.primary 
-                              : Colors.grey.shade300,
+                              : context.muted.withValues(alpha: 0.18),
                             width: isSelected ? 2 : 1,
                           ),
                           borderRadius: BorderRadius.circular(8),

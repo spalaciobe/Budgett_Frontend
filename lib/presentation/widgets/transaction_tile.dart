@@ -74,7 +74,7 @@ class TransactionTile extends StatelessWidget {
     final amountText =
         '$sign${CurrencyFormatter.format(t.amount, currency: t.currency)}';
 
-    final amountColor = isPending ? Colors.grey : typeColor;
+    final amountColor = isPending ? context.muted : typeColor;
 
     final extraLines = <Widget>[];
     if (t.place != null && t.place!.isNotEmpty) {
@@ -119,7 +119,7 @@ class TransactionTile extends StatelessWidget {
           t.description,
           style: AppText.tileTitle.copyWith(
             decoration: isPending ? TextDecoration.lineThrough : null,
-            color: isPending ? Colors.grey : null,
+            color: isPending ? context.muted : null,
           ),
           maxLines: 1,
           overflow: TextOverflow.fade,

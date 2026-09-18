@@ -14,6 +14,7 @@ import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/presentation/providers/message_capture_provider.dart';
 import 'package:budgett_frontend/presentation/providers/settings_provider.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
+import '../../core/app_text.dart';
 
 /// Controls for the capture pipeline: what it listens to, how bold it is
 /// allowed to be, and what it has learned so far.
@@ -285,7 +286,7 @@ class _AutomationCard extends ConsumerWidget {
             const Text(
               'Expenses larger than this always wait for your confirmation. '
               'Leave empty for no limit.',
-              style: TextStyle(fontSize: 13),
+              style: AppText.subtitle,
             ),
             kGapXl,
             TextField(
@@ -332,7 +333,7 @@ class _AutomationCard extends ConsumerWidget {
             const Text(
               'Two messages with the same amount inside this window are '
               'treated as one payment.',
-              style: TextStyle(fontSize: 13),
+              style: AppText.subtitle,
             ),
             kGapXl,
             ...options.map((minutes) => ListTile(
@@ -392,7 +393,7 @@ class _KnownSourcesCard extends ConsumerWidget {
                     'Nothing yet. Sources appear here after the first bank '
                     'message arrives — then you can rename them and pick a '
                     'default account.',
-                    style: TextStyle(fontSize: 13),
+                    style: AppText.subtitle,
                   ),
                 );
               }
@@ -648,7 +649,7 @@ class _RememberedMerchantsCard extends ConsumerWidget {
                     'Nothing remembered yet. Confirm a captured expense once '
                     'and the merchant is saved here with its name and '
                     'category.',
-                    style: TextStyle(fontSize: 13),
+                    style: AppText.subtitle,
                   ),
                 );
               }

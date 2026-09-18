@@ -98,7 +98,7 @@ class _EditBudgetDialogState extends ConsumerState<EditBudgetDialog> {
     final isIncome = widget.categoryType == 'income';
     final color = widget.categoryColor != null 
         ? Color(int.parse(widget.categoryColor!))
-        : Colors.grey;
+        : context.muted;
     
     return AlertDialog(
       title: Row(

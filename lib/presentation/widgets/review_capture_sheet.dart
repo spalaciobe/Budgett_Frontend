@@ -299,12 +299,12 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
                   items: [
                     const DropdownMenuItem<String?>(
                       value: null,
-                      child: Text('None', style: TextStyle(fontSize: 13)),
+                      child: Text('None', style: AppText.subtitle),
                     ),
                     ...groups.map((group) => DropdownMenuItem<String?>(
                           value: group.id,
                           child: Text(group.name,
-                              style: const TextStyle(fontSize: 13),
+                              style: AppText.subtitle,
                               overflow: TextOverflow.fade),
                         )),
                   ],
@@ -469,7 +469,7 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
           icon: const Icon(Icons.schedule, size: 18),
           label: Align(
             alignment: Alignment.centerLeft,
-            child: Text(dateLabel, style: const TextStyle(fontSize: 13)),
+            child: Text(dateLabel, style: AppText.subtitle),
           ),
         ),
         if (_message.hasLocation) ...[
@@ -518,12 +518,12 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
               ? null
               : (value) => setState(() => _rememberName = value),
           title: const Text('Save this name and category',
-              style: TextStyle(fontSize: 13)),
+              style: AppText.subtitle),
           subtitle: Text(
             key == null
                 ? 'Needs a merchant in the message'
                 : 'Messages for "$key" will be named "${name.isEmpty ? '…' : name}"',
-            style: const TextStyle(fontSize: 11),
+            style: AppText.caption,
           ),
           contentPadding: EdgeInsets.zero,
           dense: true,
@@ -534,10 +534,10 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
               ? null
               : (value) => setState(() => _autoPostNext = value),
           title: const Text('Record future ones automatically',
-              style: TextStyle(fontSize: 13)),
+              style: AppText.subtitle),
           subtitle: const Text(
             'Skips this review when the next message matches',
-            style: TextStyle(fontSize: 11),
+            style: AppText.caption,
           ),
           contentPadding: EdgeInsets.zero,
           dense: true,
@@ -549,12 +549,12 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
                 ? null
                 : (value) => setState(() => _rememberCard = value),
             title: Text('Link card •${_message.cardLast4} to this account',
-                style: const TextStyle(fontSize: 13)),
+                style: AppText.subtitle),
             subtitle: Text(
               accountName == null
                   ? 'Select an account first'
                   : 'Future messages for •${_message.cardLast4} use $accountName',
-              style: const TextStyle(fontSize: 11),
+              style: AppText.caption,
             ),
             contentPadding: EdgeInsets.zero,
             dense: true,
@@ -595,7 +595,7 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
               value: account.id,
               child: Text(
                 account.isPocket ? '  ↳ ${account.name}' : account.name,
-                style: const TextStyle(fontSize: 13),
+                style: AppText.subtitle,
                 overflow: TextOverflow.fade,
               ),
             ))
@@ -615,7 +615,7 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
           items.add(DropdownMenuItem(
             value: sub.id,
             child: Text('${category.name} > ${sub.name}',
-                style: const TextStyle(fontSize: 13),
+                style: AppText.subtitle,
                 overflow: TextOverflow.fade),
           ));
         }
@@ -623,7 +623,7 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
         items.add(DropdownMenuItem(
           value: category.id,
           child: Text(category.name,
-              style: const TextStyle(fontSize: 13),
+              style: AppText.subtitle,
               overflow: TextOverflow.fade),
         ));
       }

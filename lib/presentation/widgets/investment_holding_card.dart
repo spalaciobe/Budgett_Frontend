@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/app_spacing.dart';
 import '../../data/models/investment_holding_model.dart';
 import '../utils/currency_formatter.dart';
+import '../../core/app_theme.dart';
 
 /// Card displaying a single investment holding with quantity, cost, price,
 /// market value, P&L, and an action menu (Buy, Sell, Edit, Delete).
@@ -28,10 +29,9 @@ class InvestmentHoldingCard extends StatelessWidget {
     final pnlPct = holding.unrealizedPnlPct;
     final isPositive = pnl >= 0;
     final pnlColor =
-        isPositive ? Colors.green.shade600 : theme.colorScheme.error;
+        isPositive ? context.positive : theme.colorScheme.error;
 
     return Card(
-      elevation: 1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: kSpaceLg),
@@ -68,10 +68,10 @@ class InvestmentHoldingCard extends StatelessWidget {
                     const PopupMenuItem(value: 'buy', child: Text('Buy')),
                     const PopupMenuItem(value: 'sell', child: Text('Sell')),
                     const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'delete',
                       child: Text('Delete',
-                          style: TextStyle(color: Colors.red)),
+                          style: TextStyle(color: context.negative)),
                     ),
                   ],
                   onSelected: (v) {

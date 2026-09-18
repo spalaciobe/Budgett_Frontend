@@ -12,6 +12,8 @@ import '../../data/repositories/bank_repository.dart';
 import '../providers/finance_provider.dart';
 import '../providers/fx_rate_provider.dart';
 import '../utils/currency_formatter.dart';
+import '../../core/app_theme.dart';
+import '../../core/app_text.dart';
 
 enum _PaymentPreset { minimum, statementMonth, currentBalance, custom }
 
@@ -207,11 +209,11 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Padding(
+            Padding(
               padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
               child: Text(
                 'Pick billing cycle',
-                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                style: AppText.sectionTitle,
               ),
             ),
             const Divider(height: 1),
@@ -704,8 +706,8 @@ class _CyclePickerTile extends StatelessWidget {
       leading: SizedBox(
         width: 18,
         child: isCurrent
-            ? const Icon(Icons.fiber_manual_record,
-                size: 10, color: Colors.green)
+            ? Icon(Icons.fiber_manual_record,
+                size: 10, color: context.positive)
             : const SizedBox.shrink(),
       ),
       title: Row(

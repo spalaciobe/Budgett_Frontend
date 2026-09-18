@@ -7,6 +7,7 @@ import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:budgett_frontend/data/models/account_model.dart';
 import 'package:budgett_frontend/data/models/recurring_transaction_model.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
+import '../../core/app_text.dart';
 
 class EditRecurringTransactionDialog extends ConsumerStatefulWidget {
   final RecurringTransaction transaction;
@@ -76,7 +77,7 @@ class _EditRecurringTransactionDialogState
         value: a.id,
         child: Text(
           a.name,
-          style: const TextStyle(fontSize: 13),
+          style: AppText.subtitle,
           overflow: TextOverflow.fade,
         ),
       ));
@@ -93,7 +94,7 @@ class _EditRecurringTransactionDialogState
               Expanded(
                 child: Text(
                   p.name,
-                  style: const TextStyle(fontSize: 13),
+                  style: AppText.subtitle,
                   overflow: TextOverflow.fade,
                 ),
               ),
@@ -326,7 +327,7 @@ class _EditRecurringTransactionDialogState
                             value: sub.id,
                             child: Text(
                               '${cat.name} > ${sub.name}',
-                              style: const TextStyle(fontSize: 13),
+                              style: AppText.subtitle,
                               overflow: TextOverflow.fade,
                             ),
                           ));
@@ -337,7 +338,7 @@ class _EditRecurringTransactionDialogState
                           value: cat.id,
                           child: Text(
                             cat.name,
-                            style: const TextStyle(fontSize: 13),
+                            style: AppText.subtitle,
                             overflow: TextOverflow.fade,
                           ),
                         ));

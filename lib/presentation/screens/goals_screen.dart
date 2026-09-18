@@ -8,6 +8,10 @@ import 'package:budgett_frontend/presentation/widgets/add_goal_dialog.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:budgett_frontend/presentation/widgets/edit_goal_dialog.dart';
 import 'package:budgett_frontend/presentation/utils/icon_helper.dart';
+import '../../core/app_theme.dart';
+import '../../core/app_text.dart';
+import '../widgets/skeleton.dart';
+import '../widgets/page_body.dart';
 
 class GoalsScreen extends ConsumerWidget {
   const GoalsScreen({super.key});
@@ -32,7 +36,9 @@ class GoalsScreen extends ConsumerWidget {
               message: 'Set a savings goal with the + button.',
             );
           }
-          return ListView.separated(
+          return PageBody(
+            maxWidth: kColumnMaxWidth,
+            child: ListView.separated(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: kScreenPaddingWithFab,
             itemCount: goals.length,
@@ -90,7 +96,6 @@ class GoalsScreen extends ConsumerWidget {
               final isMaterialIcon = IconHelper.isValidIcon(goal.iconName);
 
               return Card(
-                elevation: 2,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(kCardRadius)),
                 child: InkWell(
                   onTap: () {
@@ -101,7 +106,26 @@ class GoalsScreen extends ConsumerWidget {
                   },
                   child: Padding(
                     padding: kCardPadding,
-                    child: Row(
+                    // The timeline panel is 150px wide. Beside a 48px avatar on
+                    // a 390px screen that left ~124px for the goal's name and
+                    // amounts, so every one of them truncated. Below ~520px it
+                    // moves under the row and gets the full width instead.
+                    child: LayoutBuilder(
+                      builder: (context, cardConstraints) {
+                    final wide = cardConstraints.maxWidth >= 520;
+                    final Widget? timelinePanel = deadline == null
+                        ? null
+                        : _GoalTimelinePanel(
+                            wide: wide,
+                            timeInfo: timeInfo,
+                            monthlySavings: monthlySavings,
+                            expectedAmount: expectedAmount,
+                            currentAmount: goal.currentAmount,
+                          );
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                    Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         CircleAvatar(
@@ -115,7 +139,7 @@ class GoalsScreen extends ConsumerWidget {
                               )
                             : Text(
                                 goal.iconName ?? '🎯',
-                                style: const TextStyle(fontSize: 24),
+                                style: AppText.balance,
                               ),
                         ),
                         const SizedBox(width: 16),
@@ -126,7 +150,7 @@ class GoalsScreen extends ConsumerWidget {
                             children: [
                               Text(
                                 goal.name,
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                style: AppText.sectionTitle,
                                 maxLines: 1,
                                 overflow: TextOverflow.fade,
                               ),
@@ -143,7 +167,7 @@ class GoalsScreen extends ConsumerWidget {
                                     ),
                                     TextSpan(
                                       text: ' / ${CurrencyFormatter.format(goal.targetAmount, decimalDigits: 0)}',
-                                      style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                                      style: AppText.subtitle.copyWith(color: context.muted),
                                     ),
                                   ],
                                 ),
@@ -156,7 +180,7 @@ class GoalsScreen extends ConsumerWidget {
                                   LinearProgressIndicator(
                                     value: 1, // Full background
                                     backgroundColor: Colors.transparent,
-                                    color: Colors.grey.shade200,
+                                    color: context.muted.withValues(alpha: 0.18),
                                     minHeight: 10,
                                     borderRadius: BorderRadius.circular(5),
                                   ),
@@ -169,7 +193,7 @@ class GoalsScreen extends ConsumerWidget {
                                           Container(
                                             height: 10,
                                             decoration: BoxDecoration(
-                                              color: Colors.green.withValues(alpha: 0.3),
+                                              color: context.positive.withValues(alpha: 0.3),
                                               borderRadius: BorderRadius.circular(5),
                                             ),
                                           ),
@@ -206,105 +230,25 @@ class GoalsScreen extends ConsumerWidget {
                           ),
                         ),
                         
-                        if (deadline != null)
-                        Container(
-                          width: 150,
-                          margin: const EdgeInsets.only(left: 16),
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            // Removed explicit background color and border as per request "Dont use white background"
-                            // Using a subtle surface tone or transparent
-                            color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5), 
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(timeInfo, style: Theme.of(context).textTheme.bodySmall),
-                              const SizedBox(height: 4),
-                              if (monthlySavings > 0) ...[
-                                Text(
-                                  'Rec. Savings:',
-                                  style: TextStyle(fontSize: 10, color: Colors.grey[600]),
-                                ),
-                                Text(
-                                  CurrencyFormatter.format(monthlySavings, decimalDigits: 0),
-                                  style: TextStyle(
-                                    color: Theme.of(context).colorScheme.secondary,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                              ],
-                              if (expectedAmount > 0 && goal.currentAmount < expectedAmount)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: Colors.red.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
-                                  ),
-                                  child: FittedBox(
-                                    fit: BoxFit.scaleDown,
-                                    alignment: Alignment.centerRight,
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.trending_down, color: Colors.red[400], size: 14),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          'Behind by ${CurrencyFormatter.format(expectedAmount - goal.currentAmount, decimalDigits: 0)}',
-                                          style: TextStyle(
-                                            fontSize: 10, 
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.red[100],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                )
-                              else if (expectedAmount > 0)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: Colors.green.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: Colors.green.withValues(alpha: 0.2)),
-                                  ),
-                                  child: FittedBox(
-                                    fit: BoxFit.scaleDown,
-                                    alignment: Alignment.centerRight,
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.check_circle_outline, color: Colors.green[400], size: 14),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          'On track!',
-                                          style: TextStyle(
-                                            fontSize: 10, 
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.green[100],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
+                        if (wide && timelinePanel != null) timelinePanel,
                       ],
+                    ),
+                    if (!wide && timelinePanel != null) ...[
+                      kGapXl,
+                      timelinePanel,
+                    ],
+                      ],
+                    );
+                      },
                     ),
                   ),
                 ),
               );
             },
+          ),
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const SkeletonCards(),
         error: (err, stack) => Center(child: Text(friendlyError(err))),
         ),
       ),
@@ -350,4 +294,125 @@ class _DottedVerticalLinePainter extends CustomPainter {
   
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// The deadline panel on a goal card: where the goal should be by now, and
+/// whether it is.
+///
+/// Sits beside the goal on a wide card and underneath it on a narrow one —
+/// at 150px fixed beside a 48px avatar it used to leave the goal's own name
+/// and amounts about 124px on a phone, so all three truncated.
+class _GoalTimelinePanel extends StatelessWidget {
+  final bool wide;
+  final String timeInfo;
+  final double monthlySavings;
+  final double expectedAmount;
+  final double currentAmount;
+
+  const _GoalTimelinePanel({
+    required this.wide,
+    required this.timeInfo,
+    required this.monthlySavings,
+    required this.expectedAmount,
+    required this.currentAmount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final behind = expectedAmount > 0 && currentAmount < expectedAmount;
+    final align = wide ? CrossAxisAlignment.end : CrossAxisAlignment.start;
+
+    final status = expectedAmount <= 0
+        ? null
+        : _StatusPill(
+            behind: behind,
+            label: behind
+                ? 'Behind by ${CurrencyFormatter.format(expectedAmount - currentAmount, decimalDigits: 0)}'
+                : 'On track',
+          );
+
+    final details = <Widget>[
+      Text(timeInfo, style: AppText.caption.copyWith(color: context.muted)),
+      if (monthlySavings > 0) ...[
+        kGapXs,
+        Text(
+          'Save ${CurrencyFormatter.format(monthlySavings, decimalDigits: 0)} a month',
+          style: AppText.amountSmall.copyWith(color: theme.colorScheme.secondary),
+        ),
+      ],
+    ];
+
+    return Container(
+      width: wide ? 150 : null,
+      margin: wide ? const EdgeInsets.only(left: kSpaceXxl) : null,
+      padding: const EdgeInsets.all(kSpaceLg),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: wide
+          ? Column(
+              crossAxisAlignment: align,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ...details,
+                if (status != null) ...[kGapLg, status],
+              ],
+            )
+          // Side by side when it has the full card width: the recommended
+          // saving and the verdict answer the same question.
+          : Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: details,
+                  ),
+                ),
+                if (status != null) ...[const SizedBox(width: kSpaceXl), status],
+              ],
+            ),
+    );
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  final bool behind;
+  final String label;
+
+  const _StatusPill({required this.behind, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = behind ? context.negative : context.positive;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            behind ? Icons.trending_down : Icons.check_circle_outline,
+            color: color,
+            size: 13,
+          ),
+          const SizedBox(width: 5),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.fade,
+              softWrap: false,
+              style: AppText.badge.copyWith(color: color),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

@@ -138,13 +138,17 @@ class AppTheme {
     );
   }
 
+  /// Note: no `titleTextStyle`/`subtitleTextStyle` here. Setting them to a
+  /// colourless [AppText] role stops `ListTile` from applying the theme's
+  /// `onSurface` colour, and the title renders in the default light ink —
+  /// invisible on a white card. The text theme already maps `bodyLarge` and
+  /// `bodySmall` to the same roles *with* a colour, which is what ListTile
+  /// falls back to.
   static ListTileThemeData get _listTileTheme => const ListTileThemeData(
         dense: true,
         visualDensity: _density,
         minVerticalPadding: 7,
         contentPadding: EdgeInsets.symmetric(horizontal: 14),
-        titleTextStyle: AppText.tileTitle,
-        subtitleTextStyle: AppText.caption,
       );
 
   static ButtonStyle get _primaryButtonStyle => ElevatedButton.styleFrom(
@@ -614,4 +618,24 @@ extension AppSemanticColorsX on BuildContext {
   /// extension somehow isn't registered.
   AppSemanticColors get semantic =>
       Theme.of(this).extension<AppSemanticColors>() ?? AppSemanticColors.dark;
+
+  // Shorthands for the five colours that carry meaning in this app. They exist
+  // so that painting a number the right colour is shorter than reaching for a
+  // raw `Colors.green` — the reason ~146 raw Material colours had accumulated
+  // across the UI, each one ignoring the theme it was painted in.
+
+  /// Income, gains, money coming in.
+  Color get positive => semantic.positive;
+
+  /// Expenses, losses, money going out, destructive actions.
+  Color get negative => Theme.of(this).colorScheme.error;
+
+  /// Pending, near-limit, needs attention but isn't wrong yet.
+  Color get warning => semantic.warning;
+
+  /// De-emphasised text, disabled rows, inactive icons.
+  Color get muted => semantic.muted;
+
+  /// The brand accent: actions, selection, informational highlights.
+  Color get brand => Theme.of(this).colorScheme.primary;
 }

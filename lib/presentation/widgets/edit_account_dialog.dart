@@ -14,6 +14,7 @@ import '../../data/repositories/broker_repository.dart';
 import '../../data/models/broker_model.dart';
 import '../../data/models/investment_details_model.dart';
 import 'add_account_dialog.dart' show buildInvestmentDetailsMap;
+import '../../core/app_theme.dart';
 
 class EditAccountDialog extends ConsumerStatefulWidget {
   final Account account;
@@ -947,8 +948,8 @@ class _EditAccountDialogState extends ConsumerState<EditAccountDialog> {
                   children: [
                     TextButton.icon(
                       onPressed: _isLoading ? null : _deleteAccount,
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      label: const Text('Delete', style: TextStyle(color: Colors.red)),
+                      icon: Icon(Icons.delete, color: context.negative),
+                      label: Text('Delete', style: TextStyle(color: context.negative)),
                     ),
                     Row(
                       mainAxisSize: MainAxisSize.min,

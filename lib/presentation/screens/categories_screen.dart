@@ -9,6 +9,10 @@ import '../providers/finance_provider.dart';
 import '../utils/icon_helper.dart';
 import '../widgets/create_category_dialog.dart';
 import '../widgets/edit_category_dialog.dart';
+import '../../core/app_text.dart';
+import '../widgets/skeleton.dart';
+import '../widgets/page_body.dart';
+import '../widgets/empty_state.dart';
 
 class CategoriesScreen extends ConsumerWidget {
   const CategoriesScreen({super.key});
@@ -27,41 +31,38 @@ class CategoriesScreen extends ConsumerWidget {
           await ref.read(categoriesProvider.future);
         },
         child: categoriesAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const SkeletonList(),
         error: (e, _) => Center(child: Text(friendlyError(e))),
         data: (categories) {
           final income = categories.where((c) => c.type == 'income').toList();
           final expense = categories.where((c) => c.type == 'expense').toList();
 
-          return LayoutBuilder(
-            builder: (context, constraints) {
-              // Two-column grid of tiles on wide screens, single column on
-              // mobile.
-              final twoCols = constraints.maxWidth >= 720;
-              const gap = 12.0;
-              final itemW = (constraints.maxWidth - 32 - gap) / 2;
+          // On a fresh account this screen used to render two headings with a
+          // count of zero and nothing else — a blank page where the person's
+          // first task should be.
+          if (categories.isEmpty) {
+            return const EmptyState(
+              icon: Icons.category_outlined,
+              title: 'No categories yet',
+              message:
+                  'Categories are how spending gets grouped in your budget. '
+                  'Create your first one with the + button.',
+            );
+          }
 
-              Widget section(List<Category> cats) {
-                if (!twoCols) {
-                  return Column(
-                    children: cats
-                        .map((c) => _CategoryTile(category: c, ref: ref))
-                        .toList(),
-                  );
-                }
-                return Wrap(
-                  spacing: gap,
-                  children: [
-                    for (final c in cats)
-                      SizedBox(
-                        width: itemW,
-                        child: _CategoryTile(category: c, ref: ref),
-                      ),
-                  ],
-                );
-              }
+          // ContentGrid adds columns as the screen widens and keeps each
+          // tile within a readable width, instead of splitting whatever
+          // width it is handed between exactly two ~700px tiles.
+          Widget section(List<Category> cats) => ContentGrid(
+                maxItemWidth: 360,
+                spacing: kSpaceLg,
+                children: [
+                  for (final c in cats) _CategoryTile(category: c, ref: ref),
+                ],
+              );
 
-              return ListView(
+          return PageBody(
+            child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: kScreenPadding,
                 children: [
@@ -84,8 +85,7 @@ class CategoriesScreen extends ConsumerWidget {
                   section(expense),
                   const SizedBox(height: 64),
                 ],
-              );
-            },
+            ),
           );
         },
         ),
@@ -133,7 +133,7 @@ class _SectionHeader extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         Chip(
-          label: Text('$count', style: const TextStyle(fontSize: 12)),
+          label: Text('$count', style: AppText.caption),
           padding: const EdgeInsets.symmetric(horizontal: 4),
           visualDensity: VisualDensity.compact,
         ),
@@ -177,9 +177,9 @@ class _CategoryTile extends StatelessWidget {
               ),
             ),
             if (_isSystemCategory)
-              const Tooltip(
+              Tooltip(
                 message: 'System category (Colombia)',
-                child: Icon(Icons.public, size: 14, color: Colors.blueGrey),
+                child: Icon(Icons.public, size: 14, color: context.muted),
               ),
           ],
         ),
@@ -189,7 +189,7 @@ class _CategoryTile extends StatelessWidget {
                 style: Theme.of(context)
                     .textTheme
                     .bodySmall
-                    ?.copyWith(color: Colors.grey),
+                    ?.copyWith(color: context.muted),
               )
             : null,
         trailing: _isSystemCategory
@@ -208,7 +208,7 @@ class _CategoryTile extends StatelessWidget {
                     },
                   ),
                   IconButton(
-                    icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                    icon: Icon(Icons.delete_outline, size: 18, color: context.negative),
                     tooltip: 'Delete',
                     onPressed: () => _confirmDelete(context),
                   ),
@@ -223,8 +223,8 @@ class _CategoryTile extends StatelessWidget {
                         const EdgeInsets.only(left: 72, right: 16),
                     title: Text(sc.name,
                         style: Theme.of(context).textTheme.bodySmall),
-                    leading: const Icon(Icons.subdirectory_arrow_right,
-                        size: 14, color: Colors.grey),
+                    leading: Icon(Icons.subdirectory_arrow_right,
+                        size: 14, color: context.muted),
                   ),
                 )
                 .toList()
@@ -248,7 +248,7 @@ class _CategoryTile extends StatelessWidget {
           ),
           FilledButton(
             style:
-                FilledButton.styleFrom(backgroundColor: Colors.red),
+                FilledButton.styleFrom(backgroundColor: context.negative),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Delete'),
           ),

@@ -127,8 +127,6 @@ class AccountCard extends StatelessWidget {
       button: true,
       excludeSemantics: true,
       child: Card(
-        elevation: 4,
-        shadowColor: Colors.black12,
         clipBehavior: Clip.antiAlias,
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(kCardRadius)),

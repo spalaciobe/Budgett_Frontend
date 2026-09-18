@@ -21,6 +21,8 @@ import 'package:budgett_frontend/core/responsive.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:budgett_frontend/presentation/screens/credit_card_details_screen.dart';
 import 'package:budgett_frontend/presentation/screens/investment_details_screen.dart';
+import '../../core/app_text.dart';
+import '../widgets/skeleton.dart';
 
 // ── Top-level helpers ─────────────────────────────────────────────────────────
 
@@ -93,7 +95,7 @@ Widget? _investmentGainsSubtitle(
       if (InvestmentCalculator.isCdtMatured(details)) {
         return Text(
           'Matured — collect',
-          style: baseStyle?.copyWith(color: Colors.orange.shade700),
+          style: baseStyle?.copyWith(color: context.warning),
         );
       }
       final accrued = InvestmentCalculator.cdtAccruedInterest(details);
@@ -212,7 +214,6 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
           ),
         ],
       ),
-      backgroundColor: Theme.of(context).colorScheme.surface,
       body: accountsAsync.when(
         data: (accounts) {
           final sorted = _sortAccounts(accounts, sortOption, customOrder);
@@ -221,7 +222,7 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
               ? _buildDesktopLayout(sorted, reorderable: reorderable)
               : _buildMobileList(sorted, reorderable: reorderable);
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const SkeletonCards(),
         error: (err, _) => Center(child: Text(friendlyError(err))),
       ),
       floatingActionButton: FloatingActionButton(
@@ -898,14 +899,14 @@ class _InvestmentAccountCard extends ConsumerWidget {
 
     final dimColor =
         Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55);
-    const subtitleStyle = TextStyle(fontSize: 11);
+    const subtitleStyle = AppText.caption;
 
     switch (details.investmentType) {
       case InvestmentType.cdt:
         if (InvestmentCalculator.isCdtMatured(details)) {
           return Text(
             'Matured — collect',
-            style: subtitleStyle.copyWith(color: Colors.orange.shade700),
+            style: subtitleStyle.copyWith(color: context.warning),
           );
         }
         final accrued = InvestmentCalculator.cdtAccruedInterest(details);
@@ -966,7 +967,6 @@ class _SavingsInterestCard extends ConsumerWidget {
         : null;
 
     return Card(
-      elevation: 1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: kCardPadding,
@@ -1164,7 +1164,6 @@ class _PocketTile extends ConsumerWidget {
         ? '${(sid!.apyRate! * 100).toStringAsFixed(2)}%'
         : null;
     return Card(
-      elevation: 0,
       color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
       margin: const EdgeInsets.symmetric(vertical: 4),
       child: ListTile(
@@ -1172,7 +1171,7 @@ class _PocketTile extends ConsumerWidget {
         title: Text(pocket.name),
         subtitle: apyPct != null
             ? Text('$apyPct APY',
-                style: TextStyle(color: context.semantic.positive, fontSize: 12))
+                style: AppText.caption.copyWith(color: context.semantic.positive))
             : null,
         trailing: Text(
           CurrencyFormatter.format(pocket.balance),
@@ -1246,7 +1245,6 @@ class AccountDetailsScreen extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Card(
-                elevation: 2,
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16)),
                 child: Padding(

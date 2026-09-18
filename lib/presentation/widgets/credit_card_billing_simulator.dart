@@ -6,6 +6,8 @@ import '../../data/models/bank_model.dart';
 import '../../data/repositories/bank_repository.dart';
 import '../../core/utils/credit_card_calculator.dart';
 import '../providers/finance_provider.dart';
+import '../../core/app_theme.dart';
+import '../../core/app_text.dart';
 
 class CreditCardBillingSubtitle extends ConsumerWidget {
   final Account account;
@@ -179,7 +181,6 @@ class CreditCardBillingSimulator extends ConsumerWidget {
     final dateFormat = DateFormat('dd/MM/yyyy', 'es_CO');
 
     return Card(
-      elevation: 2,
       color: Theme.of(context).colorScheme.surfaceContainer,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
@@ -214,28 +215,28 @@ class CreditCardBillingSimulator extends ConsumerWidget {
               isHighlighted: true),
             const SizedBox(height: 8),
             _buildDateRow(context, 'Cutoff Date', cutoffDate, dateFormat,
-              icon: Icons.content_cut, color: Colors.orange),
+              icon: Icons.content_cut, color: context.warning),
             const SizedBox(height: 8),
             _buildDateRow(context, 'Payment Due', paymentDate, dateFormat,
-              icon: Icons.event_available, color: Colors.green),
+              icon: Icons.event_available, color: context.positive),
               
             if (daysToPayment > 0 && daysToPayment < 15) ...[
                const SizedBox(height: 12),
                Container(
                  padding: const EdgeInsets.all(8),
                  decoration: BoxDecoration(
-                   color: Colors.orange.withValues(alpha: 0.1),
+                   color: context.warning.withValues(alpha: 0.1),
                    borderRadius: BorderRadius.circular(8),
-                   border: Border.all(color: Colors.orange.withValues(alpha: 0.3))
+                   border: Border.all(color: context.warning.withValues(alpha: 0.3))
                  ),
                  child: Row(
                    children: [
-                     const Icon(Icons.warning_amber, size: 16, color: Colors.orange),
+                     Icon(Icons.warning_amber, size: 16, color: context.warning),
                      const SizedBox(width: 8),
                      Expanded(
                        child: Text(
                          'Payment due in $daysToPayment days',
-                         style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 12),
+                         style: AppText.badge.copyWith(color: context.warning),
                          overflow: TextOverflow.fade,
                        ),
                      ),
@@ -293,12 +294,12 @@ class CreditCardBillingSimulator extends ConsumerWidget {
                 left: 0,
                 right: 0,
                 top: lineTop,
-                child: Container(height: 2, color: Colors.grey.withValues(alpha: 0.3)),
+                child: Container(height: 2, color: context.muted.withValues(alpha: 0.3)),
               ),
               _buildTimelineNode(context, width, 0.0, 'Start', cycleStart, color: primary, lineTop: lineTop),
               _buildTimelineNode(context, width, todayRatio, 'Today', today, color: primary, isPrimary: true, above: todayAbove, lineTop: lineTop),
-              _buildTimelineNode(context, width, cutoffRatio, 'Cutoff', cutoff, color: Colors.orange, lineTop: lineTop),
-              _buildTimelineNode(context, width, 1.0, 'Pay', payment, color: Colors.green, lineTop: lineTop),
+              _buildTimelineNode(context, width, cutoffRatio, 'Cutoff', cutoff, color: context.warning, lineTop: lineTop),
+              _buildTimelineNode(context, width, 1.0, 'Pay', payment, color: context.positive, lineTop: lineTop),
             ],
           ),
         );
@@ -336,11 +337,11 @@ class CreditCardBillingSimulator extends ConsumerWidget {
     );
     final dateText = Text(
       DateFormat('d MMM', 'es_CO').format(date),
-      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: color),
+      style: AppText.badge.copyWith(color: color),
     );
     final labelText = Text(
       label,
-      style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSurfaceVariant),
+      style: AppText.badge.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
     );
 
     if (above) {

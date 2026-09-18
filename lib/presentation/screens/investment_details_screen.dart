@@ -28,6 +28,8 @@ import '../widgets/portfolio_donut_chart.dart';
 import '../widgets/portfolio_value_chart.dart';
 import '../widgets/swap_holding_dialog.dart';
 import '../widgets/transaction_tile.dart';
+import '../../core/app_text.dart';
+import '../widgets/skeleton.dart';
 
 class InvestmentDetailsScreen extends ConsumerWidget {
   final String accountId;
@@ -173,14 +175,13 @@ class _Body extends ConsumerWidget {
                   )),
           const SizedBox(height: 8),
           txAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
+            loading: () => const SkeletonList(),
             error: (e, _) => Text(friendlyError(e)),
             data: (txs) {
               if (txs.isEmpty) {
                 return const Text('No transactions yet.');
               }
               return Card(
-                elevation: 1,
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
                 child: ListView.separated(
@@ -328,8 +329,6 @@ class _SummaryHeader extends StatelessWidget {
         : (hasHoldings ? pnl.costBasis : null);
 
     return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
@@ -352,7 +351,7 @@ class _SummaryHeader extends StatelessWidget {
                       visualDensity: VisualDensity.compact,
                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       backgroundColor: isStale
-                          ? Colors.orange.withValues(alpha: 0.2)
+                          ? context.warning.withValues(alpha: 0.2)
                           : theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
                     ),
                   ),
@@ -497,7 +496,6 @@ class _CdtSection extends ConsumerWidget {
     return Column(
       children: [
         Card(
-          elevation: 1,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           child: Padding(
@@ -524,7 +522,7 @@ class _CdtSection extends ConsumerWidget {
                       child: _StatItem(
                         label: matured ? 'Status' : 'Days Left',
                         value: matured ? 'Matured' : '$daysLeft days',
-                        color: matured ? Colors.orange : null,
+                        color: matured ? context.warning : null,
                       ),
                     ),
                   ],
@@ -645,7 +643,7 @@ class _HoldingsListState extends ConsumerState<_HoldingsList> {
               child: SegmentedButton<int>(
                 style: SegmentedButton.styleFrom(
                   visualDensity: VisualDensity.compact,
-                  textStyle: const TextStyle(fontSize: 12),
+                  textStyle: AppText.caption,
                   minimumSize: const Size(0, 32),
                 ),
                 segments: const [
@@ -685,7 +683,7 @@ class _HoldingsListState extends ConsumerState<_HoldingsList> {
                 SegmentedButton<int>(
                   style: SegmentedButton.styleFrom(
                     visualDensity: VisualDensity.compact,
-                    textStyle: const TextStyle(fontSize: 12),
+                    textStyle: AppText.caption,
                     minimumSize: const Size(0, 32),
                   ),
                   segments: const [
@@ -919,7 +917,6 @@ class _HoldingsListState extends ConsumerState<_HoldingsList> {
     final centerValue = CurrencyFormatter.format(total, currency: baseCurrency);
 
     return Card(
-      elevation: 1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -995,7 +992,6 @@ class _InvestmentHistoryChartState
         .any((e) => chartableHoldingIds.contains(e.holdingId));
 
     return Card(
-      elevation: 1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -1042,7 +1038,7 @@ class _InvestmentHistoryChartState
                   SegmentedButton<_HistoryMetric>(
                     style: SegmentedButton.styleFrom(
                       visualDensity: VisualDensity.compact,
-                      textStyle: const TextStyle(fontSize: 12),
+                      textStyle: AppText.caption,
                     ),
                     segments: const [
                       ButtonSegment(
@@ -1465,7 +1461,7 @@ class InvestmentDetailsBody extends ConsumerWidget {
     final fxAsync = ref.watch(fxRateProvider);
 
     return holdingsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => const SkeletonList(),
       error: (e, _) => Center(child: Text(friendlyError(e))),
       data: (holdings) => _Body(
         account: account,

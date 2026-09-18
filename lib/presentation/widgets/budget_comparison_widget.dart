@@ -5,6 +5,7 @@ import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:budgett_frontend/core/app_theme.dart';
 import 'package:budgett_frontend/presentation/utils/icon_helper.dart';
 import 'package:budgett_frontend/data/models/sub_category_model.dart';
+import '../../core/app_text.dart';
 
 class BudgetComparisonWidget extends StatefulWidget {
   final String categoryName;
@@ -646,12 +647,12 @@ class _CategoryIconButtonState extends State<_CategoryIconButton> {
           IconHelper.iconMap.containsKey(widget.iconName)) {
         return Icon(
           IconHelper.iconMap[widget.iconName],
-          color: widget.color ?? Colors.grey,
+          color: widget.color ?? context.muted,
           size: 20,
         );
       }
       return Text(widget.iconName ?? '📁',
-          style: const TextStyle(fontSize: 20));
+          style: AppText.balance);
     }
 
     return MouseRegion(
@@ -663,7 +664,7 @@ class _CategoryIconButtonState extends State<_CategoryIconButton> {
         },
         child: CircleAvatar(
           backgroundColor:
-              widget.color?.withValues(alpha: 0.5) ?? Colors.grey.withValues(alpha: 0.5),
+              widget.color?.withValues(alpha: 0.5) ?? context.muted.withValues(alpha: 0.5),
           radius: 16,
           child: _isHovered
               ? const Icon(Icons.more_horiz, color: Colors.white, size: 20)

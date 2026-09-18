@@ -8,6 +8,7 @@ import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/presentation/utils/icon_helper.dart';
 import 'package:budgett_frontend/presentation/widgets/create_category_dialog.dart'
     show savingsTargetAccountField;
+import '../../core/app_theme.dart';
 
 
 class EditCategoryDialog extends ConsumerStatefulWidget {
@@ -206,11 +207,11 @@ class _EditCategoryDialogState extends ConsumerState<EditCategoryDialog> {
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         IconButton(
-                                          icon: const Icon(Icons.check, size: 18, color: Colors.green),
+                                          icon: Icon(Icons.check, size: 18, color: context.positive),
                                           onPressed: () => _confirmRename(sub),
                                         ),
                                         IconButton(
-                                          icon: const Icon(Icons.close, size: 18, color: Colors.grey),
+                                          icon: Icon(Icons.close, size: 18, color: context.muted),
                                           onPressed: () => setState(() {
                                             _editControllers[sub.id]?.text = _renamedSubCategories[sub.id] ?? sub.name;
                                             _editingSubCategoryId = null;
@@ -222,11 +223,11 @@ class _EditCategoryDialogState extends ConsumerState<EditCategoryDialog> {
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         IconButton(
-                                          icon: const Icon(Icons.edit, size: 18, color: Colors.grey),
+                                          icon: Icon(Icons.edit, size: 18, color: context.muted),
                                           onPressed: () => setState(() => _editingSubCategoryId = sub.id),
                                         ),
                                         IconButton(
-                                          icon: const Icon(Icons.delete, size: 18, color: Colors.grey),
+                                          icon: Icon(Icons.delete, size: 18, color: context.muted),
                                           onPressed: () {
                                             setState(() {
                                               _existingSubCategories.remove(sub);
@@ -245,7 +246,7 @@ class _EditCategoryDialogState extends ConsumerState<EditCategoryDialog> {
                             contentPadding: EdgeInsets.zero,
                             title: Text(entry.value, style: const TextStyle(fontStyle: FontStyle.italic)),
                             trailing: IconButton(
-                              icon: const Icon(Icons.delete, size: 18, color: Colors.grey),
+                              icon: Icon(Icons.delete, size: 18, color: context.muted),
                               onPressed: () {
                                 setState(() {
                                   _newSubCategories.removeAt(entry.key);
@@ -296,8 +297,8 @@ class _EditCategoryDialogState extends ConsumerState<EditCategoryDialog> {
                 children: [
                   TextButton.icon(
                     onPressed: _isLoading ? null : _deleteCategory,
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    label: const Text('Delete', style: TextStyle(color: Colors.red)),
+                    icon: Icon(Icons.delete, color: context.negative),
+                    label: Text('Delete', style: TextStyle(color: context.negative)),
                   ),
                   Row(
                     mainAxisSize: MainAxisSize.min,
@@ -408,7 +409,7 @@ class _EditCategoryDialogState extends ConsumerState<EditCategoryDialog> {
             child: const Text('Cancel'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(backgroundColor: context.negative),
             onPressed: () => Navigator.of(context).pop(true),
             child: const Text('Delete'),
           ),
@@ -490,7 +491,7 @@ class _IconGrid extends StatelessWidget {
                   border: Border.all(
                     color: isSelected
                         ? Theme.of(context).colorScheme.primary
-                        : Colors.grey.shade300,
+                        : context.muted.withValues(alpha: 0.18),
                     width: isSelected ? 2 : 1,
                   ),
                   borderRadius: BorderRadius.circular(6),

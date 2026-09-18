@@ -7,6 +7,7 @@ import 'package:budgett_frontend/data/models/category_model.dart';
 import 'package:budgett_frontend/data/models/sub_category_model.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/presentation/utils/icon_helper.dart';
+import '../../core/app_theme.dart';
 
 class CreateCategoryDialog extends ConsumerStatefulWidget {
   const CreateCategoryDialog({super.key});
@@ -229,7 +230,7 @@ class _CreateCategoryDialogState extends ConsumerState<CreateCategoryDialog> {
                 if (_subCategories.isNotEmpty)
                   Container(
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade300),
+                      border: Border.all(color: context.muted.withValues(alpha: 0.18)),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: ListView.separated(
@@ -243,8 +244,8 @@ class _CreateCategoryDialogState extends ConsumerState<CreateCategoryDialog> {
                           dense: true,
                           title: Text(_subCategories[index]),
                           trailing: IconButton(
-                            icon: const Icon(Icons.delete,
-                                size: 18, color: Colors.grey),
+                            icon: Icon(Icons.delete,
+                                size: 18, color: context.muted),
                             onPressed: () {
                               setState(() {
                                 _subCategories.removeAt(index);
@@ -461,7 +462,7 @@ class _IconGrid extends StatelessWidget {
                   border: Border.all(
                     color: isSelected
                         ? Theme.of(context).colorScheme.primary
-                        : Colors.grey.shade300,
+                        : context.muted.withValues(alpha: 0.18),
                     width: isSelected ? 2 : 1,
                   ),
                   borderRadius: BorderRadius.circular(6),

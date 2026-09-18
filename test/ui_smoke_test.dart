@@ -16,6 +16,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show FontLoader, rootBundle;
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -23,6 +24,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:budgett_frontend/core/app_theme.dart';
 import 'package:budgett_frontend/core/services/capture_ingest_service.dart';
 import 'package:budgett_frontend/core/services/message_capture_service.dart';
 import 'package:budgett_frontend/core/services/update_checker_service.dart';
@@ -57,11 +59,19 @@ import 'package:budgett_frontend/presentation/widgets/investment_holding_card.da
 import 'package:budgett_frontend/presentation/widgets/portfolio_donut_chart.dart';
 import 'package:budgett_frontend/presentation/widgets/review_capture_sheet.dart';
 import 'package:budgett_frontend/presentation/widgets/transaction_tile.dart';
+import 'package:budgett_frontend/presentation/widgets/add_transaction_dialog.dart';
 import 'package:budgett_frontend/presentation/widgets/update_available_dialog.dart';
 
-const _breakpoints = <(String, Size)>[
-  ('mobile', Size(390, 844)),
-  ('desktop', Size(1440, 900)),
+// Each case is (label, size, dark). The theme matters: until now this
+// harness rendered every screen with a bare `MaterialApp()`, i.e. Flutter's
+// default Material 3 baseline (the lilac background in older screenshots) —
+// so the PNGs never showed Budgett's own surfaces, and reviewing colour or
+// contrast in them was meaningless. Dark mode gets a pass of its own because
+// the two themes are where this app diverged most.
+const _breakpoints = <(String, Size, bool)>[
+  ('mobile', Size(390, 844), false),
+  ('desktop', Size(1440, 900), false),
+  ('mobile_dark', Size(390, 844), true),
 ];
 
 // ─── fixture builders ─────────────────────────────────────────────────────────
@@ -466,6 +476,13 @@ final _targets = <String, _Target>{
     () => const HomeScreen(),
     overrides: _financeOverrides(),
   ),
+  // The form people use most, and the one that had fourteen fields on screen
+  // at once. Captured collapsed (the default) so the shot shows what someone
+  // actually faces when they tap +.
+  'dialog_add_transaction': _Target(
+    () => const Scaffold(body: AddTransactionDialog()),
+    overrides: _financeOverrides(),
+  ),
   'screen_categories': _Target(
     () => const CategoriesScreen(),
     overrides: _financeOverrides(),
@@ -564,6 +581,27 @@ final _targets = <String, _Target>{
 
 // ─── harness ──────────────────────────────────────────────────────────────────
 
+/// Registers the bundled fonts with the test binding.
+Future<void> _loadAppFonts() async {
+  Future<void> load(String family, List<String> assets) async {
+    final loader = FontLoader(family);
+    for (final asset in assets) {
+      loader.addFont(rootBundle.load(asset));
+    }
+    await loader.load();
+  }
+
+  await load('OpenSans', const [
+    'assets/fonts/OpenSans-Regular.ttf',
+    'assets/fonts/OpenSans-Medium.ttf',
+    'assets/fonts/OpenSans-SemiBold.ttf',
+    'assets/fonts/OpenSans-Bold.ttf',
+  ]);
+  await load('SpaceGrotesk', const [
+    'assets/fonts/SpaceGrotesk-Variable.ttf',
+  ]);
+}
+
 Future<File> _capture(WidgetTester tester, Key key, String name) async {
   final element = tester.element(find.byKey(key));
   final boundary = element.renderObject! as RenderRepaintBoundary;
@@ -583,10 +621,14 @@ void main() {
     await initializeDateFormatting('es');
     await initializeDateFormatting('en_US');
     SharedPreferences.setMockInitialValues({});
+    // Without this every glyph renders as an empty box, which hides exactly
+    // the problems (truncation, line wrap, figure alignment) the screenshots
+    // exist to catch.
+    await _loadAppFonts();
   });
 
   for (final entry in _targets.entries) {
-    for (final (label, size) in _breakpoints) {
+    for (final (label, size, dark) in _breakpoints) {
       testWidgets('${entry.key} @ $label', (tester) async {
         tester.view.physicalSize = size;
         tester.view.devicePixelRatio = 1;
@@ -598,6 +640,7 @@ void main() {
           ProviderScope(
             overrides: entry.value.overrides,
             child: MaterialApp(
+              theme: dark ? AppTheme.darkTheme : AppTheme.lightTheme,
               home: RepaintBoundary(
                 key: captureKey,
                 child: entry.value.builder(),

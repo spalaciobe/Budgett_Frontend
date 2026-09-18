@@ -18,6 +18,8 @@ import '../../presentation/widgets/credit_card_billing_simulator.dart';
 import '../../presentation/widgets/edit_account_dialog.dart';
 import '../../presentation/widgets/transaction_tile.dart';
 import '../../presentation/widgets/pay_credit_card_dialog.dart';
+import '../../core/app_text.dart';
+import '../widgets/skeleton.dart';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 final _monthNames = [
@@ -262,7 +264,7 @@ class CreditCardDetailsBody extends ConsumerWidget {
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
                             color: currency == 'USD'
-                                ? Colors.blue.withValues(alpha: 0.12)
+                                ? context.brand.withValues(alpha: 0.12)
                                 : Theme.of(context).colorScheme.primaryContainer,
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -272,7 +274,7 @@ class CreditCardDetailsBody extends ConsumerWidget {
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
                               color: currency == 'USD'
-                                  ? Colors.blue.shade700
+                                  ? context.brand
                                   : Theme.of(context).colorScheme.primary,
                             ),
                           ),
@@ -332,7 +334,7 @@ class CreditCardDetailsBody extends ConsumerWidget {
 
               return Column(children: children);
             },
-            loading: () => const Center(child: CircularProgressIndicator()),
+            loading: () => const SkeletonList(),
             error: (e, s) => Text(friendlyError(e)),
           ),
         ],
@@ -357,7 +359,6 @@ class CreditCardDetailsBody extends ConsumerWidget {
 
     if (rules == null) {
       return Card(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -408,7 +409,6 @@ class CreditCardDetailsBody extends ConsumerWidget {
         }
 
         return Card(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           child: Padding(
             padding: kCardPadding,
             child: Column(
@@ -433,7 +433,7 @@ class CreditCardDetailsBody extends ConsumerWidget {
                     color: Theme.of(context).colorScheme.primary),
                 const SizedBox(height: 6),
                 _buildRuleRow(context, Icons.payment, 'Payment', _describePaymentRule(rules),
-                    color: Colors.green),
+                    color: context.positive),
                 if (cycleDates.isNotEmpty) ...[
                   kGapXl,
                   const Divider(),
@@ -462,11 +462,11 @@ class CreditCardDetailsBody extends ConsumerWidget {
       children: [
         Icon(icon, size: 18, color: color ?? Theme.of(context).colorScheme.onSurfaceVariant),
         const SizedBox(width: 8),
-        Text('$label: ', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+        Text('$label: ', style: AppText.cardName),
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(fontSize: 13),
+            style: AppText.subtitle,
             overflow: TextOverflow.fade,
           ),
         ),
@@ -493,14 +493,14 @@ class CreditCardDetailsBody extends ConsumerWidget {
             child: Row(children: [
               Icon(Icons.content_cut, size: 14, color: Theme.of(context).colorScheme.primary),
               const SizedBox(width: 4),
-              Text(dateFormat.format(pair.cutoff), style: const TextStyle(fontSize: 12)),
+              Text(dateFormat.format(pair.cutoff), style: AppText.caption),
             ]),
           ),
           Expanded(
             child: Row(children: [
-              const Icon(Icons.payment, size: 14, color: Colors.green),
+              Icon(Icons.payment, size: 14, color: context.positive),
               const SizedBox(width: 4),
-              Text(dateFormat.format(pair.payment), style: const TextStyle(fontSize: 12)),
+              Text(dateFormat.format(pair.payment), style: AppText.caption),
             ]),
           ),
         ],
@@ -570,13 +570,13 @@ class CreditCardDetailsBody extends ConsumerWidget {
               '${isApprox ? "≈ " : ""}${CurrencyFormatter.format(amount, currency: currency)}',
               maxLines: 1,
               softWrap: false,
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color),
+              style: AppText.balance.copyWith(color: color),
             ),
           ),
           if (isApprox) ...[
             const SizedBox(height: 2),
             Text('USD debt converted at TRM',
-                style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                style: AppText.badge.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
           ],
         ],
       ),
@@ -959,7 +959,7 @@ class _CreditCardRulesBottomSheetState extends ConsumerState<_CreditCardRulesBot
                 onChanged: _onBankSelected,
                 validator: (v) => v == null ? 'Select a bank' : null,
               ),
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const SkeletonList(),
               error: (e, _) => Text(friendlyError(e)),
             ),
             kGapXl,
@@ -1213,7 +1213,7 @@ class _BillingCalendarSheetState extends ConsumerState<_BillingCalendarSheet> {
                   );
                 },
               ),
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const SkeletonList(),
               error: (e, _) => Center(child: Text(friendlyError(e))),
             ),
           ),
@@ -1460,10 +1460,10 @@ class _EditMonthDialogState extends State<_EditMonthDialog> {
           children: [
             ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.content_cut, color: Colors.orange),
+              leading: Icon(Icons.content_cut, color: context.warning),
               title: const Text('Statement Date'),
               subtitle: Text(_fmt.format(_cutoff),
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  style: AppText.sectionTitle),
               trailing: TextButton(
                 onPressed: () => _pickDate(isCutoff: true),
                 child: const Text('Change'),
@@ -1472,10 +1472,10 @@ class _EditMonthDialogState extends State<_EditMonthDialog> {
             const SizedBox(height: 8),
             ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.payment, color: Colors.green),
+              leading: Icon(Icons.payment, color: context.positive),
               title: const Text('Payment Date'),
               subtitle: Text(_fmt.format(_payment),
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  style: AppText.sectionTitle),
               trailing: TextButton(
                 onPressed: () => _pickDate(isCutoff: false),
                 child: const Text('Change'),

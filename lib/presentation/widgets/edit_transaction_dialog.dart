@@ -10,6 +10,8 @@ import 'package:budgett_frontend/data/repositories/bank_repository.dart';
 import 'package:budgett_frontend/core/utils/credit_card_calculator.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/presentation/widgets/credit_card_billing_simulator.dart';
+import '../../core/app_theme.dart';
+import '../../core/app_text.dart';
 
 class EditTransactionDialog extends ConsumerStatefulWidget {
   final Transaction transaction;
@@ -123,7 +125,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
           value: a.id,
           child: Text(
             a.name,
-            style: const TextStyle(fontSize: 13),
+            style: AppText.subtitle,
             overflow: TextOverflow.fade,
           ),
         ));
@@ -145,7 +147,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
               Expanded(
                 child: Text(
                   p.name,
-                  style: const TextStyle(fontSize: 13),
+                  style: AppText.subtitle,
                   overflow: TextOverflow.fade,
                 ),
               ),
@@ -550,7 +552,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                       Expanded(
                         child: Text(
                           'Installment ${widget.transaction.installmentNumber} of ${widget.transaction.numCuotas} — generated from purchase',
-                          style: const TextStyle(fontSize: 13),
+                          style: AppText.subtitle,
                         ),
                       ),
                     ],
@@ -598,7 +600,7 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                       Expanded(
                         child: Text(
                           'Editing this installment purchase will regenerate all future installments. Paid cuotas will keep their status.',
-                          style: TextStyle(fontSize: 12),
+                          style: AppText.caption,
                         ),
                       ),
                     ],
@@ -817,13 +819,13 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                                 for (final sub in cat.subCategories!) {
                                   dropdownItems.add(DropdownMenuItem(
                                     value: sub.id,
-                                    child: Text('${cat.name} > ${sub.name}', style: const TextStyle(fontSize: 13)),
+                                    child: Text('${cat.name} > ${sub.name}', style: AppText.subtitle),
                                   ));
                                 }
                               } else {
                                 dropdownItems.add(DropdownMenuItem(
                                   value: cat.id,
-                                  child: Text(cat.name, style: const TextStyle(fontSize: 13)),
+                                  child: Text(cat.name, style: AppText.subtitle),
                                 ));
                               }
                             }
@@ -1034,8 +1036,8 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                     children: [
                       TextButton.icon(
                         onPressed: _isLoading ? null : _deleteTransaction,
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        label: const Text('Delete', style: TextStyle(color: Colors.red)),
+                        icon: Icon(Icons.delete, color: context.negative),
+                        label: Text('Delete', style: TextStyle(color: context.negative)),
                       ),
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(),

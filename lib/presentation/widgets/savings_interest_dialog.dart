@@ -8,6 +8,7 @@ import '../../data/models/account_model.dart';
 import '../../data/models/savings_interest_details_model.dart';
 import '../providers/finance_provider.dart';
 import '../utils/currency_formatter.dart';
+import '../../core/app_theme.dart';
 
 /// Dialog to formally record accrued interest on a savings account (parent
 /// or pocket). Pre-fills the recommended amount using the E.A. compound
@@ -373,7 +374,6 @@ class _SegmentBreakdown extends StatelessWidget {
     }
 
     return Card(
-      elevation: 0,
       color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       child: Padding(
@@ -430,7 +430,7 @@ class _SegmentBreakdown extends StatelessWidget {
                     child: Text(
                       CurrencyFormatter.format(rows[i].interest),
                       style: valueStyle?.copyWith(
-                          color: Colors.green.shade600),
+                          color: context.positive),
                       textAlign: TextAlign.right,
                     ),
                   ),
