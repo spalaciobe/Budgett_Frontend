@@ -70,6 +70,7 @@ import 'package:budgett_frontend/presentation/widgets/transaction_tile.dart';
 import 'package:budgett_frontend/presentation/widgets/add_transaction_dialog.dart';
 import 'package:budgett_frontend/presentation/widgets/edit_transaction_dialog.dart';
 import 'package:budgett_frontend/presentation/widgets/update_available_dialog.dart';
+import 'package:budgett_frontend/data/repositories/message_capture_repository.dart';
 
 // Each case is (label, size, dark). The theme matters: until now this
 // harness rendered every screen with a bare `MaterialApp()`, i.e. Flutter's
@@ -459,7 +460,23 @@ List<Override> _captureOverrides({
           .overrideWith((ref) async => pending ?? [_capturedMessage()]),
       captureHistoryProvider.overrideWith((ref) async => history ?? const []),
       captureSettingsProvider.overrideWith(_StubCaptureSettings.new),
+      messageCaptureRepositoryProvider
+          .overrideWithValue(_StubCaptureRepository()),
     ];
+
+/// The merchant sheet counts the movements it would rename before offering to
+/// rename them; without this the count would reach Supabase.
+class _StubCaptureRepository extends MessageCaptureRepository {
+  _StubCaptureRepository() : super(_StubSupabaseClient());
+
+  @override
+  Future<int> countRecordedUnder(String name) async => 3;
+}
+
+class _StubSupabaseClient implements SupabaseClient {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
+}
 
 /// Keeps `captureSettingsProvider` off SharedPreferences so the screenshot is
 /// deterministic.
@@ -715,6 +732,11 @@ final _targets = <String, _Target>{
   ),
   'screen_capture_settings': _Target(
     () => const CaptureSettingsScreen(),
+    overrides: _captureOverrides(),
+  ),
+  'sheet_edit_merchant': _Target(
+    // showModalBottomSheet supplies the Material in the app; here it doesn't.
+    () => Material(child: EditMerchantSheet(alias: _merchantAliases.first)),
     overrides: _captureOverrides(),
   ),
 };

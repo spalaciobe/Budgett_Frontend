@@ -202,6 +202,55 @@ class MessageCaptureRepository {
         .eq('user_id', _userId);
   }
 
+  /// How many recorded movements still carry [name] as their merchant.
+  ///
+  /// Only rows that came from a capture are counted: a manually typed expense
+  /// that happens to share the name was named by the user, not by the alias.
+  Future<int> countRecordedUnder(String name) => _withRetry(() async {
+        final List<dynamic> data = await _client
+            .from('transactions')
+            .select('id')
+            .eq('user_id', _userId)
+            .eq('place', name)
+            .not('captured_message_id', 'is', null);
+        return data.length;
+      }, 'Error counting recorded movements');
+
+  /// Rewrites the merchant name on movements already recorded as [from].
+  ///
+  /// The friendly name is *copied* onto the transaction when it is recorded,
+  /// not read back from the alias, so renaming the rule alone would leave the
+  /// history spelled the old way and the same merchant would show up twice in
+  /// every list and report.
+  ///
+  /// `description` is only rewritten where it still equals the old name —
+  /// anything the user has since retyped on that row is theirs to keep.
+  /// Returns the number of movements renamed.
+  Future<int> renameRecordedMerchant({
+    required String from,
+    required String to,
+  }) =>
+      _withRetry(() async {
+        final List<dynamic> untouched = await _client
+            .from('transactions')
+            .update({'place': to, 'description': to})
+            .eq('user_id', _userId)
+            .eq('place', from)
+            .eq('description', from)
+            .not('captured_message_id', 'is', null)
+            .select('id');
+
+        final List<dynamic> renamedByHand = await _client
+            .from('transactions')
+            .update({'place': to})
+            .eq('user_id', _userId)
+            .eq('place', from)
+            .not('captured_message_id', 'is', null)
+            .select('id');
+
+        return untouched.length + renamedByHand.length;
+      }, 'Error renaming recorded movements');
+
   Future<void> deleteAlias(String id) async {
     await _client
         .from('merchant_aliases')

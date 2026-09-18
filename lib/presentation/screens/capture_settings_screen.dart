@@ -698,30 +698,17 @@ class _AliasTile extends ConsumerWidget {
         icon: const Icon(Icons.delete_outline),
         onPressed: () => _confirmDelete(context, ref),
       ),
-      onTap: () => _toggleAutoPost(context, ref),
+      // Tapping used to flip auto-post with nothing on screen to say so, and
+      // the name the pipeline had learned could not be corrected at all: the
+      // only way out of a bad name was to forget the merchant and teach it
+      // again from the next message.
+      onTap: () => showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        builder: (_) => EditMerchantSheet(alias: alias),
+      ),
     );
-  }
-
-  Future<void> _toggleAutoPost(BuildContext context, WidgetRef ref) async {
-    try {
-      await ref
-          .read(messageCaptureRepositoryProvider)
-          .updateAlias(alias.id, {'auto_post': !alias.autoPost});
-      ref.invalidate(merchantAliasesProvider);
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(alias.autoPost
-              ? '${alias.displayName} will now be reviewed'
-              : '${alias.displayName} will be recorded automatically'),
-        ),
-      );
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(friendlyError(e, action: 'update merchant'))),
-      );
-    }
   }
 
   Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
@@ -752,6 +739,199 @@ class _AliasTile extends ConsumerWidget {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(friendlyError(e, action: 'forget merchant'))),
+      );
+    }
+  }
+}
+
+
+/// Renaming a remembered merchant, and deciding what happens to the movements
+/// already recorded under the old name.
+///
+/// The rule matches on [MerchantAlias.pattern] -- the bank's own text, which
+/// is never shown as a name -- so the name is free to be anything. What it is
+/// not free of is history: the name is copied onto each transaction as it is
+/// recorded, so a rename here leaves every past movement spelled the old way
+/// unless we rewrite those too. That is what the checkbox is for.
+class EditMerchantSheet extends ConsumerStatefulWidget {
+  final MerchantAlias alias;
+
+  const EditMerchantSheet({super.key, required this.alias});
+
+  @override
+  ConsumerState<EditMerchantSheet> createState() => _EditMerchantSheetState();
+}
+
+class _EditMerchantSheetState extends ConsumerState<EditMerchantSheet> {
+  late final TextEditingController _name =
+      TextEditingController(text: widget.alias.displayName);
+  late bool _autoPost = widget.alias.autoPost;
+  bool _renamePast = true;
+  bool _saving = false;
+
+  /// How many movements carry the old name. Null while we are still counting;
+  /// the checkbox only appears once we can say the number, because "also
+  /// rename past movements" without one is a question the user cannot answer.
+  int? _recorded;
+
+  @override
+  void initState() {
+    super.initState();
+    _name.addListener(() => setState(() {}));
+    _countRecorded();
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  Future<void> _countRecorded() async {
+    try {
+      final count = await ref
+          .read(messageCaptureRepositoryProvider)
+          .countRecordedUnder(widget.alias.displayName);
+      if (mounted) setState(() => _recorded = count);
+    } catch (_) {
+      // Counting is a courtesy; a rename must still be possible without it.
+      if (mounted) setState(() => _recorded = 0);
+    }
+  }
+
+  String get _trimmed => _name.text.trim();
+  bool get _renamed => _trimmed != widget.alias.displayName;
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    final recorded = _recorded;
+    final canSave = _trimmed.isNotEmpty && !_saving;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        16,
+        16,
+        16 + MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Edit merchant',
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 4),
+            Text(
+              'Messages are matched on "${widget.alias.pattern}", so renaming '
+              'this only changes what you read.',
+              style: AppText.caption.copyWith(color: muted),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _name,
+              autofocus: true,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(
+                labelText: 'Name',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SwitchListTile(
+              value: _autoPost,
+              onChanged: (v) => setState(() => _autoPost = v),
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Record without asking'),
+              subtitle: Text(
+                _autoPost
+                    ? 'Purchases here are filed straight away.'
+                    : 'Purchases here wait in the inbox for review.',
+                style: AppText.caption.copyWith(color: muted),
+              ),
+            ),
+            if (_renamed && recorded != null && recorded > 0)
+              CheckboxListTile(
+                value: _renamePast,
+                onChanged: (v) => setState(() => _renamePast = v ?? false),
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                title: Text(
+                  'Also rename the $recorded movement'
+                  '${recorded == 1 ? '' : 's'} already recorded',
+                  style: AppText.subtitle,
+                ),
+                subtitle: Text(
+                  'Otherwise the same merchant shows up under both names in '
+                  'your history.',
+                  style: AppText.caption.copyWith(color: muted),
+                ),
+              ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: _saving ? null : () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: canSave ? _save : null,
+                  child: _saving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Save'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    final repo = ref.read(messageCaptureRepositoryProvider);
+    final oldName = widget.alias.displayName;
+    final newName = _trimmed;
+
+    try {
+      await repo.updateAlias(widget.alias.id, {
+        'display_name': newName,
+        'auto_post': _autoPost,
+      });
+
+      var renamed = 0;
+      if (_renamed && _renamePast) {
+        renamed = await repo.renameRecordedMerchant(from: oldName, to: newName);
+        // The movements themselves changed, so every list built on them is
+        // now stale.
+        ref.invalidate(recentTransactionsProvider);
+      }
+      ref.invalidate(merchantAliasesProvider);
+      ref.invalidate(captureHistoryProvider);
+
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(renamed > 0
+              ? 'Renamed to $newName, including $renamed past movement'
+                  '${renamed == 1 ? '' : 's'}'
+              : 'Saved'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(friendlyError(e, action: 'save merchant'))),
       );
     }
   }
