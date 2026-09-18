@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'app_palette.dart';
 import 'app_spacing.dart';
 import 'app_text.dart';
 
@@ -34,29 +35,31 @@ import 'app_text.dart';
 /// border, in both themes. That hairline is the app's structural device: it
 /// says "this is one object", and it is the only decoration a card gets.
 class AppTheme {
-  // ── Brand palette ─────────────────────────────────────────────────────────
-  static const Color _primary = Color(0xFF1B998B); // Teal — brand
-  static const Color _lavender = Color(0xFF8D6A9F); // Transfers
-  static const Color _peach = Color(0xFFFFBF81); // Goals / highlights
-  static const Color _error = Color(0xFFDC3248); // Expenses / negatives
+  /// The palette every theme below is built from.
+  ///
+  /// Swappable so alternatives can be compared without editing the dozen
+  /// places the brand colour appears. Changing this one line changes the app.
+  static AppPalette palette = AppPalette.teal;
 
-  // ── Light surfaces ────────────────────────────────────────────────────────
-  // The background is a hair deeper than the cards and carries a trace of the
-  // brand's teal, so white cards read as raised without a shadow.
-  static const Color _lightBackground = Color(0xFFF1F5F4);
-  static const Color _lightSurface = Colors.white;
-  static const Color _lightSurfaceVariant = Color(0xFFE8EDEC);
-  static const Color _lightOutline = Color(0xFFDDE4E2);
-  static const Color _lightOnSurface = Color(0xFF16201E);
-  static const Color _lightOnSurfaceVariant = Color(0xFF5C6764);
+  static Color get _primary => palette.brand;
+  static Color get _onPrimary => palette.onBrand;
+  static Color get _lavender => palette.transfer;
+  static Color get _peach => palette.highlight;
+  static Color get _error => palette.negative;
 
-  // ── Dark surfaces ─────────────────────────────────────────────────────────
-  static const Color _darkBackground = Color(0xFF121418);
-  static const Color _darkSurface = Color(0xFF1E2229);
-  static const Color _darkSurfaceVariant = Color(0xFF2A2F3A);
-  static const Color _darkOutline = Color(0xFF333A45);
-  static const Color _darkOnSurface = Color(0xFFECEDEE);
-  static const Color _darkOnSurfaceVariant = Color(0xFF9BA4AE);
+  static Color get _lightBackground => palette.lightBackground;
+  static Color get _lightSurface => palette.lightSurface;
+  static Color get _lightSurfaceVariant => palette.lightSurfaceVariant;
+  static Color get _lightOutline => palette.lightOutline;
+  static Color get _lightOnSurface => palette.lightOnSurface;
+  static Color get _lightOnSurfaceVariant => palette.lightOnSurfaceVariant;
+
+  static Color get _darkBackground => palette.darkBackground;
+  static Color get _darkSurface => palette.darkSurface;
+  static Color get _darkSurfaceVariant => palette.darkSurfaceVariant;
+  static Color get _darkOutline => palette.darkOutline;
+  static Color get _darkOnSurface => palette.darkOnSurface;
+  static Color get _darkOnSurfaceVariant => palette.darkOnSurfaceVariant;
 
   /// One step tighter than Material's default, where it used to be two.
   /// `VisualDensity.compact` (-2) plus 11px body text made rows physically
@@ -165,7 +168,7 @@ class AppTheme {
       ElevatedButton.styleFrom(
         elevation: 0,
         backgroundColor: _primary,
-        foregroundColor: Colors.white,
+        foregroundColor: _onPrimary,
         disabledBackgroundColor: _primary.withValues(alpha: 0.35),
         disabledForegroundColor: Colors.white70,
         minimumSize: Size(fullWidth ? double.infinity : 0, 46),
@@ -209,7 +212,7 @@ class AppTheme {
     return NavigationRailThemeData(
       backgroundColor: surface,
       indicatorColor: _primary.withValues(alpha: 0.14),
-      selectedIconTheme: const IconThemeData(color: _primary, size: 24),
+      selectedIconTheme: IconThemeData(color: _primary, size: 24),
       unselectedIconTheme: IconThemeData(color: onSurfaceVariant, size: 24),
       selectedLabelTextStyle: AppText.badge.copyWith(color: _primary),
       unselectedLabelTextStyle: AppText.badge.copyWith(color: onSurfaceVariant),
@@ -247,10 +250,10 @@ class AppTheme {
       brightness: Brightness.light,
       visualDensity: _density,
       scaffoldBackgroundColor: _lightBackground,
-      extensions: const <ThemeExtension<dynamic>>[AppSemanticColors.light],
-      colorScheme: const ColorScheme.light(
+      extensions: <ThemeExtension<dynamic>>[AppSemanticColors.light],
+      colorScheme: ColorScheme.light(
         primary: _primary,
-        onPrimary: Colors.white,
+        onPrimary: _onPrimary,
         primaryContainer: Color(0xFFD3EBE7),
         onPrimaryContainer: Color(0xFF07322D),
         secondary: _lavender,
@@ -275,8 +278,8 @@ class AppTheme {
         outlineVariant: _lightOutline,
       ),
       textTheme: text,
-      iconTheme: const IconThemeData(color: _lightOnSurfaceVariant, size: 22),
-      primaryIconTheme: const IconThemeData(color: _primary),
+      iconTheme: IconThemeData(color: _lightOnSurfaceVariant, size: 22),
+      primaryIconTheme: IconThemeData(color: _primary),
       appBarTheme: AppBarTheme(
         centerTitle: false,
         backgroundColor: Colors.transparent,
@@ -286,11 +289,11 @@ class AppTheme {
         scrolledUnderElevation: 0,
         toolbarHeight: 58,
         titleTextStyle: AppText.screenTitle.copyWith(color: _lightOnSurface),
-        iconTheme: const IconThemeData(color: _lightOnSurfaceVariant),
+        iconTheme: IconThemeData(color: _lightOnSurfaceVariant),
       ),
       cardTheme: _cardTheme(_lightSurface, _lightOutline),
       listTileTheme: _listTileTheme,
-      dividerTheme: const DividerThemeData(
+      dividerTheme: DividerThemeData(
         color: _lightOutline,
         space: 8,
         thickness: 1,
@@ -317,7 +320,7 @@ class AppTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: _primary,
-          side: const BorderSide(color: _lightOutline),
+          side: BorderSide(color: _lightOutline),
           minimumSize: const Size(0, 44),
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -330,9 +333,9 @@ class AppTheme {
           textStyle: AppText.cardName,
         ),
       ),
-      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: _primary,
-        foregroundColor: Colors.white,
+        foregroundColor: _onPrimary,
         elevation: 2,
         focusElevation: 2,
         hoverElevation: 3,
@@ -351,12 +354,12 @@ class AppTheme {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
-          side: const BorderSide(color: _lightOutline),
+          side: BorderSide(color: _lightOutline),
         ),
         titleTextStyle: AppText.sectionTitle.copyWith(color: _lightOnSurface),
         contentTextStyle: AppText.subtitle.copyWith(color: _lightOnSurface),
       ),
-      bottomSheetTheme: const BottomSheetThemeData(
+      bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: _lightSurface,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
@@ -379,7 +382,7 @@ class AppTheme {
         ),
         textStyle: AppText.caption.copyWith(color: Colors.white),
       ),
-      progressIndicatorTheme: const ProgressIndicatorThemeData(
+      progressIndicatorTheme: ProgressIndicatorThemeData(
         color: _primary,
         linearMinHeight: 6,
       ),
@@ -389,7 +392,7 @@ class AppTheme {
         trackColor: WidgetStateProperty.resolveWith((states) =>
             states.contains(WidgetState.selected) ? _primary : null),
       ),
-      sliderTheme: const SliderThemeData(
+      sliderTheme: SliderThemeData(
         activeTrackColor: _primary,
         thumbColor: _primary,
       ),
@@ -412,10 +415,10 @@ class AppTheme {
       brightness: Brightness.dark,
       visualDensity: _density,
       scaffoldBackgroundColor: _darkBackground,
-      extensions: const <ThemeExtension<dynamic>>[AppSemanticColors.dark],
-      colorScheme: const ColorScheme.dark(
+      extensions: <ThemeExtension<dynamic>>[AppSemanticColors.dark],
+      colorScheme: ColorScheme.dark(
         primary: _primary,
-        onPrimary: Colors.white,
+        onPrimary: _onPrimary,
         primaryContainer: Color(0xFF12413B),
         onPrimaryContainer: Color(0xFFB8E7E0),
         secondary: _lavender,
@@ -443,8 +446,8 @@ class AppTheme {
       // Icons follow the text colour, not an accent. The old theme painted
       // every icon lime here and left them near-black in light mode, which is
       // what made the two themes read as different apps.
-      iconTheme: const IconThemeData(color: _darkOnSurfaceVariant, size: 22),
-      primaryIconTheme: const IconThemeData(color: _primary),
+      iconTheme: IconThemeData(color: _darkOnSurfaceVariant, size: 22),
+      primaryIconTheme: IconThemeData(color: _primary),
       appBarTheme: AppBarTheme(
         centerTitle: false,
         backgroundColor: Colors.transparent,
@@ -454,11 +457,11 @@ class AppTheme {
         scrolledUnderElevation: 0,
         toolbarHeight: 58,
         titleTextStyle: AppText.screenTitle.copyWith(color: _darkOnSurface),
-        iconTheme: const IconThemeData(color: _darkOnSurfaceVariant),
+        iconTheme: IconThemeData(color: _darkOnSurfaceVariant),
       ),
       cardTheme: _cardTheme(_darkSurface, _darkOutline),
       listTileTheme: _listTileTheme,
-      dividerTheme: const DividerThemeData(
+      dividerTheme: DividerThemeData(
         color: _darkOutline,
         space: 8,
         thickness: 1,
@@ -485,7 +488,7 @@ class AppTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: _primary,
-          side: const BorderSide(color: _darkOutline),
+          side: BorderSide(color: _darkOutline),
           minimumSize: const Size(0, 44),
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -498,9 +501,9 @@ class AppTheme {
           textStyle: AppText.cardName,
         ),
       ),
-      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: _primary,
-        foregroundColor: Colors.white,
+        foregroundColor: _onPrimary,
         elevation: 2,
         focusElevation: 2,
         hoverElevation: 3,
@@ -519,12 +522,12 @@ class AppTheme {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
-          side: const BorderSide(color: _darkOutline),
+          side: BorderSide(color: _darkOutline),
         ),
         titleTextStyle: AppText.sectionTitle.copyWith(color: _darkOnSurface),
         contentTextStyle: AppText.subtitle.copyWith(color: _darkOnSurface),
       ),
-      bottomSheetTheme: const BottomSheetThemeData(
+      bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: _darkSurface,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
@@ -547,7 +550,7 @@ class AppTheme {
         ),
         textStyle: AppText.caption.copyWith(color: _darkOnSurface),
       ),
-      progressIndicatorTheme: const ProgressIndicatorThemeData(
+      progressIndicatorTheme: ProgressIndicatorThemeData(
         color: _primary,
         linearMinHeight: 6,
       ),
@@ -557,7 +560,7 @@ class AppTheme {
         trackColor: WidgetStateProperty.resolveWith((states) =>
             states.contains(WidgetState.selected) ? _primary : null),
       ),
-      sliderTheme: const SliderThemeData(
+      sliderTheme: SliderThemeData(
         activeTrackColor: _primary,
         thumbColor: _primary,
       ),
@@ -596,17 +599,17 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
   });
 
   /// Darker shades that keep contrast on the light surface (white).
-  static const light = AppSemanticColors(
-    positive: Color(0xFF2E7D32), // green 800
-    warning: Color(0xFFC2410C), // burnt orange
-    muted: Color(0xFF5C6764),
+  static final light = AppSemanticColors(
+    positive: AppTheme.palette.positiveLight,
+    warning: AppTheme.palette.warningLight,
+    muted: AppTheme.palette.lightOnSurfaceVariant,
   );
 
-  /// Lighter shades that keep contrast on the dark surface (#1E2229).
-  static const dark = AppSemanticColors(
-    positive: Color(0xFF66BB6A), // green 400
-    warning: Color(0xFFFFB74D), // orange 300
-    muted: Color(0xFF9BA4AE),
+  /// Lighter shades that keep contrast on the dark surface.
+  static final dark = AppSemanticColors(
+    positive: AppTheme.palette.positiveDark,
+    warning: AppTheme.palette.warningDark,
+    muted: AppTheme.palette.darkOnSurfaceVariant,
   );
 
   @override

@@ -337,7 +337,7 @@ class _FakeFinanceRepository extends FinanceRepository {
       const {};
 }
 
-List<Override> _financeOverrides() => [
+List<Override> financeOverrides() => [
       financeRepositoryProvider.overrideWithValue(_FakeFinanceRepository()),
     ];
 
@@ -450,7 +450,7 @@ List<Override> _captureOverrides({
   CaptureStatus status = _captureStatus,
 }) =>
     [
-      ..._financeOverrides(),
+      ...financeOverrides(),
       captureStatusProvider.overrideWith((ref) async => status),
       captureSourcesProvider.overrideWith((ref) async => _captureSources),
       merchantAliasesProvider.overrideWith((ref) async => _merchantAliases),
@@ -573,7 +573,7 @@ final _targets = <String, _Target>{
   // ─── screens (need provider overrides) ──
   'screen_home': _Target(
     () => const HomeScreen(),
-    overrides: _financeOverrides(),
+    overrides: financeOverrides(),
   ),
   // Home when the capture inbox has something waiting: the pill is the only
   // difference, and it has to stay a single row.
@@ -590,57 +590,57 @@ final _targets = <String, _Target>{
     () => Scaffold(
       body: EditTransactionDialog(transaction: _tx(accountId: 'acc-1')),
     ),
-    overrides: _financeOverrides(),
+    overrides: financeOverrides(),
   ),
   // The form people use most, and the one that had fourteen fields on screen
   // at once. Captured collapsed (the default) so the shot shows what someone
   // actually faces when they tap +.
   'dialog_add_transaction': _Target(
     () => const Scaffold(body: AddTransactionDialog()),
-    overrides: _financeOverrides(),
+    overrides: financeOverrides(),
   ),
   'screen_categories': _Target(
     () => const CategoriesScreen(),
-    overrides: _financeOverrides(),
+    overrides: financeOverrides(),
   ),
   'screen_goals': _Target(
     () => const GoalsScreen(),
-    overrides: _financeOverrides(),
+    overrides: financeOverrides(),
   ),
   'screen_expense_groups': _Target(
     () => const ExpenseGroupsScreen(),
-    overrides: _financeOverrides(),
+    overrides: financeOverrides(),
   ),
   'screen_recurring_transactions': _Target(
     () => const RecurringTransactionsScreen(),
-    overrides: _financeOverrides(),
+    overrides: financeOverrides(),
   ),
   // Account detail screens were never rendered here, which is how a title
   // collapsed to one letter per line and reached production unseen.
   'screen_credit_card_details': _Target(
     () => const CreditCardDetailsScreen(accountId: 'acc-2'),
-    overrides: _financeOverrides(),
+    overrides: financeOverrides(),
   ),
   'screen_accounts': _Target(
     () => const AccountsScreen(),
-    overrides: _financeOverrides(),
+    overrides: financeOverrides(),
   ),
   'screen_investment_details': _Target(
     () => const InvestmentDetailsScreen(accountId: 'acc-4'),
-    overrides: _financeOverrides(),
+    overrides: financeOverrides(),
   ),
   // The reworked navigation: Plan's four tabs, and what's left in More.
   'screen_plan': _Target(
     () => const PlanScreen(),
-    overrides: _financeOverrides(),
+    overrides: financeOverrides(),
   ),
   'screen_more': _Target(
     () => const MoreScreen(),
-    overrides: _financeOverrides(),
+    overrides: financeOverrides(),
   ),
   'screen_budget': _Target(
     () => const BudgetScreen(),
-    overrides: _financeOverrides(),
+    overrides: financeOverrides(),
   ),
   // -- message capture --
   'capture_card_pending': _Target(
@@ -721,7 +721,7 @@ final _targets = <String, _Target>{
 // ─── harness ──────────────────────────────────────────────────────────────────
 
 /// Registers the bundled fonts with the test binding.
-Future<void> _loadAppFonts() async {
+Future<void> loadAppFonts() async {
   Future<void> load(String family, List<String> assets) async {
     final loader = FontLoader(family);
     for (final asset in assets) {
@@ -741,7 +741,7 @@ Future<void> _loadAppFonts() async {
   ]);
 }
 
-Future<File> _capture(WidgetTester tester, Key key, String name) async {
+Future<File> captureBoundary(WidgetTester tester, Key key, String name) async {
   final element = tester.element(find.byKey(key));
   final boundary = element.renderObject! as RenderRepaintBoundary;
   final out = File('test/screenshots/$name.png');
@@ -763,7 +763,7 @@ void main() {
     // Without this every glyph renders as an empty box, which hides exactly
     // the problems (truncation, line wrap, figure alignment) the screenshots
     // exist to catch.
-    await _loadAppFonts();
+    await loadAppFonts();
   });
 
   for (final entry in _targets.entries) {
@@ -797,7 +797,7 @@ void main() {
           await tester.pump(const Duration(milliseconds: 100));
         }
 
-        final out = await _capture(tester, captureKey, '${entry.key}_$label');
+        final out = await captureBoundary(tester, captureKey, '${entry.key}_$label');
         expect(out.existsSync(), isTrue);
         expect(out.lengthSync(), greaterThan(0));
       });
