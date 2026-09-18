@@ -302,9 +302,14 @@ class _SummaryHeader extends StatelessWidget {
     // Stale indicator
     final isStale = fxRate?.isStale ?? false;
 
-    // Price freshness
+    // Price freshness. Cash-equivalents (stablecoins, COPW…) are excluded on
+    // purpose: the price feed skips them because their price tracks the
+    // holding currency 1:1, so their priceUpdatedAt is frozen at whenever the
+    // row was last touched and would otherwise drag this indicator down
+    // forever. Null here means nothing is market-priced, and the label hides.
     DateTime? oldestPrice;
     for (final h in holdings) {
+      if (h.isCashEquivalent) continue;
       if (h.priceUpdatedAt != null) {
         if (oldestPrice == null || h.priceUpdatedAt!.isBefore(oldestPrice)) {
           oldestPrice = h.priceUpdatedAt;
