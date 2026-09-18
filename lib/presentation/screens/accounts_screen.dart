@@ -1246,8 +1246,11 @@ class AccountDetailsScreen extends ConsumerWidget {
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: kScreenPadding,
+          // stretch, not start: a Card inside a start-aligned Column sizes to
+          // its text, so the balance card stopped short of the right edge and
+          // left a gap no other screen has.
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Card(
                 shape: RoundedRectangleBorder(

@@ -4,6 +4,7 @@ import 'package:budgett_frontend/presentation/providers/update_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ota_update/ota_update.dart';
+import '../../core/services/release_notes.dart';
 
 class UpdateAvailableDialog extends ConsumerStatefulWidget {
   final UpdateInfo info;
@@ -87,6 +88,7 @@ class _UpdateAvailableDialogState extends ConsumerState<UpdateAvailableDialog> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final info = widget.info;
+    final notes = formatReleaseNotes(info.releaseNotes);
 
     return Dialog(
       child: Container(
@@ -115,16 +117,34 @@ class _UpdateAvailableDialogState extends ConsumerState<UpdateAvailableDialog> {
               '(build ${info.currentBuildNumber}).',
               style: theme.textTheme.bodyMedium,
             ),
-            if ((info.releaseNotes ?? '').trim().isNotEmpty) ...[
+            // Nothing at all when the release body carries no actual news:
+            // an empty "What's new" heading over a changelog URL was worse
+            // than saying nothing.
+            if (notes.isNotEmpty) ...[
               const SizedBox(height: 12),
               Text("What's new", style: theme.textTheme.titleSmall),
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               ConstrainedBox(
                 constraints: const BoxConstraints(maxHeight: 160),
                 child: SingleChildScrollView(
-                  child: Text(
-                    info.releaseNotes!.trim(),
-                    style: theme.textTheme.bodySmall,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (final note in notes)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('·  ', style: theme.textTheme.bodySmall),
+                              Expanded(
+                                child: Text(note,
+                                    style: theme.textTheme.bodySmall),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ),
