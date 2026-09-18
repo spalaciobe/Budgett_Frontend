@@ -634,6 +634,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           child: PageBody(
             child: TwoPaneLayout(
               asideWidth: 420,
+              // Half the section gap once stacked: the summary and the list
+              // below it are one subject, and the full gap cost a row of
+              // history on a phone without making the two any easier to tell
+              // apart.
+              stackedGap: kSpaceSection / 2,
               aside: const _MonthSummaryCard(),
               main: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

@@ -81,8 +81,14 @@ class TwoPaneLayout extends StatelessWidget {
   /// Width of the aside on desktop.
   final double asideWidth;
 
-  /// Gap between the panes.
+  /// Gap between the panes, side by side.
   final double gap;
+
+  /// Gap between the panes once they stack, below desktop. Separate from [gap]
+  /// because the two do different work: side by side it separates columns and
+  /// needs the room, stacked it only separates a summary from the list under
+  /// it, where the same figure pushes the list down the screen.
+  final double? stackedGap;
 
   const TwoPaneLayout({
     super.key,
@@ -90,6 +96,7 @@ class TwoPaneLayout extends StatelessWidget {
     required this.aside,
     this.asideWidth = 340,
     this.gap = kSpaceSection,
+    this.stackedGap,
   });
 
   @override
@@ -101,7 +108,7 @@ class TwoPaneLayout extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           aside,
-          SizedBox(height: gap),
+          SizedBox(height: stackedGap ?? gap),
           main,
         ],
       );
