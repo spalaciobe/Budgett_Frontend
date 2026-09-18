@@ -28,6 +28,19 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
+          # PINNED ON PURPOSE — do not change to a floating version.
+          #
+          # An unpinned `stable` made every release fail the moment upstream
+          # Flutter raised its minimum Gradle to 8.14.0, while this project's
+          # wrapper is on 8.11.1 (android/gradle/wrapper/gradle-wrapper.properties).
+          # Pinning keeps the release reproducible and matches the toolchain the
+          # APK is actually tested against.
+          #
+          # To move forward, bump Flutter, the Gradle wrapper and (if the newer
+          # Flutter asks for them) AGP/Kotlin in settings.gradle together, and
+          # verify a release build before pushing to main — a failed run here
+          # blocks publishing for everyone.
+          flutter-version: 3.38.7
           cache: true
 
       - name: Bump build number
