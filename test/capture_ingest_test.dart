@@ -517,6 +517,34 @@ void main() {
     });
   });
 
+  group('capture fingerprint', () {
+    test('is stable for the same capture', () {
+      expect(_capture().fingerprint, _capture().fingerprint);
+    });
+
+    test('separates different bodies from the same source and instant', () {
+      final a = _capture(body: 'Compra por \$10.000 en TIENDA A');
+      final b = _capture(body: 'Compra por \$10.000 en TIENDA B');
+      expect(a.fingerprint, isNot(b.fingerprint));
+    });
+
+    test('separates the two channels reporting the same payment', () {
+      expect(_capture().fingerprint,
+          isNot(_capture(channel: 'sms', sourceKey: '890255').fingerprint));
+    });
+
+    test('holds no value beyond 2^53, so it compiles and matches on the web', () {
+      // A 64-bit hash is a dart2js compile error ("can't be represented
+      // exactly in JavaScript") and would also diverge between the VM and the
+      // browser. Every component here must stay web-safe.
+      final parts = _capture().fingerprint.split('|');
+      expect(parts, hasLength(5));
+      final hash = int.parse(parts.last, radix: 16);
+      expect(hash, lessThan(0x80000000));
+      expect(int.parse(parts[2]), lessThan(9007199254740992)); // 2^53
+    });
+  });
+
   group('result summary', () {
     test('reads as a single line for the sync snackbar', () async {
       final run = await _ingest(

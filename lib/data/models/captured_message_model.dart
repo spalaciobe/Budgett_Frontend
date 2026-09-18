@@ -164,7 +164,8 @@ class RawCapture {
         channel,
         sourceKey,
         receivedAt.millisecondsSinceEpoch,
-        _fnv1a(body),
+        body.length,
+        _stableHash(body),
       ].join('|');
 
   factory RawCapture.fromPlatform(Map<dynamic, dynamic> map) {
@@ -184,17 +185,27 @@ class RawCapture {
   }
 }
 
-/// FNV-1a, 64-bit, hex. Deterministic across runs and platforms — unlike
-/// `String.hashCode`, which Dart does not guarantee to be stable.
-String _fnv1a(String input) {
-  const offsetBasis = 0xcbf29ce484222325;
-  const prime = 0x100000001b3;
-  var hash = offsetBasis;
+/// Stable 31-bit polynomial hash of [input], as hex.
+///
+/// Deterministic across runs AND platforms, which `String.hashCode` is not —
+/// Dart makes no stability guarantee for it, so a rebuilt app could stop
+/// recognising fingerprints it wrote earlier.
+///
+/// Why 31 bits and not a wider hash: on the web an `int` is a JavaScript
+/// double, exact only to 2^53, and 64-bit literals are a compile error. Here
+/// every intermediate value stays below 2^36 (`hash < 2^31` times 31) and the
+/// mask keeps 31 bits, so the VM and dart2js produce identical output.
+///
+/// 31 bits is ample because this hash never identifies a message on its own:
+/// [RawCapture.fingerprint] prefixes it with the channel, the source and the
+/// arrival millisecond, so a collision would need two different bodies from
+/// the same source in the same millisecond.
+String _stableHash(String input) {
+  var hash = 0;
   for (final unit in input.codeUnits) {
-    hash ^= unit;
-    hash = (hash * prime) & 0xFFFFFFFFFFFFFFFF;
+    hash = (hash * 31 + unit) & 0x7FFFFFFF;
   }
-  return hash.toRadixString(16).padLeft(16, '0');
+  return hash.toRadixString(16).padLeft(8, '0');
 }
 
 /// Convenience view over a parsed message plus the alias that matched it,
