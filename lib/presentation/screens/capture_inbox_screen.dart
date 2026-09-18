@@ -76,10 +76,11 @@ class _CaptureInboxScreenState extends ConsumerState<CaptureInboxScreen> {
             ),
           ],
           bottom: const TabBar(
-            // Scrollable so two tabs stay compact and left-aligned on a
-            // desktop-width window instead of stretching to the edges.
-            isScrollable: true,
-            tabAlignment: TabAlignment.start,
+            // Same as Transactions: two tabs sharing the width read as a pair
+            // and give a full-width tap target each. Left-aligning them left
+            // two thirds of the bar empty and looked like a mistake.
+            labelStyle: AppText.cardName,
+            unselectedLabelStyle: AppText.cardName,
             tabs: [
               Tab(text: 'To review'),
               Tab(text: 'History'),
