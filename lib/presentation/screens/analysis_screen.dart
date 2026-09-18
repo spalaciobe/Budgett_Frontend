@@ -530,15 +530,17 @@ class _PortfolioContent extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // A fixed title, a badge and a labelled button in one Row overflowed
-        // the right edge on a phone. The title yields first: it can fade, the
-        // action cannot.
+        // the right edge on a phone, and making the title yield only moved the
+        // problem: it truncated instead. The word "portfolio" was the part to
+        // cut — this section sits inside the Portfolio tab, which already
+        // said it.
         Row(
           children: [
             const Icon(Icons.pie_chart_outline, size: 20),
             const SizedBox(width: 8),
             Flexible(
               child: Text(
-                'Consolidated portfolio',
+                'Consolidated',
                 style: theme.textTheme.titleMedium
                     ?.copyWith(fontWeight: FontWeight.bold),
                 maxLines: 1,
