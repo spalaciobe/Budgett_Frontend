@@ -10,6 +10,7 @@ import 'package:budgett_frontend/presentation/providers/fx_rate_provider.dart';
 import 'package:budgett_frontend/presentation/providers/update_provider.dart';
 import 'package:budgett_frontend/presentation/widgets/update_available_dialog.dart';
 import '../widgets/screen_title.dart';
+import '../../core/utils/date_format.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -144,7 +145,7 @@ class SettingsScreen extends ConsumerWidget {
                         subtitle: Text('Unavailable'),
                       );
                     }
-                    final dateStr = DateFormat('dd/MM/yyyy', 'en').format(fxRate.asOfDate);
+                    final dateStr = formatFullDate(fxRate.asOfDate);
                     final rateStr = NumberFormat('#,##0.00', 'en_US').format(fxRate.rate);
                     return ListTile(
                       leading: const Icon(Icons.currency_exchange),

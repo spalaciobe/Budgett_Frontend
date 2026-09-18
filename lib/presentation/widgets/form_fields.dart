@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../core/app_spacing.dart';
 import '../../core/app_text.dart';
 import '../utils/currency_formatter.dart';
+import '../../core/utils/date_format.dart';
 
 /// The shared pieces of the transaction forms.
 ///
@@ -180,7 +181,7 @@ class TransactionDateField extends StatelessWidget {
             label: Text(
               isToday || isYesterday
                   ? 'Another day'
-                  : DateFormat('d MMM yyyy').format(value),
+                  : formatFullDate(value),
               maxLines: 1,
               overflow: TextOverflow.fade,
               softWrap: false,

@@ -160,14 +160,14 @@ class GoalsScreen extends ConsumerWidget {
                                 TextSpan(
                                   children: [
                                     TextSpan(
-                                      text: CurrencyFormatter.format(goal.currentAmount, decimalDigits: 0),
+                                      text: CurrencyFormatter.format(goal.currentAmount),
                                       style: TextStyle(
                                         color: Theme.of(context).colorScheme.primary,
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
                                     TextSpan(
-                                      text: ' / ${CurrencyFormatter.format(goal.targetAmount, decimalDigits: 0)}',
+                                      text: ' / ${CurrencyFormatter.format(goal.targetAmount)}',
                                       style: AppText.subtitle.copyWith(color: context.muted),
                                     ),
                                   ],
@@ -329,7 +329,7 @@ class _GoalTimelinePanel extends StatelessWidget {
         : _StatusPill(
             behind: behind,
             label: behind
-                ? 'Behind by ${CurrencyFormatter.format(expectedAmount - currentAmount, decimalDigits: 0)}'
+                ? 'Behind by ${CurrencyFormatter.format(expectedAmount - currentAmount)}'
                 : 'On track',
           );
 
@@ -338,7 +338,7 @@ class _GoalTimelinePanel extends StatelessWidget {
       if (monthlySavings > 0) ...[
         kGapXs,
         Text(
-          'Save ${CurrencyFormatter.format(monthlySavings, decimalDigits: 0)} a month',
+          'Save ${CurrencyFormatter.format(monthlySavings)} a month',
           style: AppText.amountSmall.copyWith(color: theme.colorScheme.secondary),
         ),
       ],

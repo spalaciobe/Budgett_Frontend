@@ -8,6 +8,7 @@ import '../../core/utils/credit_card_calculator.dart';
 import '../providers/finance_provider.dart';
 import '../../core/app_theme.dart';
 import '../../core/app_text.dart';
+import '../../core/utils/date_format.dart';
 
 class CreditCardBillingSubtitle extends ConsumerWidget {
   final Account account;
@@ -178,7 +179,7 @@ class CreditCardBillingSimulator extends ConsumerWidget {
     final isAfterCutoff = transactionDate.isAfter(cutoffDate);
     final daysToPayment = paymentDate.difference(DateTime.now()).inDays;
 
-    final dateFormat = DateFormat('dd/MM/yyyy', 'es_CO');
+    String dateFormat(DateTime d) => formatFullDate(d);
 
     return Card(
       color: Theme.of(context).colorScheme.surfaceContainer,
@@ -336,7 +337,7 @@ class CreditCardBillingSimulator extends ConsumerWidget {
       ),
     );
     final dateText = Text(
-      DateFormat('d MMM', 'es_CO').format(date),
+      formatDayMonth(date),
       style: AppText.badge.copyWith(color: color),
     );
     final labelText = Text(
@@ -377,7 +378,7 @@ class CreditCardBillingSimulator extends ConsumerWidget {
     );
   }
 
-  Widget _buildDateRow(BuildContext context, String label, DateTime date, DateFormat fmt, {bool isHighlighted = false, IconData? icon, Color? color}) {
+  Widget _buildDateRow(BuildContext context, String label, DateTime date, String Function(DateTime) fmt, {bool isHighlighted = false, IconData? icon, Color? color}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -390,7 +391,7 @@ class CreditCardBillingSimulator extends ConsumerWidget {
              )),
           ],
         ),
-        Text(fmt.format(date), style: const TextStyle(fontWeight: FontWeight.w500)),
+        Text(fmt(date), style: const TextStyle(fontWeight: FontWeight.w500)),
       ],
     );
   }

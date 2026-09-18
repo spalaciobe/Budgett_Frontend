@@ -5,6 +5,7 @@ import '../../core/app_text.dart';
 import '../../core/app_theme.dart';
 import '../../data/models/transaction_model.dart';
 import '../utils/currency_formatter.dart';
+import '../../core/utils/date_format.dart';
 
 /// Standardized transaction row used across account detail views
 /// (credit card, investment, savings / checking / cash).
@@ -138,7 +139,7 @@ class TransactionTile extends StatelessWidget {
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 Text(
-                  DateFormat('d MMM', 'en').format(t.date),
+                  formatDayMonth(t.date),
                   style: AppText.caption,
                 ),
                 if (isPending) const _PendingBadge(),

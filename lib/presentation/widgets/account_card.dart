@@ -47,9 +47,8 @@ class AccountCard extends StatelessWidget {
             : isSavingsWithPockets
                 ? CurrencyFormatter.format(
                     acc.totalBalanceWithPockets,
-                    decimalDigits: 0,
                   )
-                : CurrencyFormatter.format(acc.balance, decimalDigits: 0));
+                : CurrencyFormatter.format(acc.balance));
 
     final gradient = BoxDecoration(
       gradient: LinearGradient(
@@ -81,7 +80,7 @@ class AccountCard extends StatelessWidget {
             (isSavingsWithPockets
                 ? Text(
                     '${acc.pockets.length} $pocketLabel · '
-                    '${CurrencyFormatter.format(acc.pocketsBalance, decimalDigits: 0)} stored',
+                    '${CurrencyFormatter.format(acc.pocketsBalance)} stored',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                     ),

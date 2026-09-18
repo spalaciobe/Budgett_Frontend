@@ -249,7 +249,7 @@ class _AutomationCard extends ConsumerWidget {
             title: const Text('Always review above'),
             subtitle: Text(cap <= 0
                 ? 'No limit — any amount can be recorded automatically'
-                : CurrencyFormatter.format(cap, decimalDigits: 0)),
+                : CurrencyFormatter.format(cap)),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _editAmountCap(context, ref, cap),
           ),
@@ -274,7 +274,7 @@ class _AutomationCard extends ConsumerWidget {
       text: current <= 0
           ? ''
           : CurrencyFormatter.format(current,
-              includeSymbol: false, decimalDigits: 0),
+              includeSymbol: false),
     );
 
     final result = await showDialog<double>(

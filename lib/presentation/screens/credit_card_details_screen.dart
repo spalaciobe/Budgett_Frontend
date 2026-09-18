@@ -21,6 +21,7 @@ import '../../presentation/widgets/pay_credit_card_dialog.dart';
 import '../../core/app_text.dart';
 import '../widgets/skeleton.dart';
 import '../widgets/page_body.dart';
+import '../../core/utils/date_format.dart';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 final _monthNames = [
@@ -489,7 +490,7 @@ class CreditCardDetailsBody extends ConsumerWidget {
   }
 
   Widget _buildDateRow(BuildContext context, _CutoffPaymentPair pair) {
-    final dateFormat = DateFormat('dd/MM/yyyy', 'en');
+    String dateFormat(DateTime d) => formatFullDate(d);
     final monthFormat = DateFormat('MMMM', 'en');
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -507,14 +508,14 @@ class CreditCardDetailsBody extends ConsumerWidget {
             child: Row(children: [
               Icon(Icons.content_cut, size: 14, color: Theme.of(context).colorScheme.primary),
               const SizedBox(width: 4),
-              Text(dateFormat.format(pair.cutoff), style: AppText.caption),
+              Text(dateFormat(pair.cutoff), style: AppText.caption),
             ]),
           ),
           Expanded(
             child: Row(children: [
               Icon(Icons.payment, size: 14, color: context.positive),
               const SizedBox(width: 4),
-              Text(dateFormat.format(pair.payment), style: AppText.caption),
+              Text(dateFormat(pair.payment), style: AppText.caption),
             ]),
           ),
         ],
@@ -556,7 +557,7 @@ class CreditCardDetailsBody extends ConsumerWidget {
       final parts = period.split('-');
       if (parts.length == 2) {
         final date = DateTime(int.parse(parts[0]), int.parse(parts[1]));
-        return DateFormat('MMMM yyyy', 'en').format(date);
+        return formatMonthYear(date);
       }
     } catch (_) {}
     return period;
@@ -1118,7 +1119,7 @@ class _BillingCalendarSheet extends ConsumerStatefulWidget {
 
 class _BillingCalendarSheetState extends ConsumerState<_BillingCalendarSheet> {
   int _year = DateTime.now().year;
-  final _fmt = DateFormat('d MMM', 'en');
+  String _fmt(DateTime d) => formatDayMonth(d);
 
   @override
   Widget build(BuildContext context) {
@@ -1328,7 +1329,7 @@ class _MonthRow extends StatelessWidget {
   final DateTime cutoff;
   final DateTime payment;
   final bool isOverridden;
-  final DateFormat fmt;
+  final String Function(DateTime) fmt;
   final VoidCallback onEdit;
   final VoidCallback? onReset;
 
@@ -1377,8 +1378,8 @@ class _MonthRow extends StatelessWidget {
               ],
             ),
           ),
-          Expanded(child: Text(fmt.format(cutoff), style: textStyle)),
-          Expanded(child: Text(fmt.format(payment), style: textStyle)),
+          Expanded(child: Text(fmt(cutoff), style: textStyle)),
+          Expanded(child: Text(fmt(payment), style: textStyle)),
           SizedBox(
             width: 96,
             child: Row(
@@ -1433,7 +1434,7 @@ class _EditMonthDialog extends StatefulWidget {
 class _EditMonthDialogState extends State<_EditMonthDialog> {
   late DateTime _cutoff;
   late DateTime _payment;
-  final _fmt = DateFormat('dd/MM/yyyy', 'en');
+  String _fmt(DateTime d) => formatFullDate(d);
 
   @override
   void initState() {
@@ -1476,7 +1477,7 @@ class _EditMonthDialogState extends State<_EditMonthDialog> {
               contentPadding: EdgeInsets.zero,
               leading: Icon(Icons.content_cut, color: context.warning),
               title: const Text('Statement Date'),
-              subtitle: Text(_fmt.format(_cutoff),
+              subtitle: Text(_fmt(_cutoff),
                   style: AppText.sectionTitle),
               trailing: TextButton(
                 onPressed: () => _pickDate(isCutoff: true),
@@ -1488,7 +1489,7 @@ class _EditMonthDialogState extends State<_EditMonthDialog> {
               contentPadding: EdgeInsets.zero,
               leading: Icon(Icons.payment, color: context.positive),
               title: const Text('Payment Date'),
-              subtitle: Text(_fmt.format(_payment),
+              subtitle: Text(_fmt(_payment),
                   style: AppText.sectionTitle),
               trailing: TextButton(
                 onPressed: () => _pickDate(isCutoff: false),

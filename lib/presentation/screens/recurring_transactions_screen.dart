@@ -12,6 +12,7 @@ import '../../core/app_text.dart';
 import '../widgets/page_body.dart';
 import '../widgets/skeleton.dart';
 import '../widgets/screen_title.dart';
+import '../../core/utils/date_format.dart';
 
 class RecurringTransactionsScreen extends ConsumerWidget {
   const RecurringTransactionsScreen({super.key});
@@ -78,7 +79,7 @@ class RecurringTransactionsScreen extends ConsumerWidget {
                     softWrap: false,
                   ),
                   subtitle: Text(
-                    '${_capitalize(item.frequency)} · ${DateFormat('d MMM').format(item.nextRunDate)}',
+                    '${_capitalize(item.frequency)} · ${formatDayMonth(item.nextRunDate)}',
                     style: AppText.caption.copyWith(color: context.muted),
                     maxLines: 1,
                     overflow: TextOverflow.fade,

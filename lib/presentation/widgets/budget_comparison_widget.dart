@@ -152,8 +152,7 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                                     .onSurfaceVariant),
                           ),
                           Text(
-                            CurrencyFormatter.format(widget.spentAmount,
-                                decimalDigits: 0),
+                            CurrencyFormatter.format(widget.spentAmount),
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
@@ -205,9 +204,9 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                         Expanded(
                           child: Text(
                             widget.isIncome
-                                ? '${CurrencyFormatter.format(widget.spentAmount, decimalDigits: 0)} earned — set a target to track progress'
+                                ? '${CurrencyFormatter.format(widget.spentAmount)} earned — set a target to track progress'
                                 : widget.isSavings
-                                    ? '${CurrencyFormatter.format(widget.spentAmount, decimalDigits: 0)} contributed — set a monthly target to track progress'
+                                    ? '${CurrencyFormatter.format(widget.spentAmount)} contributed — set a monthly target to track progress'
                                     : 'Spent without a budget — tap to set one',
                             style: TextStyle(
                               fontSize: 11,
@@ -384,8 +383,7 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                                       Theme.of(context).colorScheme.onSurfaceVariant),
                             ),
                             Text(
-                              CurrencyFormatter.format(widget.spentAmount,
-                                  decimalDigits: 0),
+                              CurrencyFormatter.format(widget.spentAmount),
                               maxLines: 1,
                               overflow: TextOverflow.fade,
                               style: TextStyle(
@@ -476,10 +474,10 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                             widget.isIncome
                                 ? ((isOverBudget || progress >= 1)
                                     ? 'Target reached!'
-                                    : '${CurrencyFormatter.format(widget.budgetAmount - widget.spentAmount, decimalDigits: 0)} to go')
+                                    : '${CurrencyFormatter.format(widget.budgetAmount - widget.spentAmount)} to go')
                                 : (isOverBudget
-                                    ? 'Over budget by ${CurrencyFormatter.format(widget.spentAmount - widget.budgetAmount, decimalDigits: 0)}'
-                                    : '${CurrencyFormatter.format(widget.budgetAmount - widget.spentAmount, decimalDigits: 0)} remaining'),
+                                    ? 'Over budget by ${CurrencyFormatter.format(widget.spentAmount - widget.budgetAmount)}'
+                                    : '${CurrencyFormatter.format(widget.budgetAmount - widget.spentAmount)} remaining'),
                             style: TextStyle(
                               fontSize: 12,
                               color: statusColor,
@@ -516,8 +514,7 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                                   Theme.of(context).colorScheme.onSurfaceVariant),
                         ),
                         Text(
-                          CurrencyFormatter.format(widget.accumulatedBalance!,
-                              decimalDigits: 0),
+                          CurrencyFormatter.format(widget.accumulatedBalance!),
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
@@ -597,8 +594,7 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                                   ),
                                 ),
                                 Text(
-                                  CurrencyFormatter.format(amount,
-                                      decimalDigits: 0),
+                                  CurrencyFormatter.format(amount),
                                   style: const TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w500),

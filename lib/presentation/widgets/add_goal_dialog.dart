@@ -265,7 +265,7 @@ class _AddGoalDialogState extends ConsumerState<AddGoalDialog> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '${CurrencyFormatter.format(monthlySavings, decimalDigits: 2)} / month',
+                              '${CurrencyFormatter.format(monthlySavings)} / month',
                               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                                 fontWeight: FontWeight.bold,
                                 color: Theme.of(context).colorScheme.onPrimaryContainer,

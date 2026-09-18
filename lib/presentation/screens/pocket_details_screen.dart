@@ -12,6 +12,7 @@ import '../providers/finance_provider.dart';
 import '../utils/currency_formatter.dart';
 import '../widgets/edit_account_dialog.dart';
 import '../widgets/savings_interest_dialog.dart';
+import '../../core/utils/date_format.dart';
 
 final _pocketTxProvider =
     FutureProvider.family.autoDispose<List<Transaction>, String>(
@@ -246,7 +247,7 @@ class _InterestSection extends ConsumerWidget {
                                       .withValues(alpha: 0.55),
                                 )),
                             Text(
-                              DateFormat('dd/MM/yyyy').format(fromDate!),
+                              formatFullDate(fromDate!),
                               style: theme.textTheme.bodySmall
                                   ?.copyWith(fontWeight: FontWeight.w500),
                             ),
@@ -403,7 +404,7 @@ class _TxTile extends StatelessWidget {
       dense: true,
       title: Text(tx.description, style: theme.textTheme.bodyMedium),
       subtitle: Text(
-        DateFormat('dd/MM/yyyy').format(tx.date),
+        formatFullDate(tx.date),
         style: theme.textTheme.bodySmall,
       ),
       trailing: Text(

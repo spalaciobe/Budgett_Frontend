@@ -954,7 +954,7 @@ class _TransactionListTile extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                '${isTransfer ? '' : (isExpense ? '−' : '+')}${CurrencyFormatter.format(t.amount, decimalDigits: 0)}',
+                '${isTransfer ? '' : (isExpense ? '−' : '+')}${CurrencyFormatter.format(t.amount)}',
                 maxLines: 1,
                 overflow: TextOverflow.fade,
                 style: TextStyle(
@@ -1179,7 +1179,7 @@ class _InstallmentGroupTileState extends State<_InstallmentGroupTile> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    '−${CurrencyFormatter.format(perCuota, decimalDigits: 0)}',
+                    '−${CurrencyFormatter.format(perCuota)}',
                     style: TextStyle(
                       color: color,
                       fontWeight: FontWeight.bold,
@@ -1187,7 +1187,7 @@ class _InstallmentGroupTileState extends State<_InstallmentGroupTile> {
                     ),
                   ),
                   Text(
-                    '× $numCuotas · ${CurrencyFormatter.format(total, decimalDigits: 0)}',
+                    '× $numCuotas · ${CurrencyFormatter.format(total)}',
                     style: TextStyle(
                       fontSize: 10,
                       color: theme.colorScheme.onSurface.withValues(alpha: 0.5),

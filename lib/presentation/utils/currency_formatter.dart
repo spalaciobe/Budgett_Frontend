@@ -4,6 +4,12 @@ import 'package:intl/intl.dart';
 class CurrencyFormatter {
   /// Formats [amount] according to [currency].
   ///
+  /// **Call sites must not pass [decimalDigits].** The rule is the currency's,
+  /// not the screen's: COP has no centavos, USD has cents. It used to be
+  /// restated at 48 call sites, and where they disagreed the same list showed
+  /// `$2.500.000` next to `$6.692.950,00`. The parameter stays for the rare
+  /// genuine exception (see [compact]).
+  ///
   /// COP: es_CO grouping, '$' as a *prefix* (matching the input field, where
   /// the user types the symbol in front), 0 decimals by default — centavos
   /// aren't used for COP (e.g. $1.200.000). Pass [decimalDigits] to override.

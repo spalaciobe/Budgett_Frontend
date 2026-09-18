@@ -18,6 +18,7 @@ import 'package:budgett_frontend/presentation/widgets/review_capture_sheet.dart'
 import '../widgets/skeleton.dart';
 import '../widgets/page_body.dart';
 import '../widgets/screen_title.dart';
+import '../../core/utils/date_format.dart';
 
 /// The review queue for captured bank messages.
 ///
@@ -313,7 +314,7 @@ class CaptureCard extends ConsumerWidget {
     final captionParts = <String>[
       if (issuer.isNotEmpty) issuer else source?.effectiveName ?? message.sourceKey,
       if (message.cardLast4 != null) '•${message.cardLast4}',
-      DateFormat('d MMM', 'en').format(message.occurredAt),
+      formatDayMonth(message.occurredAt),
       // Only when it is not the obvious case — a red minus already reads as
       // "expense", and spelling it out cost the caption a whole extra line.
       if (message.kind != null && message.kind != MessageKind.purchase)

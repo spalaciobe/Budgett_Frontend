@@ -8,6 +8,7 @@ import 'package:budgett_frontend/data/models/account_model.dart';
 import 'package:budgett_frontend/data/models/recurring_transaction_model.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import '../../core/app_text.dart';
+import '../../core/utils/date_format.dart';
 
 class EditRecurringTransactionDialog extends ConsumerStatefulWidget {
   final RecurringTransaction transaction;
@@ -283,7 +284,7 @@ class _EditRecurringTransactionDialogState
                       border: OutlineInputBorder(),
                       suffixIcon: Icon(Icons.calendar_today, size: 18),
                     ),
-                    child: Text(DateFormat('dd/MM/yyyy').format(_nextRunDate)),
+                    child: Text(formatFullDate(_nextRunDate)),
                   ),
                 ),
                 kGapMd,

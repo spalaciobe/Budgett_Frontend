@@ -697,8 +697,8 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
           ),
           Text(
             widget.availableToAllocate > 0
-                ? 'Remaining: ${CurrencyFormatter.format(widget.availableToAllocate, decimalDigits: 0)}'
-                : 'Over: ${CurrencyFormatter.format(widget.availableToAllocate.abs(), decimalDigits: 0)}',
+                ? 'Remaining: ${CurrencyFormatter.format(widget.availableToAllocate)}'
+                : 'Over: ${CurrencyFormatter.format(widget.availableToAllocate.abs())}',
             style: TextStyle(
               color: widget.allocationPercentage > 100
                   ? context.negative
@@ -807,7 +807,7 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Over budget by ${CurrencyFormatter.format(widget.totalSpent - widget.totalBudget, decimalDigits: 0)}',
+                        'Over budget by ${CurrencyFormatter.format(widget.totalSpent - widget.totalBudget)}',
                         style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -835,7 +835,7 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Spending exceeds actual income by ${CurrencyFormatter.format(widget.totalSpent - widget.monthlyIncome, decimalDigits: 0)}',
+                        'Spending exceeds actual income by ${CurrencyFormatter.format(widget.totalSpent - widget.monthlyIncome)}',
                         style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -941,7 +941,7 @@ class _BudgetTopCardState extends State<_BudgetTopCard> {
                       ),
                     ),
                     Text(
-                      CurrencyFormatter.format(centerAmount, decimalDigits: 0),
+                      CurrencyFormatter.format(centerAmount),
                       style: const TextStyle(
                           fontWeight: FontWeight.bold, fontSize: 14),
                     ),

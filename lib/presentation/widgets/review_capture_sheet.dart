@@ -17,6 +17,7 @@ import 'package:budgett_frontend/data/repositories/bank_repository.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/presentation/providers/message_capture_provider.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
+import '../../core/utils/date_format.dart';
 
 /// Confirms one captured message — and, more importantly, teaches the pipeline
 /// what to do with the next one like it.
@@ -72,7 +73,6 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
               _message.amount!,
               currency: _message.currency ?? 'COP',
               includeSymbol: false,
-              decimalDigits: 0,
             ),
     );
     _nameController = TextEditingController(text: _message.headline);
@@ -459,7 +459,7 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
   /// The time and place of the payment, both captured at the moment the bank
   /// message arrived.
   Widget _buildWhenAndWhere(ThemeData theme) {
-    final dateLabel = DateFormat('dd/MM/yyyy HH:mm', 'en').format(_occurredAt);
+    final dateLabel = formatDateTime(_occurredAt);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

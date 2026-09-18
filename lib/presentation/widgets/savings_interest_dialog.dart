@@ -10,6 +10,7 @@ import '../providers/finance_provider.dart';
 import '../utils/currency_formatter.dart';
 import '../../core/app_theme.dart';
 import '../../core/app_text.dart';
+import '../../core/utils/date_format.dart';
 
 /// Dialog to formally record accrued interest on a savings account (parent
 /// or pocket). Pre-fills the recommended amount using the E.A. compound
@@ -142,7 +143,7 @@ class _SavingsInterestDialogState
               if (fromDate != null) ...[
                 const SizedBox(height: 4),
                 Text(
-                  'Period: ${DateFormat('dd/MM/yyyy').format(fromDate)} → ${DateFormat('dd/MM/yyyy').format(_recordDate)}',
+                  'Period: ${formatFullDate(fromDate)} → ${formatFullDate(_recordDate)}',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
                   ),
@@ -246,7 +247,7 @@ class _SavingsInterestDialogState
                     border: OutlineInputBorder(),
                     suffixIcon: Icon(Icons.calendar_today, size: 18),
                   ),
-                  child: Text(DateFormat('dd/MM/yyyy').format(_recordDate)),
+                  child: Text(formatFullDate(_recordDate)),
                 ),
               ),
               const SizedBox(height: 8),
@@ -347,7 +348,7 @@ class _SegmentBreakdown extends StatelessWidget {
           toDate: toNorm);
       rows.add(_SegmentRow(
         label:
-            '${DateFormat('MMM d').format(fromNorm)} – ${DateFormat('MMM d').format(toNorm)}',
+            '${formatDayMonth(fromNorm)} – ${formatDayMonth(toNorm)}',
         balance: seg.balance,
         days: days,
         interest: interest,
@@ -367,7 +368,7 @@ class _SegmentBreakdown extends StatelessWidget {
           toDate: asOfNorm);
       rows.add(_SegmentRow(
         label:
-            '${DateFormat('MMM d').format(openFromNorm)} – ${isToday ? 'today' : DateFormat('MMM d').format(asOfNorm)}',
+            '${formatDayMonth(openFromNorm)} – ${isToday ? 'today' : formatDayMonth(asOfNorm)}',
         balance: currentBalance,
         days: openDays,
         interest: openInterest,

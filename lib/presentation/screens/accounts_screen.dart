@@ -103,7 +103,7 @@ Widget? _investmentGainsSubtitle(
       final accrued = InvestmentCalculator.cdtAccruedInterest(details);
       if (accrued <= 0) return null;
       return Text(
-        '+${CurrencyFormatter.format(accrued, decimalDigits: 2)} earned',
+        '+${CurrencyFormatter.format(accrued)} earned',
         style: baseStyle?.copyWith(color: context.semantic.positive),
       );
 
@@ -441,11 +441,11 @@ class _AccountListItem extends ConsumerWidget {
       final currency = account.investmentDetails?.baseCurrency ?? 'COP';
       balance = currency == 'USD'
           ? CurrencyFormatter.format(tv.total, currency: 'USD')
-          : CurrencyFormatter.format(tv.total, decimalDigits: 2);
+          : CurrencyFormatter.format(tv.total);
       balanceSubtitle =
           _investmentGainsSubtitle(context, account, holdings, currency);
     } else if (account.type == 'credit_card' && account.balanceUsd != 0) {
-      balance = CurrencyFormatter.format(account.balance, decimalDigits: 2);
+      balance = CurrencyFormatter.format(account.balance);
       balanceSubtitle = Text(
         CurrencyFormatter.format(account.balanceUsd, currency: 'USD'),
         style: theme.textTheme.labelSmall?.copyWith(
@@ -454,12 +454,11 @@ class _AccountListItem extends ConsumerWidget {
       );
     } else if (account.isSavingsParent && account.pockets.isNotEmpty) {
       balance = CurrencyFormatter.format(
-          account.totalBalanceWithPockets,
-          decimalDigits: 2);
+          account.totalBalanceWithPockets);
       final pocketLabel = account.pockets.length == 1 ? 'pocket' : 'pockets';
       balanceSubtitle = Text(
         '${account.pockets.length} $pocketLabel · '
-        '${CurrencyFormatter.format(account.pocketsBalance, decimalDigits: 2)} stored',
+        '${CurrencyFormatter.format(account.pocketsBalance)} stored',
         style: theme.textTheme.labelSmall?.copyWith(
           color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
         ),
@@ -467,7 +466,7 @@ class _AccountListItem extends ConsumerWidget {
         overflow: TextOverflow.fade,
       );
     } else {
-      balance = CurrencyFormatter.format(account.balance, decimalDigits: 2);
+      balance = CurrencyFormatter.format(account.balance);
     }
 
     return Material(
@@ -693,9 +692,9 @@ class _AccountDetailPanel extends ConsumerWidget {
       final currency = account.investmentDetails?.baseCurrency ?? 'COP';
       balanceText = currency == 'USD'
           ? CurrencyFormatter.format(totalValue.total, currency: 'USD')
-          : CurrencyFormatter.format(totalValue.total, decimalDigits: 2);
+          : CurrencyFormatter.format(totalValue.total);
     } else if (account.type == 'credit_card') {
-      balanceText = CurrencyFormatter.format(account.balance, decimalDigits: 2);
+      balanceText = CurrencyFormatter.format(account.balance);
       if (account.balanceUsd != 0) {
         subBalance = Text(
           CurrencyFormatter.format(account.balanceUsd, currency: 'USD'),
@@ -705,18 +704,17 @@ class _AccountDetailPanel extends ConsumerWidget {
       }
     } else if (account.isSavingsParent && account.pockets.isNotEmpty) {
       balanceText = CurrencyFormatter.format(
-          account.totalBalanceWithPockets,
-          decimalDigits: 2);
+          account.totalBalanceWithPockets);
       subBalance = Text(
-        '${CurrencyFormatter.format(account.balance, decimalDigits: 2)} own · '
-        '${CurrencyFormatter.format(account.pocketsBalance, decimalDigits: 2)} in pockets',
+        '${CurrencyFormatter.format(account.balance)} own · '
+        '${CurrencyFormatter.format(account.pocketsBalance)} in pockets',
         style: theme.textTheme.bodySmall
             ?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.55)),
         maxLines: 1,
         overflow: TextOverflow.fade,
       );
     } else {
-      balanceText = CurrencyFormatter.format(account.balance, decimalDigits: 2);
+      balanceText = CurrencyFormatter.format(account.balance);
     }
 
     final typeLabel = switch (account.type) {
@@ -883,7 +881,7 @@ class _InvestmentAccountCard extends ConsumerWidget {
 
     final balanceDisplay = baseCurrency == 'USD'
         ? CurrencyFormatter.format(totalValue.total, currency: 'USD')
-        : CurrencyFormatter.format(totalValue.total, decimalDigits: 2);
+        : CurrencyFormatter.format(totalValue.total);
 
     return AccountCard(
       account: account,
@@ -917,7 +915,7 @@ class _InvestmentAccountCard extends ConsumerWidget {
         final accrued = InvestmentCalculator.cdtAccruedInterest(details);
         if (accrued <= 0) return null;
         return Text(
-          '+${CurrencyFormatter.format(accrued, decimalDigits: 2)} earned',
+          '+${CurrencyFormatter.format(accrued)} earned',
           style: subtitleStyle.copyWith(color: context.semantic.positive),
         );
 
@@ -1219,9 +1217,8 @@ class AccountDetailsScreen extends ConsumerWidget {
     final balanceText = account.isSavingsParent && account.pockets.isNotEmpty
         ? CurrencyFormatter.format(
             account.totalBalanceWithPockets,
-            decimalDigits: 2,
           )
-        : CurrencyFormatter.format(account.balance, decimalDigits: 2);
+        : CurrencyFormatter.format(account.balance);
 
     return Scaffold(
       appBar: AppBar(
@@ -1277,8 +1274,8 @@ class AccountDetailsScreen extends ConsumerWidget {
                           account.pockets.isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Text(
-                          '${CurrencyFormatter.format(account.balance, decimalDigits: 2)} own · '
-                          '${CurrencyFormatter.format(account.pocketsBalance, decimalDigits: 2)} in pockets',
+                          '${CurrencyFormatter.format(account.balance)} own · '
+                          '${CurrencyFormatter.format(account.pocketsBalance)} in pockets',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurface
                                 .withValues(alpha: 0.55),

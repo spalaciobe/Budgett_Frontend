@@ -14,6 +14,7 @@ import '../providers/fx_rate_provider.dart';
 import '../utils/currency_formatter.dart';
 import '../../core/app_theme.dart';
 import '../../core/app_text.dart';
+import '../../core/utils/date_format.dart';
 
 enum _PaymentPreset { minimum, statementMonth, currentBalance, custom }
 
@@ -190,7 +191,7 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
       final parts = period.split('-');
       if (parts.length == 2) {
         final date = DateTime(int.parse(parts[0]), int.parse(parts[1]));
-        return DateFormat('MMMM yyyy', 'en').format(date);
+        return formatMonthYear(date);
       }
     } catch (_) {}
     return period;
