@@ -196,6 +196,82 @@ void main() {
     });
   });
 
+  group('transfers and QR — where the counterparty IS the merchant', () {
+    // Verbatim Bancolombia messages. Most of this user's spending is Bre-B
+    // keys, account transfers and QR, none of which name a shop. The
+    // destination (a key, an account number, or the person) has to become the
+    // merchant, otherwise there is nothing stable to attach an alias to and
+    // every transfer stays unclassifiable forever.
+
+    test('QR payment to a Bre-B key', () {
+      final result = _parse(
+        'Bancolombia: SEBASTIAN PALACIO BETANCUR pagaste \$10,000.00 por '
+        'codigo QR desde tu cuenta *1951 a la llave 0039635842 el 20/09/2026 '
+        'a las 15:27. Con codigo QR es facil y de una. Dudas al 018000912345.',
+        receivedAt: DateTime(2026, 9, 20, 15, 28),
+      );
+
+      expect(result.status, ParseStatus.parsed);
+      expect(result.amount, 10000.0);
+      // The article and the noun are stripped; the key itself is the identity.
+      expect(result.merchantKey, 'LLAVE 0039635842');
+      // The source account, never the destination, is the card.
+      expect(result.cardLast4, '1951');
+      expect(result.occurredAt, DateTime(2026, 9, 20, 15, 27));
+    });
+
+    test('transfer to an account number', () {
+      final result = _parse(
+        'Bancolombia: Transferiste \$20,000 desde tu cuenta *1951 a la cuenta '
+        '*01768288204 el 20/09/2026 a las 09:16. ¿Dudas? Llamanos al '
+        '018000931987. Estamos cerca.',
+        receivedAt: DateTime(2026, 9, 20, 9, 17),
+      );
+
+      expect(result.kind, MessageKind.transferOut);
+      expect(result.amount, 20000.0);
+      expect(result.merchantKey, 'CUENTA 01768288204');
+      expect(result.cardLast4, '1951');
+    });
+
+    test('a named person wins over the key that precedes them', () {
+      // "a la llave 98648320 … a EDISON ARANGO CORREA": the name is the
+      // useful identity, and it appears AFTER the key, so only scanning the
+      // first "a" would miss it.
+      final result = _parse(
+        'Bancolombia: SEBASTIAN, transferiste \$12,000.00 a la llave 98648320 '
+        'desde tu cuenta *1951 a EDISON ARANGO CORREA el 20/09/26 a las 08:41. '
+        'Con Bre-b es de una y gratis. Dudas al 018000912345.',
+        receivedAt: DateTime(2026, 9, 20, 8, 42),
+      );
+
+      expect(result.kind, MessageKind.transferOut);
+      expect(result.amount, 12000.0);
+      expect(result.merchantKey, 'EDISON ARANGO CORREA');
+      expect(result.cardLast4, '1951');
+      expect(result.occurredAt, DateTime(2026, 9, 20, 8, 41));
+    });
+
+    test('an identifier keeps its digits — they are its identity', () {
+      // The store-code stripper would otherwise collapse every key to
+      // "LLAVE", making all transfers share a single useless alias.
+      expect(normalizeMerchant('llave 0039635842'), 'LLAVE 0039635842');
+      expect(normalizeMerchant('cuenta *01768288204'), 'CUENTA 01768288204');
+      // A real store code after a plain name is still noise.
+      expect(normalizeMerchant('EXITO 1234'), 'EXITO');
+    });
+
+    test('transfers out can post unattended once taught', () {
+      // They become type=expense and need no destination account, so the
+      // blanket exclusion only meant this user's most common payment could
+      // never be automated.
+      expect(MessageKind.transferOut.transactionType, 'expense');
+      expect(MessageKind.transferOut.isAutoPostable, isTrue);
+      // A card payment is a real transfer between two accounts — still manual.
+      expect(MessageKind.payment.isAutoPostable, isFalse);
+    });
+  });
+
   group('other issuers', () {
     test('Nequi outgoing transfer', () {
       final result = _parse(
@@ -208,8 +284,10 @@ void main() {
       expect(result.kind, MessageKind.transferOut);
       expect(result.amount, 20000.0);
       expect(result.merchantKey, 'SEBASTIAN P');
-      // Transfers need a destination account, so they never post unattended.
-      expect(result.kind!.isAutoPostable, isFalse);
+      // A transfer out becomes a plain expense, so once an alias supplies the
+      // account and category there is nothing left to ask about.
+      expect(result.kind!.transactionType, 'expense');
+      expect(result.kind!.isAutoPostable, isTrue);
     });
 
     test('Nu purchase, issuer resolved from the package name', () {

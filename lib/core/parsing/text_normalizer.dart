@@ -49,6 +49,15 @@ const _cityTokens = {
 final _citySuffix =
     RegExp(r'\s+(?:SANTA MARTA|' + _cityTokens.join('|') + r')$');
 
+/// Nouns issuers put in front of a transfer destination. A number right after
+/// one of these is the destination's identity, not a store code — collapsing
+/// "LLAVE 0039635842" to "LLAVE" would make every Bre-B transfer share one
+/// useless alias.
+const _identifierTokens = {
+  'LLAVE', 'CUENTA', 'PRODUCTO', 'NEQUI', 'DAVIPLATA', 'CELULAR', 'NUMERO',
+  'NIT', 'CC', 'AHORROS', 'CORRIENTE', 'REF', 'REFERENCIA',
+};
+
 /// Street-type abbreviations. A number right after one of these is an address,
 /// not a store code — "ARA CL 100" keeps its 100.
 const _streetTokens = {
@@ -62,11 +71,8 @@ const _streetTokens = {
 /// removed from the END, so a legitimate name that happens to contain a city
 /// word ("BOGOTA BEER COMPANY") survives.
 final _trailingNoise = <RegExp>[
-  // POS / terminal / store identifiers: "EXITO 1234", "D1 #0012".
-  // Four digits or more, or any run introduced by '#'. Three bare digits are
-  // left alone because they are usually an address (see [_stripStoreCode]).
-  RegExp(r'\s+#\d{2,}$'),
-  RegExp(r'\s+\d{4,}$'),
+  // Store codes are handled by [_stripTrailingNumber], which has to look at
+  // the preceding token, so they are not blind regexes here.
   // City suffixes Colombian acquirers append.
   _citySuffix,
   // Country / currency tails: "… CO", "… COL", "… COP"
@@ -99,7 +105,7 @@ String normalizeMerchant(String input) {
     for (final pattern in _trailingNoise) {
       out = out.replaceFirst(pattern, '').trim();
     }
-    out = _stripStoreCode(out);
+    out = _stripTrailingNumber(out);
     out = _stripTruncatedCityTail(out);
   }
 
@@ -122,14 +128,19 @@ String _stripTruncatedCityTail(String input) {
   return '${match.group(1)} ${match.group(2)}';
 }
 
-/// Removes a trailing 2–3 digit store code, unless it follows a street
-/// abbreviation — in which case it is a house number and part of the name.
-String _stripStoreCode(String input) {
-  final match = RegExp(r'^(.*?)\s+(\d{2,3})$').firstMatch(input);
+/// Removes a trailing number that is a POS / terminal / store code.
+///
+/// Kept when the preceding token shows the number is part of the name rather
+/// than noise: a street abbreviation makes it a house number ("ARA CL 100"),
+/// and a destination noun makes it an account or Bre-B key
+/// ("LLAVE 0039635842").
+String _stripTrailingNumber(String input) {
+  final match = RegExp(r'^(.*?)\s+#?(\d{2,})$').firstMatch(input);
   if (match == null) return input;
   final head = match.group(1)!;
   final lastWord = head.split(' ').last;
   if (_streetTokens.contains(lastWord)) return input;
+  if (_identifierTokens.contains(lastWord)) return input;
   return head;
 }
 

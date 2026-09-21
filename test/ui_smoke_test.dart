@@ -457,6 +457,10 @@ List<Override> _captureOverrides({
       captureStatusProvider.overrideWith((ref) async => status),
       captureSourcesProvider.overrideWith((ref) async => _captureSources),
       merchantAliasesProvider.overrideWith((ref) async => _merchantAliases),
+      // The review sheet pre-fills the account from this, so the target
+      // has to render with a realistic mapping rather than an error.
+      captureCardMappingsProvider.overrideWith(
+          (ref) async => const {'bancolombia|1234': 'acc-1'}),
       pendingCapturesProvider
           .overrideWith((ref) async => pending ?? [_capturedMessage()]),
       captureHistoryProvider.overrideWith((ref) async => history ?? const []),

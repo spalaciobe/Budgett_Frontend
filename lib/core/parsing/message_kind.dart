@@ -81,9 +81,16 @@ enum MessageKind {
 
   /// Whether this kind may ever be posted without the user looking at it.
   ///
-  /// Deliberately narrow: a transfer needs a destination account and a card
-  /// payment needs two legs, so neither can be derived from a one-line
-  /// message with any confidence. Those always go through the inbox.
+  /// [transferOut] counts: it becomes `type='expense'` and needs no
+  /// destination account, so there is nothing left to ask about once an alias
+  /// supplies the account and category. Excluding it only meant that Bre-B
+  /// keys, account transfers and QR — most of what a Colombian account
+  /// actually pays with — could never be automated.
+  ///
+  /// [payment] stays out because a card payment is a real two-leg transfer
+  /// between accounts, and the far leg cannot be derived from one line.
   bool get isAutoPostable =>
-      this == MessageKind.purchase || this == MessageKind.withdrawal;
+      this == MessageKind.purchase ||
+      this == MessageKind.withdrawal ||
+      this == MessageKind.transferOut;
 }

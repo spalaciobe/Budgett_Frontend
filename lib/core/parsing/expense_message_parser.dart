@@ -330,48 +330,124 @@ final _merchantTerminator = RegExp(
   caseSensitive: false,
 );
 
+/// Nouns that introduce a transfer destination. Lowercase; matched against
+/// the normalised candidate.
+const _destinationNouns = {
+  'llave', 'cuenta', 'producto', 'nequi', 'daviplata', 'celular', 'numero',
+  'nit', 'cc', 'ahorros', 'corriente',
+};
+
+/// Words that mark the account as the USER'S OWN, never the counterparty
+/// ("desde tu cuenta *1951").
+final _ownershipWord = RegExp(r'^(?:tu|tus|su|sus|mi|mis)\b');
+
+final _leadingArticle = RegExp(r'^(?:el|la|los|las|lo)\s+');
+
+/// A connector the terminator leaves dangling. Issuers write
+/// "… a EDISON ARANGO CORREA el 20/09/26", and the cut lands before the date,
+/// so the "el" stays glued to the name.
+final _trailingConnector =
+    RegExp(r'\s+(?:el|del|la|de|a|en|dia)$', caseSensitive: false);
+
+enum _CounterpartyKind { name, identifier }
+
 /// Pulls the counterparty out of [text].
 ///
-/// Purchases name the merchant after "en"; transfers name the person after
-/// "a" (outgoing) or "de" (incoming). We search only the text that FOLLOWS the
-/// amount, because the leading part is boilerplate ("Bancolombia le informa").
+/// Purchases name the merchant after "en"; transfers name the destination
+/// after "a" (outgoing) or "de" (incoming). We search the text that FOLLOWS
+/// the amount first, because the leading part is boilerplate ("Bancolombia le
+/// informa").
+///
+/// Two things this has to get right for Colombian transfers, where most
+/// payments have no shop name at all:
+///
+///   * **Every** occurrence of a preposition is considered, not just the
+///     first. "a la llave 98648320 … a EDISON ARANGO CORREA" names the person
+///     second, and they are the useful identity.
+///   * A destination noun and its article are stripped down to the identifier
+///     behind them, so "a la cuenta *01768288204" becomes
+///     "CUENTA 01768288204" — something stable to hang an alias on. Without
+///     this the whole candidate was discarded for starting with "la", and the
+///     transfer arrived with no merchant to name.
+///
+/// A person's name outranks a bare identifier when a message carries both.
 String? findMerchant(String text, int searchFrom, MessageKind kind) {
   final tail = searchFrom < text.length ? text.substring(searchFrom) : '';
   final prepositions = switch (kind) {
     MessageKind.transferIn => ['de', 'por parte de', 'en'],
-    MessageKind.transferOut => ['a', 'en', 'hacia'],
+    MessageKind.transferOut => ['a', 'en', 'hacia', 'para'],
     MessageKind.payment => ['a', 'de', 'en'],
     _ => ['en', 'a'],
   };
 
+  String? firstIdentifier;
+
   for (final source in [tail, text]) {
     for (final preposition in prepositions) {
+      // Matches only the preposition, never the text after it. A greedy `.+`
+      // capture would swallow the rest of the message, leaving allMatches
+      // with a single hit and hiding every later occurrence — which is how
+      // "a EDISON ARANGO CORREA" stayed invisible behind "a la llave …".
       final pattern = RegExp(
-        '(?:^|\\s)$preposition\\s+(?<merchant>.+)',
+        '(?:^|\\s)$preposition\\s+',
         caseSensitive: false,
       );
-      final match = pattern.firstMatch(source);
-      if (match == null) continue;
 
-      var candidate = match.namedGroup('merchant')!;
-      final terminator = _merchantTerminator.firstMatch(candidate);
-      if (terminator != null) {
-        candidate = candidate.substring(0, terminator.start);
+      for (final match in pattern.allMatches(source)) {
+        final parsed = _classifyCounterparty(source.substring(match.end));
+        if (parsed == null) continue;
+        if (parsed.kind == _CounterpartyKind.name) return parsed.value;
+        firstIdentifier ??= parsed.value;
       }
-      candidate = candidate.trim();
-
-      // "a tu Nequi" / "en tu cuenta" are not merchants.
-      final normalized = normalizeForMatch(candidate);
-      if (normalized.isEmpty) continue;
-      if (RegExp(r'^(tu|su|mi|la|el|los|las)\b').hasMatch(normalized)) continue;
-      if (candidate.length < 2) continue;
-      // A pure number is a reference, not a name.
-      if (RegExp(r'^[\d\s*#.-]+$').hasMatch(candidate)) continue;
-
-      return candidate;
     }
   }
-  return null;
+
+  return firstIdentifier;
+}
+
+/// Turns the text after a preposition into a counterparty, or null when it is
+/// not one (the user's own account, a bare reference, boilerplate).
+({_CounterpartyKind kind, String value})? _classifyCounterparty(String rest) {
+  var candidate = rest;
+  final terminator = _merchantTerminator.firstMatch(candidate);
+  if (terminator != null) {
+    candidate = candidate.substring(0, terminator.start);
+  }
+  candidate = candidate.trim();
+  while (_trailingConnector.hasMatch(candidate)) {
+    candidate = candidate.replaceFirst(_trailingConnector, '').trim();
+  }
+  if (candidate.length < 2) return null;
+
+  var normalized = normalizeForMatch(candidate);
+  if (normalized.isEmpty) return null;
+
+  // "desde tu cuenta *1951" — the source, not the destination.
+  if (_ownershipWord.hasMatch(normalized)) return null;
+
+  normalized = normalized.replaceFirst(_leadingArticle, '');
+  if (normalized.isEmpty) return null;
+
+  final words = normalized.split(' ');
+  if (_destinationNouns.contains(words.first) && words.length > 1) {
+    // Keep the identifier, drop the punctuation issuers decorate it with.
+    final id = words[1].replaceAll(RegExp(r'[^0-9a-z]'), '');
+    if (id.isEmpty) return null;
+    return (
+      kind: _CounterpartyKind.identifier,
+      value: '${words.first} $id'.toUpperCase(),
+    );
+  }
+
+  // A bare number or reference is not a name.
+  if (RegExp(r'^[\d\s*#.:-]+$').hasMatch(normalized)) return null;
+
+  // Re-cut the original text to the same length so the raw casing survives.
+  final articleLength = candidate.length - normalized.length;
+  final raw = articleLength > 0 && articleLength < candidate.length
+      ? candidate.substring(articleLength).trim()
+      : candidate;
+  return (kind: _CounterpartyKind.name, value: raw.isEmpty ? candidate : raw);
 }
 
 // ─── entry point ─────────────────────────────────────────────────────────────

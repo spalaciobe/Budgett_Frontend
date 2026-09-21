@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
 import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:budgett_frontend/core/app_text.dart';
@@ -105,6 +104,11 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
     final accountsAsync = ref.watch(accountsProvider);
     final categoriesAsync = ref.watch(categoriesProvider);
     final expenseGroupsAsync = ref.watch(expenseGroupsProvider);
+    // Watched, not read: the account seed below needs these resolved, and a
+    // `read` would hand back an empty value on the first build and never fill
+    // the field once the fetch landed.
+    ref.watch(captureCardMappingsProvider);
+    ref.watch(merchantAliasesProvider);
 
     // Seed the account once the list is available: the alias, the card map or
     // the source default may already have picked one during ingestion.
@@ -563,18 +567,32 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
     );
   }
 
+  /// Pre-fills the account, in the same order the ingest pipeline resolves it
+  /// (`CaptureIngestService._resolveAccount`): the merchant's own rule, then
+  /// the card, then the source's default.
+  ///
+  /// The card step is what makes the account stick across shops — a message
+  /// from a card that has been identified once should never ask again, no
+  /// matter which merchant it names.
   String? _seedAccountId(List<Account> accounts) {
-    // The ingest pipeline already resolved an account when it could; it lives
-    // on the alias that matched, so re-resolve through the same alias.
+    bool known(String? id) => id != null && accounts.any((a) => a.id == id);
+
     final aliases = ref.read(merchantAliasesProvider).valueOrNull;
     if (aliases != null) {
       final alias = MerchantAlias.bestMatch(aliases, _merchantKey);
-      final aliasAccount = alias?.accountId;
-      if (aliasAccount != null &&
-          accounts.any((a) => a.id == aliasAccount)) {
-        return aliasAccount;
+      if (known(alias?.accountId)) return alias!.accountId;
+    }
+
+    final last4 = _message.cardLast4;
+    if (last4 != null) {
+      final cardMap =
+          ref.read(captureCardMappingsProvider).valueOrNull ?? const {};
+      // This bank's card first, then a mapping that applies to any bank.
+      for (final key in ['${_message.issuerKey ?? ''}|$last4', '|$last4']) {
+        if (known(cardMap[key])) return cardMap[key];
       }
     }
+
     final sources = ref.read(captureSourcesProvider).valueOrNull ?? const [];
     final defaultAccount = sources
         .where((s) => s.id == _message.sourceId)
@@ -775,6 +793,7 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
       ref.invalidate(pendingCapturesProvider);
       ref.invalidate(captureHistoryProvider);
       ref.invalidate(merchantAliasesProvider);
+      ref.invalidate(captureCardMappingsProvider);
       ref.invalidate(recentTransactionsProvider);
       ref.invalidate(accountsProvider);
 

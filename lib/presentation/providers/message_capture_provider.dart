@@ -10,6 +10,7 @@ import 'package:budgett_frontend/data/models/captured_message_model.dart';
 import 'package:budgett_frontend/data/models/merchant_alias_model.dart';
 import 'package:budgett_frontend/data/repositories/bank_repository.dart';
 import 'package:budgett_frontend/data/repositories/message_capture_repository.dart';
+import 'package:budgett_frontend/presentation/providers/auth_provider.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/presentation/providers/settings_provider.dart';
 
@@ -33,19 +34,47 @@ final captureStatusProvider = FutureProvider<CaptureStatus>((ref) async {
 
 final captureSourcesProvider =
     FutureProvider<List<CaptureSource>>((ref) async {
+  // Wait for auth before querying: see sessionReadyProvider for why a
+  // premature read costs three seconds.
+  final session = await ref.watch(sessionReadyProvider.future);
+  if (session == null) return const [];
   final repository = ref.watch(messageCaptureRepositoryProvider);
   return repository.getSources();
 });
 
 final merchantAliasesProvider =
     FutureProvider<List<MerchantAlias>>((ref) async {
+  // Wait for auth before querying: see sessionReadyProvider for why a
+  // premature read costs three seconds.
+  final session = await ref.watch(sessionReadyProvider.future);
+  if (session == null) return const [];
   final repository = ref.watch(messageCaptureRepositoryProvider);
   return repository.getAliases();
+});
+
+/// Learned "card last-4 → account" mappings, keyed `issuer|last4` with an
+/// empty issuer meaning "any bank".
+///
+/// This memory is per CARD, not per merchant: once `*8225` is known to be the
+/// AMEX, every later message from that card resolves to it whatever shop it
+/// came from. The review sheet reads it to pre-fill the account.
+final captureCardMappingsProvider =
+    FutureProvider<Map<String, String>>((ref) async {
+  // Wait for auth before querying: see sessionReadyProvider for why a
+  // premature read costs three seconds.
+  final session = await ref.watch(sessionReadyProvider.future);
+  if (session == null) return const {};
+  final repository = ref.watch(messageCaptureRepositoryProvider);
+  return repository.getCardMappings();
 });
 
 /// Messages waiting for the user's decision.
 final pendingCapturesProvider =
     FutureProvider<List<CapturedMessage>>((ref) async {
+  // Wait for auth before querying: see sessionReadyProvider for why a
+  // premature read costs three seconds.
+  final session = await ref.watch(sessionReadyProvider.future);
+  if (session == null) return const [];
   final repository = ref.watch(messageCaptureRepositoryProvider);
   return repository.getCaptures(statuses: const ['pending']);
 });
@@ -54,6 +83,10 @@ final pendingCapturesProvider =
 /// the inbox's history tab so an auto-posted expense is always traceable.
 final captureHistoryProvider =
     FutureProvider<List<CapturedMessage>>((ref) async {
+  // Wait for auth before querying: see sessionReadyProvider for why a
+  // premature read costs three seconds.
+  final session = await ref.watch(sessionReadyProvider.future);
+  if (session == null) return const [];
   final repository = ref.watch(messageCaptureRepositoryProvider);
   return repository.getCaptures(
     statuses: const ['posted', 'duplicate', 'dismissed'],
@@ -103,13 +136,24 @@ class CaptureIngestController extends AsyncNotifier<CaptureIngestResult?> {
     final service = ref.read(messageCaptureServiceProvider);
     if (!service.isSupported) return null;
 
+    // Cheapest check first, and before any network: a MethodChannel call that
+    // counts the native queue. This runs on every app start and every resume,
+    // and the queue is empty almost every time — so everything below (three
+    // provider fetches plus the ingest itself) was work the app did for
+    // nothing while the user waited for the first screen.
+    if (await service.queuedCount() == 0) return null;
+
     _running = true;
     try {
       state =
           const AsyncLoading<CaptureIngestResult?>().copyWithPrevious(state);
-      final accounts = await ref.read(accountsProvider.future);
-      final banks = await ref.read(banksFutureProvider.future);
-      final settings = await ref.read(captureSettingsProvider.future);
+      // Independent fetches, so they overlap instead of costing three
+      // sequential round trips.
+      final (accounts, banks, settings) = await (
+        ref.read(accountsProvider.future),
+        ref.read(banksFutureProvider.future),
+        ref.read(captureSettingsProvider.future),
+      ).wait;
 
       // Bounded: ingestion reverse-geocodes over the network, and an await
       // that never returns would leave this notifier in AsyncLoading for the
