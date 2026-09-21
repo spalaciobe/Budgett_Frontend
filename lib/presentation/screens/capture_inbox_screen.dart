@@ -6,7 +6,6 @@ import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:budgett_frontend/core/app_theme.dart';
 import 'package:budgett_frontend/core/app_text.dart';
 import 'package:budgett_frontend/core/parsing/issuer_registry.dart';
-import 'package:budgett_frontend/core/parsing/message_kind.dart';
 import 'package:budgett_frontend/core/services/message_capture_service.dart';
 import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:budgett_frontend/data/models/captured_message_model.dart';
@@ -263,7 +262,9 @@ class CaptureList extends ConsumerWidget {
             maxWidth: kColumnMaxWidth,
             child: ListView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: kScreenPadding,
+              // The FAB floats over this list; without the extra bottom inset
+              // it sat on top of the last card's Review button.
+              padding: kScreenPaddingWithFab,
               itemCount: messages.length,
               itemBuilder: (context, index) =>
                   CaptureCard(message: messages[index]),
@@ -326,10 +327,10 @@ class CaptureCard extends ConsumerWidget {
       if (issuer.isNotEmpty) issuer else source?.effectiveName ?? message.sourceKey,
       if (message.cardLast4 != null) '•${message.cardLast4}',
       formatDayMonth(message.occurredAt),
-      // Only when it is not the obvious case — a red minus already reads as
-      // "expense", and spelling it out cost the caption a whole extra line.
-      if (message.kind != null && message.kind != MessageKind.purchase)
-        message.kind!.label,
+      // No kind word here. This caption is a single fade-truncated line, so a
+      // fourth segment does not wrap — it gets cut mid-word ("… 21 Sep · T").
+      // The signed, coloured amount already reads as in or out, and the review
+      // sheet names the type outright.
     ];
 
     return Card(
