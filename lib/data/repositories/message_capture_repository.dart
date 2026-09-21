@@ -6,6 +6,42 @@ import 'package:budgett_frontend/data/models/capture_source_model.dart';
 import 'package:budgett_frontend/data/models/captured_message_model.dart';
 import 'package:budgett_frontend/data/models/merchant_alias_model.dart';
 
+/// Builds the card lookup that [MessageCaptureRepository.getCardMappings]
+/// returns: `issuer|last4` for every stored row, plus `last4` alone when that
+/// is unambiguous.
+///
+/// The bare key exists because the last four digits are what actually
+/// identify a card. The same card is reported by the bank's own app, by a
+/// wallet app, and by an SMS short code, and each of those resolves to a
+/// different issuer slug — so a mapping taught from one source silently
+/// stopped applying to the others. A RappiCard learned under 'davivienda'
+/// would not match a message worded as Bancolombia.
+///
+/// It is skipped when two issuers map the same last4 to different accounts:
+/// guessing there could auto-post real money to the wrong account, so the
+/// issuer-scoped key remains the only way to resolve an ambiguous card.
+///
+/// Top-level and pure so the ambiguity rule can be tested directly.
+Map<String, String> buildCardMappingIndex(
+    Iterable<Map<String, dynamic>> rows) {
+  final out = <String, String>{};
+  final byLast4 = <String, Set<String>>{};
+
+  for (final row in rows) {
+    final issuer = row['issuer_key'] as String? ?? '';
+    final last4 = row['last4'] as String;
+    final accountId = row['account_id'] as String;
+    out['$issuer|$last4'] = accountId;
+    byLast4.putIfAbsent(last4, () => <String>{}).add(accountId);
+  }
+
+  byLast4.forEach((last4, accountIds) {
+    if (accountIds.length == 1) out[last4] = accountIds.first;
+  });
+
+  return out;
+}
+
 /// Supabase access for the message-capture feature: sources, the alias memory,
 /// the card map, and the captured-message inbox.
 ///
@@ -309,14 +345,8 @@ class MessageCaptureRepository {
             .from('capture_card_map')
             .select()
             .eq('user_id', _userId);
-        final out = <String, String>{};
-        for (final row in data) {
-          final map = row as Map<String, dynamic>;
-          final issuer = map['issuer_key'] as String? ?? '';
-          final last4 = map['last4'] as String;
-          out['$issuer|$last4'] = map['account_id'] as String;
-        }
-        return out;
+        return buildCardMappingIndex(
+            data.map((row) => row as Map<String, dynamic>));
       }, 'Error fetching card mappings');
 
   /// [issuerKey] null is stored as '' — see the column comment in the

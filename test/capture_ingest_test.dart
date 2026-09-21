@@ -389,6 +389,55 @@ void main() {
     });
   });
 
+  group('card memory is keyed by the card, not the issuer', () {
+    test('the bare last4 is indexed when it is unambiguous', () {
+      // A RappiCard taught while reading a Davivienda message has to keep
+      // applying when the same card shows up in a Bancolombia-worded one.
+      final index = buildCardMappingIndex([
+        {'issuer_key': 'davivienda', 'last4': '1673', 'account_id': 'acc-rappi'},
+        {'issuer_key': 'bancolombia', 'last4': '8225', 'account_id': 'acc-amex'},
+      ]);
+
+      expect(index['davivienda|1673'], 'acc-rappi');
+      expect(index['1673'], 'acc-rappi');
+      expect(index['8225'], 'acc-amex');
+    });
+
+    test('an ambiguous last4 is NOT indexed bare', () {
+      // Two banks, same four digits, different accounts. Guessing here would
+      // auto-post real money to the wrong account, so only the issuer-scoped
+      // key resolves it.
+      final index = buildCardMappingIndex([
+        {'issuer_key': 'davivienda', 'last4': '1234', 'account_id': 'acc-a'},
+        {'issuer_key': 'bancolombia', 'last4': '1234', 'account_id': 'acc-b'},
+      ]);
+
+      expect(index['davivienda|1234'], 'acc-a');
+      expect(index['bancolombia|1234'], 'acc-b');
+      expect(index.containsKey('1234'), isFalse);
+    });
+
+    test('the same card mapped twice to one account stays unambiguous', () {
+      final index = buildCardMappingIndex([
+        {'issuer_key': 'davivienda', 'last4': '1673', 'account_id': 'acc-rappi'},
+        {'issuer_key': '', 'last4': '1673', 'account_id': 'acc-rappi'},
+      ]);
+      expect(index['1673'], 'acc-rappi');
+    });
+
+    test('ingest resolves the account across issuers', () async {
+      // The message reads as Bancolombia; the card was learned elsewhere.
+      final run = await _ingest(
+        [_capture()],
+        aliases: [_alias()],
+        cardMappings: {'davivienda|1234': 'acc-savings', '1234': 'acc-savings'},
+      );
+
+      expect(run.result.posted, 1);
+      expect(run.finance.posted.single['account_id'], 'acc-savings');
+    });
+  });
+
   group('the same payment from two sources', () {
     test('records one expense and files the copy as a duplicate', () async {
       // Bancolombia pushes a notification and sends an SMS three minutes apart.

@@ -587,8 +587,14 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
     if (last4 != null) {
       final cardMap =
           ref.read(captureCardMappingsProvider).valueOrNull ?? const {};
-      // This bank's card first, then a mapping that applies to any bank.
-      for (final key in ['${_message.issuerKey ?? ''}|$last4', '|$last4']) {
+      // This bank's card first, then one taught for any bank, then the card's
+      // digits alone — the same card arrives from sources that each resolve to
+      // a different issuer, so requiring a match dropped the mapping.
+      for (final key in [
+        '${_message.issuerKey ?? ''}|$last4',
+        '|$last4',
+        last4,
+      ]) {
         if (known(cardMap[key])) return cardMap[key];
       }
     }

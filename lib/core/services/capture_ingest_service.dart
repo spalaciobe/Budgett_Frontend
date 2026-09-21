@@ -515,9 +515,12 @@ class CaptureIngestService {
     final candidates = <String?>[
       alias?.accountId,
       if (last4 != null) ...[
-        // This bank's card first, then a mapping that applies to any bank.
+        // This bank's card first, then one explicitly taught for any bank,
+        // then the card's digits alone — see getCardMappings for why the
+        // issuer must not be required to match.
         cardMap['${parsed.issuerKey ?? ''}|$last4'],
         cardMap['|$last4'],
+        cardMap[last4],
       ],
       source.defaultAccountId,
     ];
