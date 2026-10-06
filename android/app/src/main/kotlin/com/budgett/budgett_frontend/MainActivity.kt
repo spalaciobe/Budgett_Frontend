@@ -1,6 +1,8 @@
 package com.budgett.budgett_frontend
 
 import com.budgett.budgett_frontend.capture.MessageCaptureBridge
+import com.budgett.budgett_frontend.draft.DraftCaptureBridge
+import com.budgett.budgett_frontend.draft.LocalLlmBridge
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -8,6 +10,8 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
 
     private var captureBridge: MessageCaptureBridge? = null
+    private var draftBridge: DraftCaptureBridge? = null
+    private var llmBridge: LocalLlmBridge? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -20,6 +24,24 @@ class MainActivity : FlutterActivity() {
             flutterEngine.dartExecutor.binaryMessenger,
             MessageCaptureBridge.CHANNEL,
         ).setMethodCallHandler(bridge)
+
+        // Receipt OCR and dictation, for expenses entered by camera or voice.
+        val draft = DraftCaptureBridge(applicationContext)
+        draft.activity = this
+        draftBridge = draft
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            DraftCaptureBridge.CHANNEL,
+        ).setMethodCallHandler(draft)
+
+        // The optional local model. Constructing this loads nothing: the
+        // weights are only touched when a generation is actually asked for.
+        val llm = LocalLlmBridge(applicationContext)
+        llmBridge = llm
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            LocalLlmBridge.CHANNEL,
+        ).setMethodCallHandler(llm)
     }
 
     override fun onRequestPermissionsResult(
@@ -32,7 +54,10 @@ class MainActivity : FlutterActivity() {
         val handled = captureBridge
             ?.onRequestPermissionsResult(requestCode, permissions, grantResults)
             ?: false
-        if (!handled) {
+        val handledByDraft = !handled && (draftBridge
+            ?.onRequestPermissionsResult(requestCode, permissions, grantResults)
+            ?: false)
+        if (!handled && !handledByDraft) {
             super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         }
     }
@@ -40,6 +65,11 @@ class MainActivity : FlutterActivity() {
     override fun onDestroy() {
         captureBridge?.activity = null
         captureBridge = null
+        draftBridge?.activity = null
+        draftBridge?.dispose()
+        draftBridge = null
+        llmBridge?.dispose()
+        llmBridge = null
         super.onDestroy()
     }
 }

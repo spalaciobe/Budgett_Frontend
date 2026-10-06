@@ -51,6 +51,11 @@ android {
     buildTypes {
         release {
             signingConfig = keystorePropertiesFile.exists() ? signingConfigs.release : signingConfigs.debug
+            // MediaPipe and ML Kit both need keep rules; see proguard-rules.pro.
+            // Without them R8 fails the release build on protobuf annotations
+            // that are referenced but never loaded.
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
         }
     }
 }
@@ -64,4 +69,15 @@ dependencies {
     // ContextCompat / NotificationManagerCompat, used by the message-capture
     // notification listener, SMS receiver and location snapshot.
     implementation("androidx.core:core-ktx:1.13.1")
+
+    // On-device OCR for photographed receipts. The Latin model ships inside
+    // the APK rather than being fetched from Play Services, so the first
+    // receipt works offline and on a phone with no Play Store.
+    implementation("com.google.mlkit:text-recognition:16.0.1")
+
+    // MediaPipe's LLM runtime, for the optional local model that reads what
+    // the rules cannot. The model weights are NOT bundled — they are several
+    // gigabytes and this APK is distributed over the air — so this is only
+    // the runtime, and it stays dormant until the user downloads a model.
+    implementation("com.google.mediapipe:tasks-genai:0.10.24")
 }

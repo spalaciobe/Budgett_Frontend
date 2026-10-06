@@ -108,7 +108,12 @@ jobs:
         run: flutter build web --release
 
       - name: Build release APK
-        run: flutter build apk --release
+        # 64-bit ARM only. MediaPipe's LLM runtime ships a large native
+        # library per architecture; carrying all three took the APK to 127 MB,
+        # and this one is downloaded over the air on every release. Android
+        # has required 64-bit since 2019, so the only thing lost is running
+        # on an x86 emulator.
+        run: flutter build apk --release --target-platform android-arm64
 
       - name: Commit version bump
         run: |
