@@ -197,9 +197,47 @@ void main() {
       final prompt = buildExtractionPrompt('TOTAL A PAGAR 45.900');
       expect(prompt, contains('TOTAL A PAGAR 45.900'));
       expect(prompt, contains('JSON only'));
-      // One worked example: a small model follows a pattern better than it
-      // follows a description.
       expect(prompt, contains('"amount":45900'));
+    });
+
+    test('shows an empty answer as well as a full one', () {
+      // With only a complete example the model copies that shape and fills
+      // every field, inventing an amount for text that has none.
+      final prompt = buildExtractionPrompt('anything');
+      expect(prompt, contains('"amount":null'));
+    });
+
+    test('states the separator rule', () {
+      // Trained mostly on English, the model reads 45.900 as 45.9.
+      expect(buildExtractionPrompt('x'), contains('45.900 means 45900'));
+    });
+
+    test('says which figure on a receipt is the one', () {
+      final prompt = buildExtractionPrompt('x');
+      for (final trap in ['subtotal', 'cash handed over', 'change']) {
+        expect(prompt, contains(trap));
+      }
+    });
+
+    test('forbids inventing a number', () {
+      expect(buildExtractionPrompt('x'), contains('Never invent'));
+    });
+
+    test('names the shape it is reading', () {
+      expect(
+        buildExtractionPrompt('x', source: DraftSource.voice),
+        contains('someone spoke'),
+      );
+      expect(
+        buildExtractionPrompt('x', source: DraftSource.receipt),
+        contains('receipt or a bank app screen'),
+      );
+    });
+
+    test('stays short enough to be worth running on a phone', () {
+      // Every token of prompt is a second of spinner. Roughly four
+      // characters per token puts this near 300, against a 256-token answer.
+      expect(buildExtractionPrompt('short text').length, lessThan(1400));
     });
   });
 }

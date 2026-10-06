@@ -157,17 +157,31 @@ ExpenseDraft? _parseConfirmation(
   // The headline sits above the amount — "Withdraw from bolsillo" — so the
   // last text line before the figure is the description.
   final amountIndex = lines.indexWhere((l) => findAmount(l) != null);
-  final headline = lines
-      .take(amountIndex < 0 ? lines.length : amountIndex)
-      .where((l) => findAmount(l) == null)
-      .where((l) => l.trim().length > 3)
-      .lastOrNull;
+  // Nequi and DaviPlata put the verb above the figure and the person BELOW
+  // it — "Enviaste / \$85.000 / A Laura Morales" — so a name introduced by
+  // "a" or "de" after the amount wins over the headline, which would
+  // otherwise file every Nequi transfer under the word "Enviaste".
+  final below = _counterpartyAfterAmount(lines, amountIndex);
+
+  final headline = below ??
+      lines
+          .take(amountIndex < 0 ? lines.length : amountIndex)
+          .where((l) => findAmount(l) == null)
+          .where((l) => l.trim().length > 3)
+          .lastOrNull;
 
   final date = lines
       .map((l) => _readDate(l, at))
       .firstWhere((d) => d != null, orElse: () => null);
 
-  final kind = _kindFor(description: headline ?? '', negative: amount.negative);
+  // Decided from the WHOLE screen, not from the name: "Enviaste" sits above
+  // the figure and "A Laura Morales" below it, and the name is the better
+  // merchant while the verb is the only thing that says which way the money
+  // went.
+  final kind = _kindFor(
+    description: lines.join(' '),
+    negative: amount.negative,
+  );
 
   var confidence = 0.4;
   if (headline != null) confidence += 0.2;
@@ -196,8 +210,18 @@ class _SignedAmount {
 }
 
 /// The movement's amount, with its direction when the sign is visible.
+/// Lines whose number identifies something rather than costing something.
+/// A Colombian invoice leads with a nine-digit NIT, and a confirmation screen
+/// ends with a transaction number.
+final _identifierLine = RegExp(
+    r'(nit|c\.?c\.?|rut|cedula|resolucion|autorizacion|cufe|'
+    r'transaction\s*no|numero\s*de\s*transaccion|referencia|ref|'
+    r'telefono|tel|celular|cel|factura|pedido|orden)',
+    caseSensitive: false);
+
 _SignedAmount? _readSignedAmount(List<String> lines) {
   for (final line in lines) {
+    if (_identifierLine.hasMatch(normalizeForMatch(line))) continue;
     final amount = findAmount(line);
     if (amount == null) continue;
 
@@ -226,6 +250,18 @@ MessageKind _kindFor({required String description, required bool? negative}) {
   // "withdraw", but it is not cash out of a machine, and "Transferencia entre
   // cuentas" is not money leaving the user's finances.
   if (_ownTransfer.hasMatch(normalized)) return MessageKind.internalTransfer;
+  // A confirmation screen states the direction in one word above the figure:
+  // "Recibiste", "Enviaste". Checked before the sign, because these screens
+  // print no sign at all.
+  if (RegExp(r'\b(recibiste|recibido|recibida|te\s+enviaron|'
+          r'te\s+consignaron|received|deposit)\b')
+      .hasMatch(normalized)) {
+    return MessageKind.transferIn;
+  }
+  if (RegExp(r'\b(enviaste|enviado|enviada|pagaste|transferiste|sent)\b')
+      .hasMatch(normalized)) {
+    return MessageKind.transferOut;
+  }
   if (RegExp(r'\b(retiro|withdraw|cajero|atm)\b').hasMatch(normalized)) {
     return MessageKind.withdrawal;
   }
@@ -285,3 +321,32 @@ String _clean(String line) => line
     .replaceAll(RegExp(r'^[^\w]+|[^\w.)]+$'), '')
     .replaceAll(RegExp(r'\s+'), ' ')
     .trim();
+
+/// A person or merchant named just below the amount.
+///
+/// Only a line that is a name: introduced by "a"/"de"/"para"/"to"/"from", or
+/// a bare line in capitals that is not a label, a date or an identifier.
+String? _counterpartyAfterAmount(List<String> lines, int amountIndex) {
+  if (amountIndex < 0) return null;
+
+  for (final line in lines.skip(amountIndex + 1).take(3)) {
+    final trimmed = line.trim();
+    if (trimmed.length < 3) continue;
+    final normalized = normalizeForMatch(trimmed);
+    if (_identifierLine.hasMatch(normalized)) continue;
+    if (_readDate(trimmed, DateTime.now()) != null) continue;
+    if (findAmount(trimmed) != null) continue;
+
+    final introduced = RegExp(
+            r'^(?:a|de|para|hacia|to|from|for)\s+(.{3,})',
+            caseSensitive: false)
+        .firstMatch(trimmed);
+    if (introduced != null) return _clean(introduced.group(1)!);
+
+    // A bare name, in the capitals these screens use for one.
+    if (RegExp(r'^[A-Z0-9][A-Z0-9 .,&*\-]{2,}$').hasMatch(trimmed)) {
+      return _clean(trimmed);
+    }
+  }
+  return null;
+}

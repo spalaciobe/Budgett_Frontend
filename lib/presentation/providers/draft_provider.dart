@@ -10,8 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:budgett_frontend/core/parsing/expense_draft.dart';
 import 'package:budgett_frontend/core/parsing/llm_draft_extractor.dart';
-import 'package:budgett_frontend/core/parsing/receipt_parser.dart';
-import 'package:budgett_frontend/core/parsing/screenshot_parser.dart';
+import 'package:budgett_frontend/core/parsing/image_draft_reader.dart';
 import 'package:budgett_frontend/core/parsing/voice_expense_parser.dart';
 import 'package:budgett_frontend/core/services/draft_capture_service.dart';
 import 'package:budgett_frontend/core/services/local_llm_service.dart';
@@ -49,17 +48,7 @@ final draftsFromImageProvider =
   final text = await capture.readImage(path);
   if (text.trim().isEmpty) return const [];
 
-  final now = DateTime.now();
-  var drafts = parseScreenshot(text, capturedAt: now);
-
-  // Nothing that looked like a movements list or a confirmation screen: this
-  // is a paper receipt.
-  if (drafts.isEmpty || !drafts.any((d) => d.isUsable)) {
-    final receipt = parseReceipt(text, capturedAt: now);
-    if (receipt.isUsable || drafts.isEmpty) drafts = [receipt];
-  }
-
-  return _completeAll(drafts, ref);
+  return _completeAll(readImageText(text), ref);
 });
 
 /// Listens for a phrase and reads it.

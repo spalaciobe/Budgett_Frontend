@@ -194,7 +194,31 @@ String? _findSubject(String normalized, int searchFrom) {
       ? normalized.substring(amountEnd)
       : normalized.substring(searchFrom.clamp(0, normalized.length));
 
-  for (final preposition in _subjectPrepositions) {
+  // Whichever preposition comes first IN THE SENTENCE, not first in the
+  // list. "recibí X por pago de prestamo Mariana Hernandez en Bancolombia"
+  // carries both "por" and "en"; taking the list order picked "en
+  // Bancolombia" and threw the reason away.
+  //
+  // The list order still decides between two that start at the same place,
+  // which is what keeps "en el" ahead of "en".
+  final ordered = [..._subjectPrepositions];
+  final starts = <String, int>{};
+  for (final preposition in ordered) {
+    final at = RegExp('(?:^|\\s)${RegExp.escape(preposition)}\\s+')
+        .firstMatch(tail)
+        ?.start;
+    if (at != null) starts[preposition] = at;
+  }
+  ordered.sort((a, b) {
+    final byPosition = (starts[a] ?? 1 << 30).compareTo(starts[b] ?? 1 << 30);
+    return byPosition != 0
+        ? byPosition
+        : _subjectPrepositions
+            .indexOf(a)
+            .compareTo(_subjectPrepositions.indexOf(b));
+  });
+
+  for (final preposition in ordered) {
     final match =
         RegExp('(?:^|\\s)${RegExp.escape(preposition)}\\s+(.+)').firstMatch(tail);
     if (match == null) continue;

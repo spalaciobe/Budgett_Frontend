@@ -20,26 +20,59 @@ import 'package:budgett_frontend/core/services/local_llm_service.dart';
 
 /// What the model is asked for, and nothing else.
 ///
-/// Deliberately terse: a small model follows a short instruction with one
-/// example far better than a long explanation, and every token of prompt is
-/// time the user spends looking at a spinner.
-String buildExtractionPrompt(String text) => '''
-Extract the payment from this text. Answer with JSON only, no explanation.
+/// Four things this has to get right, each from how a small quantised model
+/// actually behaves:
+///
+///   * **Two examples, and one of them empty.** Given a single complete
+///     example the model copies that shape and fills every field, inventing
+///     an amount for text that has none. The empty example is what makes
+///     "it is not here" a legal answer.
+///   * **The separator rule, stated outright.** "45.900" is forty-five
+///     thousand nine hundred in Colombia. A model trained mostly on English
+///     reads it as forty-five point nine and answers 45.9.
+///   * **Which figure.** A receipt prints a subtotal, a tax line, the cash
+///     handed over and the change. Left to itself the model picks the
+///     largest, which is almost always the cash.
+///   * **One line of context per shape.** A till roll, a list of movements
+///     and a spoken sentence are different enough that naming which one it
+///     is costs a few tokens and saves a wrong reading.
+///
+/// Still short. Every token of prompt is time the user spends watching a
+/// spinner, and the budget is 256 tokens of answer.
+String buildExtractionPrompt(String text, {DraftSource? source}) {
+  final context = switch (source) {
+    DraftSource.receipt =>
+      'This is text read off a receipt or a bank app screen.',
+    DraftSource.voice => 'This is a sentence someone spoke about a payment.',
+    null => 'This is text about a payment.',
+  };
 
-Fields:
-"amount": number, no thousands separators, null if not stated
-"currency": "COP" or "USD"
-"merchant": who was paid, or null
-"date": "YYYY-MM-DD" or null
-"direction": "out" if money left, "in" if money arrived
+  return '''
+$context Extract the payment. Answer with JSON only, no explanation.
 
-Example answer:
-{"amount":45900,"currency":"COP","merchant":"LA LLAMITA","date":"2026-10-05","direction":"out"}
+Rules:
+- Use only what is written. If a field is not there, answer null.
+- Never invent or estimate an amount.
+- "." and "," are thousands separators: 45.900 means 45900, not 45.9.
+- The amount is the total actually paid: not a line item, not the subtotal,
+  not the tax, not the cash handed over, not the change.
+- A minus sign before the amount means money left; otherwise it arrived.
 
-Text:
-$text
+Fields: amount (number or null), currency ("COP" or "USD"),
+merchant (who was paid, or null), date ("YYYY-MM-DD" or null),
+direction ("out" or "in").
 
-JSON:''';
+Example 1
+Text: LA LLAMITA S.A.S. / SUBTOTAL 42.500 / TOTAL A PAGAR 45.900 / EFECTIVO 50.000 / Fecha 05/10/2026
+Answer: {"amount":45900,"currency":"COP","merchant":"LA LLAMITA S.A.S.","date":"2026-10-05","direction":"out"}
+
+Example 2
+Text: Gracias por su compra, vuelva pronto
+Answer: {"amount":null,"currency":"COP","merchant":null,"date":null,"direction":"out"}
+
+Text: $text
+Answer:''';
+}
 
 /// Reads the model's answer into the fields it managed to state.
 ///
@@ -98,7 +131,8 @@ Future<ExpenseDraft> completeWithModel(
   final String answer;
   try {
     answer = await llm.generate(
-      buildExtractionPrompt(textOverride ?? draft.rawText),
+      buildExtractionPrompt(textOverride ?? draft.rawText,
+          source: draft.source),
     );
   } on LocalLlmUnavailable {
     return draft;
