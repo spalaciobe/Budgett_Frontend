@@ -507,4 +507,63 @@ class MessageCaptureRepository {
           );
         }).toList();
       }, 'Error fetching nearby transactions');
+
+  /// The still-unpaid transaction the recurring engine generated for
+  /// [description], if one is waiting.
+  ///
+  /// `_processRecurringDueImpl` creates each cycle with `status: 'pending'`
+  /// and the note below, which is what makes the row identifiable. A bank
+  /// alert for that same charge is the confirmation it actually went
+  /// through, so the row gets settled rather than duplicated.
+  ///
+  /// Matched on the note and the amount, never on the merchant: the bank
+  /// writes "SURAMERICANA SEGUROS" where the recurring says "Health
+  /// Insurance SURA". [within] bounds how far back to look so a monthly
+  /// charge cannot settle a cycle from two months ago that was genuinely
+  /// missed.
+  Future<String?> pendingRecurringTransaction({
+    required String description,
+    required double amount,
+    required DateTime near,
+    Duration within = const Duration(days: 20),
+  }) =>
+      _withRetry(() async {
+        String asDay(DateTime d) =>
+            DateTime(d.year, d.month, d.day).toIso8601String().split('T')[0];
+
+        final List<dynamic> data = await _client
+            .from('transactions')
+            .select('id, date, amount')
+            .eq('user_id', _userId)
+            .eq('status', 'pending')
+            .eq('notes', 'Auto-generated from recurring: $description')
+            .gte('amount', amount - 1)
+            .lte('amount', amount + 1)
+            .gte('date', asDay(near.subtract(within)))
+            .lte('date', asDay(near.add(within)))
+            .order('date', ascending: false)
+            .limit(1);
+
+        if (data.isEmpty) return null;
+        return (data.first as Map<String, dynamic>)['id'] as String;
+      }, 'Error finding the pending recurring charge');
+
+  /// Settles a generated recurring charge against the message that confirms
+  /// it, so the inbox does not have to record a second copy of the expense.
+  Future<void> settleRecurringTransaction({
+    required String transactionId,
+    required String capturedMessageId,
+    DateTime? occurredAt,
+  }) async {
+    try {
+      await _client.from('transactions').update({
+        'status': 'paid',
+        'captured_message_id': capturedMessageId,
+        if (occurredAt != null)
+          'occurred_at': occurredAt.toUtc().toIso8601String(),
+      }).eq('id', transactionId).eq('user_id', _userId);
+    } catch (e) {
+      throw Exception('Error settling the recurring charge: $e');
+    }
+  }
 }

@@ -392,6 +392,20 @@ class CaptureIngestService {
       recurring: recurring,
     );
 
+    // A recurring charge is already in the ledger, generated as `pending` on
+    // its due date. The bank's alert is the confirmation it went through, so
+    // it settles that row instead of writing a second copy of the expense.
+    final recurringTxId = recurringMatch == null
+        ? null
+        : await captureRepo.pendingRecurringTransaction(
+            description: recurringMatch.label,
+            amount: parsed.amount!,
+            near: parsed.occurredAt,
+          );
+
+    // Matched a recurring but found nothing pending — the cycle was settled
+    // by hand, or this is a second charge of the same size. Either way it is
+    // not ours to decide, so it goes to the inbox rather than posting.
     final canPost = recurringMatch != null
         ? false
         : _canAutoPost(
@@ -402,16 +416,31 @@ class CaptureIngestService {
       settings: settings,
     );
 
-    final note = recurringMatch != null
-        ? 'Looks like your recurring "${recurringMatch.label}"'
-        : collision?.reason.label;
+    final note = recurringTxId != null
+        ? null
+        : recurringMatch != null
+            ? 'Looks like your recurring "${recurringMatch.label}", '
+                'but no charge is waiting for it'
+            : collision?.reason.label;
 
     final message = await captureRepo.insertCapture({
       ...row,
-      'status': 'pending',
+      'status': recurringTxId != null ? 'posted' : 'pending',
       if (note != null) 'error': note,
     });
     batchCandidates.add(candidate);
+
+    if (recurringTxId != null) {
+      await captureRepo.settleRecurringTransaction(
+        transactionId: recurringTxId,
+        capturedMessageId: message.id,
+        occurredAt: parsed.occurredAt,
+      );
+      await captureRepo.updateCapture(message.id, {
+        'transaction_id': recurringTxId,
+      });
+      return _Outcome.posted;
+    }
 
     if (!canPost) return _Outcome.pending;
 

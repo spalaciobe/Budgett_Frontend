@@ -16,6 +16,7 @@ import 'package:budgett_frontend/data/models/bank_model.dart';
 import 'package:budgett_frontend/data/models/capture_source_model.dart';
 import 'package:budgett_frontend/data/models/captured_message_model.dart';
 import 'package:budgett_frontend/data/models/merchant_alias_model.dart';
+import 'package:budgett_frontend/data/models/recurring_transaction_model.dart';
 import 'package:budgett_frontend/data/repositories/finance_repository.dart';
 import 'package:budgett_frontend/data/repositories/message_capture_repository.dart';
 
@@ -107,6 +108,7 @@ class _FakeCaptureRepository extends MessageCaptureRepository {
     this.sourceEnabled = true,
     this.existingFingerprints = const {},
     this.manualTransactions = const [],
+    this.pendingRecurringId,
   }) : super(_FakeSupabaseClient());
 
   List<MerchantAlias> aliases;
@@ -114,6 +116,11 @@ class _FakeCaptureRepository extends MessageCaptureRepository {
   bool sourceEnabled;
   Set<String> existingFingerprints;
   List<DedupCandidate> manualTransactions;
+
+  /// The id the recurring engine's unpaid row would have, or null when no
+  /// charge is waiting.
+  String? pendingRecurringId;
+  final List<({String transactionId, String capturedMessageId})> settled = [];
 
   final List<CapturedMessage> inserted = [];
   final List<({String id, Map<String, dynamic> data})> updates = [];
@@ -217,6 +224,27 @@ class _FakeCaptureRepository extends MessageCaptureRepository {
       manualTransactions;
 
   @override
+  Future<String?> pendingRecurringTransaction({
+    required String description,
+    required double amount,
+    required DateTime near,
+    Duration within = const Duration(days: 20),
+  }) async =>
+      pendingRecurringId;
+
+  @override
+  Future<void> settleRecurringTransaction({
+    required String transactionId,
+    required String capturedMessageId,
+    DateTime? occurredAt,
+  }) async {
+    settled.add((
+      transactionId: transactionId,
+      capturedMessageId: capturedMessageId
+    ));
+  }
+
+  @override
   Future<void> touchAlias(String id, int currentHitCount) async {
     touchedAliases.add(id);
   }
@@ -252,6 +280,8 @@ Future<
   String? locationLabel,
   CaptureSettings settings = const CaptureSettings(),
   List<Account>? accounts,
+  List<RecurringTransaction> recurring = const [],
+  String? pendingRecurringId,
 }) async {
   final captures = _FakeCaptureRepository(
     aliases: aliases,
@@ -259,6 +289,7 @@ Future<
     sourceEnabled: sourceEnabled,
     existingFingerprints: existingFingerprints,
     manualTransactions: manualTransactions,
+    pendingRecurringId: pendingRecurringId,
   );
   final finance = _FakeFinanceRepository();
 
@@ -271,6 +302,7 @@ Future<
   final result = await service.ingest(
     accounts: accounts ?? [_account()],
     banks: const <Bank>[],
+    recurring: recurring,
     settings: settings,
   );
 
@@ -563,6 +595,73 @@ void main() {
       expect(run.result.pending, 1);
       expect(run.finance.posted, isEmpty);
       expect(run.captures.inserted.single.error, isNotNull);
+    });
+  });
+
+  group('a charge the recurring engine already generated', () {
+    // Verbatim shapes and amounts from this user's ledger: the gym charge
+    // matches "Gym - Smart Fit" at 101,500 to the peso.
+    const gymAlert =
+        'Bancolombia le informa Compra por \$101.500,00 en SMART FIT 20 DE JULI '
+        '17/09/2026 15:44. Tarjeta *1234';
+
+    final gym = RecurringTransaction.fromJson({
+      'id': 'rec-gym',
+      'description': 'Gym - Smart Fit',
+      'amount': 101500,
+      'type': 'expense',
+      'frequency': 'monthly',
+      'next_run_date': '2026-10-17',
+      'is_active': true,
+    });
+
+    test('settles the waiting charge instead of recording a second one', () async {
+      final run = await _ingest(
+        [_capture(body: gymAlert)],
+        recurring: [gym],
+        pendingRecurringId: 'txn-gym-september',
+      );
+
+      // The expense was already in the ledger; the alert only confirms it.
+      expect(run.finance.posted, isEmpty);
+      expect(run.captures.settled, hasLength(1));
+      expect(run.captures.settled.single.transactionId, 'txn-gym-september');
+
+      final row = run.captures.rowById(run.captures.inserted.single.id)!;
+      expect(row.status, 'posted');
+      expect(row.transactionId, 'txn-gym-september');
+      // Nothing to explain: this is a clean outcome, not a warning.
+      expect(row.error, isNull);
+    });
+
+    test('asks when the amount matches but no charge is waiting', () async {
+      // Settled by hand already, or a second charge of the same size. Either
+      // way it is not ours to decide.
+      final run = await _ingest(
+        [_capture(body: gymAlert)],
+        recurring: [gym],
+        pendingRecurringId: null,
+      );
+
+      expect(run.finance.posted, isEmpty);
+      expect(run.captures.settled, isEmpty);
+
+      final row = run.captures.rowById(run.captures.inserted.single.id)!;
+      expect(row.status, 'pending');
+      expect(row.error, contains('Gym - Smart Fit'));
+    });
+
+    test('an ordinary purchase is untouched by the recurring list', () async {
+      final run = await _ingest(
+        [_capture()], // 45,900 at EXITO — nothing like the gym
+        aliases: [_alias()],
+        cardMappings: {'1234': 'acc-savings'},
+        recurring: [gym],
+        pendingRecurringId: 'txn-gym-september',
+      );
+
+      expect(run.captures.settled, isEmpty);
+      expect(run.finance.posted, hasLength(1));
     });
   });
 
