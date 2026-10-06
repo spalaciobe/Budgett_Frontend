@@ -117,7 +117,15 @@ jobs:
           git add pubspec.yaml
           git commit -m "chore: bump version to ${{ steps.bump.outputs.tag }} [skip ci]"
           git tag "${{ steps.bump.outputs.tag }}"
-          git push origin HEAD:main
+          # Two pushes close together mean this run races the next commit to
+          # main and the bump is rejected, failing a build whose APK is
+          # already signed and ready. The bump only ever touches pubspec.yaml,
+          # so replaying it on top of whatever landed meanwhile is safe.
+          for attempt in 1 2 3; do
+            git push origin HEAD:main && break
+            echo "main moved; rebasing the bump (attempt $attempt)"
+            git pull --rebase origin main
+          done
           git push origin "${{ steps.bump.outputs.tag }}"
 
       # GitHub's own generated notes are derived from pull requests. Commits
