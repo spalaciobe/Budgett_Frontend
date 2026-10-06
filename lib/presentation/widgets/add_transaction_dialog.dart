@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import 'package:budgett_frontend/core/parsing/expense_draft.dart';
 import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
@@ -20,7 +22,13 @@ import '../../core/app_text.dart';
 import 'form_fields.dart';
 
 class AddTransactionDialog extends ConsumerStatefulWidget {
-  const AddTransactionDialog({super.key});
+  const AddTransactionDialog({super.key, this.draft});
+
+  /// What a photographed receipt, a screenshot or a dictated phrase was read
+  /// as. Fills the form in; every field stays editable, and nothing is saved
+  /// until the user presses the button, because a camera can blur and a
+  /// microphone can mishear.
+  final ExpenseDraft? draft;
 
   @override
   ConsumerState<AddTransactionDialog> createState() =>
@@ -162,6 +170,31 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
       _selectedTargetAccount?.type == 'credit_card' &&
       (_selectedTargetAccount?.balanceUsd != 0 ||
           _selectedTargetAccount?.creditLimitUsd != 0);
+
+  @override
+  void initState() {
+    super.initState();
+    final draft = widget.draft;
+    if (draft == null) return;
+
+    if (draft.amount != null) {
+      // Whole pesos lose the trailing ",00" every Colombian amount carries.
+      _amountController.text = draft.amount! % 1 == 0
+          ? draft.amount!.toStringAsFixed(0)
+          : draft.amount!.toStringAsFixed(2);
+    }
+    _descriptionController.text = draft.description ?? draft.merchant ?? '';
+    _selectedDate = draft.date;
+    _selectedAccountId = draft.accountId;
+    _currency = draft.currency;
+    _selectedType = draft.kind.transactionType;
+    // What was read, kept where the user can see it: a wrong figure is much
+    // easier to forgive when its source is on screen.
+    _notesController.text = switch (draft.source) {
+      DraftSource.receipt => 'Scanned',
+      DraftSource.voice => 'Dictated: "${draft.rawText}"',
+    };
+  }
 
   @override
   void dispose() {

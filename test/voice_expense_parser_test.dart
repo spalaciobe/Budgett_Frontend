@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:budgett_frontend/core/parsing/expense_draft.dart';
 import 'package:budgett_frontend/core/parsing/message_kind.dart';
 import 'package:budgett_frontend/core/parsing/voice_expense_parser.dart';
+import 'package:budgett_frontend/data/models/account_model.dart';
 
 final _now = DateTime(2026, 10, 6, 13, 30);
 
@@ -109,10 +110,114 @@ void main() {
     });
   });
 
+  _sample();
+
   group('currency', () {
     test('pesos unless dollars are said', () {
       expect(_parse('gaste veinte mil').currency, 'COP');
       expect(_parse('gaste veinte dolares').currency, 'USD');
+    });
+  });
+}
+
+// ─── the real sample ─────────────────────────────────────────────────────────
+//
+// Budgett_Backend/res_AI_test/audio1.ogg, which has to come out as:
+//   Income · 200.000 · "Pago de prestamo Mariana Hernandez" · Bancolombia
+//
+// The recording itself cannot be transcribed on this machine, so each case
+// below is a way the same thing gets said. If the phone transcribes it some
+// other way, that wording belongs here as a failing case first.
+
+Account _acct(String id, String name) =>
+    Account.fromJson({'id': id, 'name': name, 'type': 'savings', 'balance': 0});
+
+final _accounts = [
+  _acct('acc-banco', 'Bancolombia Ahorro'),
+  _acct('acc-nu', 'Nu'),
+  _acct('acc-cash', 'Efectivo'),
+];
+
+void _sample() {
+  group('the recorded sample', () {
+    ExpenseDraft read(String spoken) =>
+        parseVoiceExpense(spoken, now: _now, accounts: _accounts);
+
+    const phrasings = [
+      'me pagaron doscientos mil de pago de prestamo Mariana Hernandez a Bancolombia',
+      'ingreso de doscientos mil pesos pago de prestamo Mariana Hernandez Bancolombia',
+      'recibi doscientos mil por pago de prestamo Mariana Hernandez en Bancolombia',
+    ];
+
+    test('reads it as money arriving, however it is phrased', () {
+      for (final spoken in phrasings) {
+        expect(read(spoken).kind.transactionType, 'income', reason: spoken);
+      }
+    });
+
+    test('reads the amount', () {
+      for (final spoken in phrasings) {
+        expect(read(spoken).amount, 200000, reason: spoken);
+      }
+    });
+
+    test('picks the account that was named', () {
+      for (final spoken in phrasings) {
+        expect(read(spoken).accountId, 'acc-banco', reason: spoken);
+      }
+    });
+
+    test('keeps the whole reason, not the first few words', () {
+      // "Pago de prestamo Mariana Hernandez" is five words; a four-word cap
+      // dropped the surname.
+      final merchant = read(phrasings.first).merchant;
+      expect(merchant, contains('Prestamo'));
+      expect(merchant, contains('Hernandez'));
+    });
+  });
+
+  group('naming an account out loud', () {
+    test('an account nobody named stays blank', () {
+      expect(
+        parseVoiceExpense('gaste veinte mil en el almuerzo',
+                now: _now, accounts: _accounts)
+            .accountId,
+        isNull,
+      );
+    });
+
+    test('an ambiguous name is left for the user to pick', () {
+      // Two accounts carry "Bancolombia"; guessing puts real money against
+      // the wrong balance.
+      final ambiguous = [
+        _acct('acc-a', 'Bancolombia Ahorro'),
+        _acct('acc-b', 'Amex Oro Bancolombia'),
+      ];
+      expect(
+        parseVoiceExpense('gaste veinte mil en Bancolombia',
+                now: _now, accounts: ambiguous)
+            .accountId,
+        isNull,
+      );
+    });
+
+    test('a generic word does not match an account', () {
+      // "Efectivo" as an account name is one thing; "cuenta" is not.
+      expect(
+        parseVoiceExpense('gaste veinte mil de la cuenta',
+                now: _now, accounts: _accounts)
+            .accountId,
+        isNull,
+      );
+    });
+
+    test('a distinctive name matches', () {
+      expect(
+        parseVoiceExpense('pague treinta mil con Nu',
+                now: _now, accounts: _accounts)
+            .accountId,
+        'acc-nu',
+      );
     });
   });
 }

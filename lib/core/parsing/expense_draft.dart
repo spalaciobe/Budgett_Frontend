@@ -39,6 +39,12 @@ class ExpenseDraft {
 
   final MessageKind kind;
 
+  /// The account the user named out loud ("… a Bancolombia"), when exactly
+  /// one of theirs matches. Null when nothing was said or when more than one
+  /// account could have been meant — picking the wrong one puts real money
+  /// against the wrong balance.
+  final String? accountId;
+
   /// The day the money moved. Falls back to now when the input gives nothing.
   final DateTime date;
 
@@ -61,6 +67,7 @@ class ExpenseDraft {
     this.merchant,
     this.description,
     this.kind = MessageKind.purchase,
+    this.accountId,
     required this.date,
     required this.confidence,
     required this.rawText,
@@ -75,6 +82,7 @@ class ExpenseDraft {
     String? merchant,
     String? description,
     MessageKind? kind,
+    String? accountId,
     DateTime? date,
     double? confidence,
     String? warning,
@@ -86,6 +94,7 @@ class ExpenseDraft {
         merchant: merchant ?? this.merchant,
         description: description ?? this.description,
         kind: kind ?? this.kind,
+        accountId: accountId ?? this.accountId,
         date: date ?? this.date,
         confidence: confidence ?? this.confidence,
         rawText: rawText,

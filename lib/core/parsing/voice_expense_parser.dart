@@ -12,7 +12,9 @@ library;
 import 'package:budgett_frontend/core/parsing/expense_draft.dart';
 import 'package:budgett_frontend/core/parsing/message_kind.dart';
 import 'package:budgett_frontend/core/parsing/spanish_numbers.dart';
+import 'package:budgett_frontend/core/parsing/spoken_account_match.dart';
 import 'package:budgett_frontend/core/parsing/text_normalizer.dart';
+import 'package:budgett_frontend/data/models/account_model.dart';
 
 /// Verbs that fix the direction of the movement, longest first so "me
 /// pagaron" is read before "pague".
@@ -28,6 +30,13 @@ const _kindVerbs = <(String, MessageKind)>[
   ('me devolvieron', MessageKind.transferIn),
   ('recibi', MessageKind.transferIn),
   ('cobre', MessageKind.transferIn),
+  // Said as a noun rather than a verb: "ingreso de doscientos mil", which is
+  // how someone dictating from a list of movements phrases it.
+  ('ingreso de', MessageKind.transferIn),
+  ('ingreso', MessageKind.transferIn),
+  ('entrada de', MessageKind.transferIn),
+  ('abono de', MessageKind.transferIn),
+  ('income', MessageKind.transferIn),
   ('i received', MessageKind.transferIn),
   ('i got paid', MessageKind.transferIn),
 
@@ -103,7 +112,13 @@ const _subjectStopWords = {
 /// Reads [spoken] into a draft.
 ///
 /// [now] is the moment of speaking, which is what "ayer" is relative to.
-ExpenseDraft parseVoiceExpense(String spoken, {DateTime? now}) {
+ExpenseDraft parseVoiceExpense(
+  String spoken, {
+  DateTime? now,
+  /// The user's accounts, so "… a Bancolombia" picks one. Left empty when
+  /// the caller has none to hand; the field then simply stays blank.
+  List<Account> accounts = const [],
+}) {
   final at = now ?? DateTime.now();
   final normalized = normalizeForMatch(spoken);
 
@@ -120,6 +135,8 @@ ExpenseDraft parseVoiceExpense(String spoken, {DateTime? now}) {
 
   final amount = parseSpokenAmount(spoken);
   final currency = _looksLikeDollars(normalized) ? 'USD' : 'COP';
+  final accountId =
+      accounts.isEmpty ? null : matchSpokenAccount(spoken, accounts);
   final date = _resolveDay(normalized, at);
   final subject = _findSubject(normalized, verbEnd);
 
@@ -146,6 +163,7 @@ ExpenseDraft parseVoiceExpense(String spoken, {DateTime? now}) {
         ? null
         : subject,
     kind: kind ?? MessageKind.purchase,
+    accountId: accountId,
     date: date,
     confidence: confidence.clamp(0.0, 1.0),
     rawText: spoken.trim(),
@@ -189,9 +207,10 @@ String? _findSubject(String normalized, int searchFrom) {
         .toList();
     if (words.isEmpty) continue;
 
-    // Four words is a phrase, not a label; more than that and the recogniser
+    // Six words covers what a person actually says — "pago de prestamo
+    // Mariana Hernandez" is five — while still cutting off a recogniser that
     // has run on into the next sentence.
-    final subject = words.take(4).join(' ');
+    final subject = words.take(6).join(' ');
     return _titleCase(subject);
   }
   return null;

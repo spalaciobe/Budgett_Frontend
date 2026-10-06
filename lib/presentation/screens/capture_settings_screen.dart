@@ -5,6 +5,7 @@ import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:budgett_frontend/core/parsing/issuer_registry.dart';
 import 'package:budgett_frontend/core/parsing/preauth_merchants.dart';
 import 'package:budgett_frontend/core/services/capture_ingest_service.dart';
+import 'package:budgett_frontend/core/services/local_llm_service.dart';
 import 'package:budgett_frontend/core/services/message_capture_service.dart';
 import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:budgett_frontend/data/models/account_model.dart';
@@ -12,6 +13,7 @@ import 'package:budgett_frontend/data/models/capture_source_model.dart';
 import 'package:budgett_frontend/data/models/category_model.dart';
 import 'package:budgett_frontend/data/models/merchant_alias_model.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
+import 'package:budgett_frontend/presentation/providers/draft_provider.dart';
 import 'package:budgett_frontend/presentation/providers/message_capture_provider.dart';
 import 'package:budgett_frontend/presentation/providers/settings_provider.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
@@ -60,6 +62,8 @@ class CaptureSettingsScreen extends ConsumerWidget {
               const _KnownSourcesCard(),
               kGapXl,
               const _RememberedMerchantsCard(),
+              kGapXl,
+              const _LocalModelCard(),
               kGapXxl,
             ],
           ),
@@ -948,5 +952,138 @@ class _EditMerchantSheetState extends ConsumerState<EditMerchantSheet> {
         SnackBar(content: Text(friendlyError(e, action: 'save merchant'))),
       );
     }
+  }
+}
+
+
+/// The optional on-device model, for receipts and dictation.
+///
+/// Presented as what it is: a large, slow download that helps with the
+/// blurry minority. Everything works without it, which is why the card leads
+/// with that rather than with a prompt to install.
+class _LocalModelCard extends ConsumerStatefulWidget {
+  const _LocalModelCard();
+
+  @override
+  ConsumerState<_LocalModelCard> createState() => _LocalModelCardState();
+}
+
+class _LocalModelCardState extends ConsumerState<_LocalModelCard> {
+  double? _progress;
+  bool _downloading = false;
+  String? _error;
+
+  Future<void> _download(LocalModelOption option) async {
+    setState(() {
+      _downloading = true;
+      _progress = 0;
+      _error = null;
+    });
+    try {
+      await ref.read(localLlmServiceProvider).download(
+            option,
+            onProgress: (fraction, _) {
+              if (mounted) setState(() => _progress = fraction);
+            },
+          );
+      ref.invalidate(localModelInstalledProvider);
+      ref.invalidate(localModelSizeProvider);
+    } catch (e) {
+      if (mounted) setState(() => _error = 'The download failed: $e');
+    } finally {
+      if (mounted) setState(() => _downloading = false);
+    }
+  }
+
+  Future<void> _remove() async {
+    await ref.read(localLlmServiceProvider).remove();
+    ref.invalidate(localModelInstalledProvider);
+    ref.invalidate(localModelSizeProvider);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final muted = theme.colorScheme.onSurfaceVariant;
+    if (!ref.watch(localLlmServiceProvider).isSupported) {
+      return const SizedBox.shrink();
+    }
+    final installed = ref.watch(localModelInstalledProvider).valueOrNull ?? false;
+    final size = ref.watch(localModelSizeProvider).valueOrNull ?? 0;
+
+    return Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: kCardPadding,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('On-device model', style: theme.textTheme.titleMedium),
+                kGapSm,
+                Text(
+                  'Receipts and dictation are read without it. A model only '
+                  'helps with the ones that come out unclear, and it never '
+                  'changes a figure that was read properly.',
+                  style: AppText.caption.copyWith(color: muted),
+                ),
+                if (installed) ...[
+                  kGapSm,
+                  Text(
+                    'Installed · ${(size / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB',
+                    style: AppText.caption.copyWith(color: theme.colorScheme.primary),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (_downloading) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: kSpaceXl),
+              child: LinearProgressIndicator(value: _progress),
+            ),
+            kGapSm,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: kSpaceXl),
+              child: Text(
+                _progress == null
+                    ? 'Downloading…'
+                    : 'Downloading ${(_progress! * 100).round()}%',
+                style: AppText.caption.copyWith(color: muted),
+              ),
+            ),
+            kGapLg,
+          ],
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: kSpaceXl),
+              child: Text(_error!,
+                  style: AppText.caption.copyWith(color: theme.colorScheme.error)),
+            ),
+          if (installed)
+            ListTile(
+              leading: const Icon(Icons.delete_outline),
+              title: const Text('Remove the model'),
+              subtitle: Text('Frees the space; everything keeps working',
+                  style: AppText.caption.copyWith(color: muted)),
+              onTap: _downloading ? null : _remove,
+            )
+          else
+            ...kLocalModels.map(
+              (option) => ListTile(
+                enabled: !_downloading,
+                leading: const Icon(Icons.download_outlined),
+                title: Text(option.name),
+                subtitle: Text(
+                  '${option.approxSizeLabel} · ${option.description}',
+                  style: AppText.caption.copyWith(color: muted),
+                ),
+                onTap: _downloading ? null : () => _download(option),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }

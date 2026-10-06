@@ -65,6 +65,10 @@ import 'package:budgett_frontend/presentation/widgets/account_card.dart';
 import 'package:budgett_frontend/presentation/widgets/budget_comparison_widget.dart';
 import 'package:budgett_frontend/presentation/widgets/investment_holding_card.dart';
 import 'package:budgett_frontend/presentation/widgets/portfolio_donut_chart.dart';
+import 'package:budgett_frontend/core/parsing/expense_draft.dart';
+import 'package:budgett_frontend/core/services/draft_capture_service.dart';
+import 'package:budgett_frontend/presentation/providers/draft_provider.dart';
+import 'package:budgett_frontend/presentation/widgets/capture_expense_sheet.dart';
 import 'package:budgett_frontend/presentation/widgets/review_capture_sheet.dart';
 import 'package:budgett_frontend/presentation/widgets/transaction_tile.dart';
 import 'package:budgett_frontend/presentation/widgets/add_transaction_dialog.dart';
@@ -700,6 +704,46 @@ final _targets = <String, _Target>{
     ),
     overrides: _captureOverrides(),
   ),
+  // Entering an expense by camera or voice. The service is faked as
+  // supported — on a test host Platform.isAndroid is false, and the
+  // unsupported state renders almost nothing, so the real layout would
+  // never be looked at.
+  'capture_expense_sheet': _Target(
+    () => const CaptureExpenseSheet(),
+    overrides: [
+      draftCaptureServiceProvider
+          .overrideWithValue(const _SupportedDraftCapture()),
+    ],
+  ),
+  // The same sheet after reading a screenshot of a movements list: one row
+  // read cleanly, one clipped by the screen edge.
+  'capture_expense_sheet_results': _Target(
+    () => CaptureExpenseSheet(
+      initialDrafts: [
+        ExpenseDraft(
+          source: DraftSource.receipt,
+          amount: 557000,
+          merchant: 'PAGO QR MOTOS GP ITAG',
+          date: DateTime(2026, 9, 30),
+          confidence: 0.9,
+          rawText: 'PAGO QR MOTOS GP ITAG',
+        ),
+        ExpenseDraft(
+          source: DraftSource.receipt,
+          amount: null,
+          merchant: 'PAGO PSE BANCO FALABELLA S A',
+          date: DateTime(2026, 9, 29),
+          confidence: 0.45,
+          rawText: 'PAGO PSE BANCO FALABELLA S A',
+          warning: 'This row was cut off — enter the amount',
+        ),
+      ],
+    ),
+    overrides: [
+      draftCaptureServiceProvider
+          .overrideWithValue(const _SupportedDraftCapture()),
+    ],
+  ),
   'review_capture_sheet': _Target(
     () => ReviewCaptureSheet(message: _capturedMessage()),
     overrides: _captureOverrides(),
@@ -887,4 +931,14 @@ void main() {
       });
     }
   }
+}
+
+
+/// Reports the platform as supported so the sheet renders its real layout.
+/// Nothing is ever invoked on it: the smoke test only paints.
+class _SupportedDraftCapture extends DraftCaptureService {
+  const _SupportedDraftCapture();
+
+  @override
+  bool get isSupported => true;
 }

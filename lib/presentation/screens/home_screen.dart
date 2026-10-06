@@ -8,6 +8,8 @@ import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/presentation/widgets/add_transaction_dialog.dart';
+import 'package:budgett_frontend/presentation/widgets/capture_expense_sheet.dart';
+import 'package:budgett_frontend/presentation/providers/draft_provider.dart';
 import 'package:budgett_frontend/presentation/widgets/edit_transaction_dialog.dart';
 import 'package:budgett_frontend/core/app_text.dart';
 import 'package:budgett_frontend/presentation/widgets/page_body.dart';
@@ -808,12 +810,42 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => showDialog(
-          context: context,
-          builder: (_) => const AddTransactionDialog(),
-        ),
-        child: const Icon(Icons.add),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          // Two shortcuts above the usual button rather than hidden behind a
+          // long press: the point of entering an expense by camera or voice
+          // is that it is faster than the form, which a gesture nobody finds
+          // would undo.
+          if (ref.watch(draftCaptureServiceProvider).isSupported) ...[
+            FloatingActionButton.small(
+              heroTag: 'capture-photo',
+              tooltip: 'Scan a receipt or a screenshot',
+              onPressed: () => showCaptureExpenseSheet(context),
+              child: const Icon(Icons.photo_camera_outlined),
+            ),
+            kGapSm,
+            FloatingActionButton.small(
+              heroTag: 'capture-voice',
+              tooltip: 'Say what you spent',
+              onPressed: () => showCaptureExpenseSheet(
+                context,
+                startWith: CaptureMode.voice,
+              ),
+              child: const Icon(Icons.mic_none_outlined),
+            ),
+            kGapSm,
+          ],
+          FloatingActionButton(
+            heroTag: 'add-transaction',
+            onPressed: () => showDialog(
+              context: context,
+              builder: (_) => const AddTransactionDialog(),
+            ),
+            child: const Icon(Icons.add),
+          ),
+        ],
       ),
       ),
     );
