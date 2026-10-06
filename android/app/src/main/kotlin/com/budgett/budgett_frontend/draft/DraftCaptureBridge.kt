@@ -84,21 +84,70 @@ class DraftCaptureBridge(private val context: Context) : MethodChannel.MethodCal
             val image = InputImage.fromFilePath(context, Uri.parse("file://$path"))
             TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
                 .process(image)
-                .addOnSuccessListener { text ->
-                    // `text.text` already joins blocks with newlines, but
-                    // going through the blocks keeps the order explicit and
-                    // drops the empties a blurry photo produces.
-                    val lines = text.textBlocks
-                        .flatMap { block -> block.lines }
-                        .map { it.text.trim() }
-                        .filter { it.isNotEmpty() }
-                    result.success(lines.joinToString("\n"))
-                }
+                .addOnSuccessListener { text -> result.success(inReadingOrder(text)) }
                 .addOnFailureListener { error ->
                     result.error("ocr_failed", error.message, null)
                 }
         } catch (e: Exception) {
             result.error("ocr_failed", e.message, null)
+        }
+    }
+
+    /**
+     * Rebuilds reading order from where the text sits on screen.
+     *
+     * ML Kit groups text into BLOCKS, and a bank app's movements list is two
+     * columns: descriptions down the left, amounts right-aligned. Those are
+     * different blocks, so walking blocks in order returns every description
+     * first and every amount afterwards. Dart then sees rows with no amount
+     * and a pile of orphan figures, which is exactly what happened to a real
+     * screenshot: three movements came back as two, one of them "cut off"
+     * with its amount plainly on screen and another carrying a number from
+     * the status bar.
+     *
+     * So the lines are sorted by where they are, not by how they were
+     * grouped, and lines sharing a row are joined left to right — which is
+     * also what puts "PAGO QR MOTOS GP ITAG" and "-$ 557.000,00" back on one
+     * line when the app draws them side by side.
+     */
+    private fun inReadingOrder(text: com.google.mlkit.vision.text.Text): String {
+        data class Fragment(val text: String, val top: Int, val left: Int, val height: Int)
+
+        val fragments = text.textBlocks
+            .flatMap { it.lines }
+            .mapNotNull { line ->
+                val box = line.boundingBox ?: return@mapNotNull null
+                val content = line.text.trim()
+                if (content.isEmpty()) null
+                else Fragment(content, box.top, box.left, box.height())
+            }
+            .sortedWith(compareBy({ it.top }, { it.left }))
+
+        if (fragments.isEmpty()) {
+            // No bounding boxes at all (it can happen): fall back to the
+            // flat reading rather than returning nothing.
+            return text.text.trim()
+        }
+
+        // Two fragments belong to the same row when their tops are closer
+        // than half a line height. A fixed pixel tolerance would be wrong
+        // across a 1080p screenshot and a 12-megapixel photo.
+        val rows = mutableListOf<MutableList<Fragment>>()
+        for (fragment in fragments) {
+            val tolerance = (fragment.height / 2).coerceAtLeast(6)
+            val row = rows.lastOrNull()
+            val anchor = row?.firstOrNull()
+            if (row != null && anchor != null &&
+                kotlin.math.abs(fragment.top - anchor.top) <= tolerance
+            ) {
+                row.add(fragment)
+            } else {
+                rows.add(mutableListOf(fragment))
+            }
+        }
+
+        return rows.joinToString("\n") { row ->
+            row.sortedBy { it.left }.joinToString(" ") { it.text }
         }
     }
 

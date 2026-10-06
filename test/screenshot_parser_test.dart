@@ -131,6 +131,59 @@ void main() {
     });
   });
 
+  group('what the status bar contributes', () {
+    test('the battery reading is not a movement', () {
+      // A real run filed a \$100 movement taken from the "100" beside the
+      // battery icon. The clock already fell out; the battery did not.
+      const withStatusBar = '''
+15:13
+100
+30 SEPT 2026
+PAGO QR MOTOS GP ITAG
+COP -\$ 557.000,00
+29 SEPT 2026
+TRANSFERENCIA CTA SUC VIRTUAL
+COP \$ 720.000,00
+''';
+      final drafts = parseScreenshot(withStatusBar, capturedAt: _captured);
+      expect(drafts, hasLength(2));
+      expect(drafts.map((d) => d.amount), isNot(contains(100)));
+      expect(drafts.first.amount, 557000);
+      expect(drafts[1].amount, 720000);
+    });
+
+    test('a percentage or a signal reading is dropped too', () {
+      const noisy = '''
+96 %
+5G
+04 OCT 2026
+COMPRA EXITO
+COP -\$ 85.400,00
+03 OCT 2026
+NOMINA
+COP \$ 900.000,00
+''';
+      final drafts = parseScreenshot(noisy, capturedAt: _captured);
+      expect(drafts, hasLength(2));
+      expect(drafts.first.amount, 85400);
+    });
+
+    test('a real three-digit amount still survives', () {
+      // The guard must not eat a genuine figure that carries a marker.
+      const small = '''
+05 OCT 2026
+PARQUEADERO
+COP -\$ 900,00
+04 OCT 2026
+PROPINA
+COP -\$ 500,00
+''';
+      final drafts = parseScreenshot(small, capturedAt: _captured);
+      expect(drafts.first.amount, 900);
+      expect(drafts[1].amount, 500);
+    });
+  });
+
   group('other shapes of the same two screens', () {
     test('an explicit plus sign is money arriving', () {
       const text = '''

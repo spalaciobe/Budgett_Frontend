@@ -27,14 +27,28 @@ import 'package:budgett_frontend/core/parsing/text_normalizer.dart';
 
 /// Spanish and English month names, abbreviated as the apps print them.
 const _months = <String, int>{
-  'ene': 1, 'jan': 1, 'feb': 2, 'mar': 3, 'abr': 4, 'apr': 4, 'may': 5,
-  'jun': 6, 'jul': 7, 'ago': 8, 'aug': 8, 'sep': 9, 'set': 9, 'oct': 10,
-  'nov': 11, 'dic': 12, 'dec': 12,
+  'ene': 1,
+  'jan': 1,
+  'feb': 2,
+  'mar': 3,
+  'abr': 4,
+  'apr': 4,
+  'may': 5,
+  'jun': 6,
+  'jul': 7,
+  'ago': 8,
+  'aug': 8,
+  'sep': 9,
+  'set': 9,
+  'oct': 10,
+  'nov': 11,
+  'dic': 12,
+  'dec': 12,
 };
 
 /// "30 SEPT 2026", "5 oct", "30 de septiembre de 2026".
-final _textualDate = RegExp(
-    r'^(\d{1,2})\s*(?:de\s+)?([a-zA-Z]{3,10})\.?\s*(?:de\s+)?(\d{4})?$');
+final _textualDate =
+    RegExp(r'^(\d{1,2})\s*(?:de\s+)?([a-zA-Z]{3,10})\.?\s*(?:de\s+)?(\d{4})?$');
 
 /// "2026-10-05", "05/10/2026".
 final _numericDate =
@@ -48,11 +62,22 @@ final _chrome = RegExp(
     r'transaction no|numero de transaccion|type of transaction|'
     r'tipo de transaccion|date|fecha|hora|\d{1,2}:\d{2}|volver|back)\b');
 
+/// The phone's own status bar, which OCR reads along with everything else.
+///
+/// The clock already falls out through [_chrome]; the battery does not. A
+/// real screenshot came back with a movement of \$100 taken from the "100"
+/// beside the battery icon. Anything that is only a short bare number, a
+/// percentage or a signal reading is the phone talking about itself.
+final _statusBar = RegExp(
+    r'^(\d{1,3}\s*%?|\d{1,2}:\d{2}\s*(a\.?m\.?|p\.?m\.?)?|'
+    r'[0-9]{1,2}g|lte|wifi|wi-fi)$',
+    caseSensitive: false);
+
 /// Words that make a movement a shuffle between the user's own accounts
 /// rather than money entering or leaving their finances.
-final _ownTransfer = RegExp(
-    r'\b(bolsillo|bolsillos|pocket|alcancia|ahorro programado|'
-    r'entre cuentas|a mi cuenta|mis cuentas|own account)\b');
+final _ownTransfer =
+    RegExp(r'\b(bolsillo|bolsillos|pocket|alcancia|ahorro programado|'
+        r'entre cuentas|a mi cuenta|mis cuentas|own account)\b');
 
 /// Reads every movement visible in [text].
 ///
@@ -65,6 +90,7 @@ List<ExpenseDraft> parseScreenshot(String text, {DateTime? capturedAt}) {
       .map((l) => l.trim())
       .where((l) => l.isNotEmpty)
       .where((l) => !_chrome.hasMatch(normalizeForMatch(l)))
+      .where((l) => !_statusBar.hasMatch(normalizeForMatch(l)))
       .toList();
 
   final rows = _splitIntoRows(lines, at);
@@ -73,7 +99,8 @@ List<ExpenseDraft> parseScreenshot(String text, {DateTime? capturedAt}) {
     // row without one is money arriving. If no row has a sign the app is not
     // using them, and the direction of every row is genuinely unknown —
     // which is worth saying rather than guessing at.
-    final usesSigns = rows.any((row) => _readSignedAmount(row.lines)?.negative == true);
+    final usesSigns =
+        rows.any((row) => _readSignedAmount(row.lines)?.negative == true);
     return rows.map((row) => _draftFromRow(row, text, at, usesSigns)).toList();
   }
 
@@ -337,8 +364,7 @@ String? _counterpartyAfterAmount(List<String> lines, int amountIndex) {
     if (_readDate(trimmed, DateTime.now()) != null) continue;
     if (findAmount(trimmed) != null) continue;
 
-    final introduced = RegExp(
-            r'^(?:a|de|para|hacia|to|from|for)\s+(.{3,})',
+    final introduced = RegExp(r'^(?:a|de|para|hacia|to|from|for)\s+(.{3,})',
             caseSensitive: false)
         .firstMatch(trimmed);
     if (introduced != null) return _clean(introduced.group(1)!);

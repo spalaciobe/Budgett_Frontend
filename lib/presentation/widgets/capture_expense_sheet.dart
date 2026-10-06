@@ -55,6 +55,7 @@ class CaptureExpenseSheet extends ConsumerStatefulWidget {
 
 class _CaptureExpenseSheetState extends ConsumerState<CaptureExpenseSheet> {
   bool _busy = false;
+  bool _showRawText = false;
   String? _status;
   String? _error;
   late List<ExpenseDraft> _drafts = widget.initialDrafts;
@@ -187,12 +188,50 @@ class _CaptureExpenseSheetState extends ConsumerState<CaptureExpenseSheet> {
                 kGapLg,
                 const Divider(),
                 kGapSm,
-                Text(
-                  _drafts.length == 1
-                      ? 'Found one movement'
-                      : 'Found ${_drafts.length} movements',
-                  style: theme.textTheme.labelLarge,
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _drafts.length == 1
+                            ? 'Found one movement'
+                            : 'Found ${_drafts.length} movements',
+                        style: theme.textTheme.labelLarge,
+                      ),
+                    ),
+                    // What the camera actually read. A wrong figure is far
+                    // easier to understand — and to report — when its source
+                    // is one tap away instead of invisible.
+                    TextButton.icon(
+                      onPressed: () =>
+                          setState(() => _showRawText = !_showRawText),
+                      icon: Icon(
+                        _showRawText
+                            ? Icons.expand_less
+                            : Icons.text_snippet_outlined,
+                        size: 18,
+                      ),
+                      label: const Text('Text read'),
+                    ),
+                  ],
                 ),
+                if (_showRawText) ...[
+                  Container(
+                    width: double.infinity,
+                    constraints: const BoxConstraints(maxHeight: 180),
+                    padding: const EdgeInsets.all(kSpaceMd),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(kCardRadius),
+                    ),
+                    child: SingleChildScrollView(
+                      child: SelectableText(
+                        _drafts.first.rawText,
+                        style: AppText.caption,
+                      ),
+                    ),
+                  ),
+                  kGapSm,
+                ],
                 kGapSm,
                 Flexible(
                   child: ListView.separated(
