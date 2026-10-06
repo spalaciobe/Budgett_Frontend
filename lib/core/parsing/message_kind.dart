@@ -18,6 +18,14 @@ enum MessageKind {
   /// A credit-card payment (the user paying down the card).
   payment,
 
+  /// Money moved between two accounts the user already owns — a Rappi
+  /// bolsillo emptied into the main account, an "entre cuentas" transfer.
+  ///
+  /// Apart from [transferIn] on purpose: nothing entered the user's finances,
+  /// so recording it as income would inflate every month a pocket is emptied,
+  /// and recording it as an expense would do the same in reverse.
+  internalTransfer,
+
   /// Reversal / chargeback / voided purchase.
   refund,
 
@@ -31,6 +39,7 @@ enum MessageKind {
         MessageKind.transferOut => 'transfer_out',
         MessageKind.transferIn => 'transfer_in',
         MessageKind.payment => 'payment',
+        MessageKind.internalTransfer => 'internal_transfer',
         MessageKind.refund => 'refund',
         MessageKind.declined => 'declined',
       };
@@ -41,6 +50,7 @@ enum MessageKind {
         'transfer_out' => MessageKind.transferOut,
         'transfer_in' => MessageKind.transferIn,
         'payment' => MessageKind.payment,
+        'internal_transfer' => MessageKind.internalTransfer,
         'refund' => MessageKind.refund,
         'declined' => MessageKind.declined,
         _ => null,
@@ -53,6 +63,7 @@ enum MessageKind {
         MessageKind.transferOut => 'Transfer out',
         MessageKind.transferIn => 'Transfer in',
         MessageKind.payment => 'Card payment',
+        MessageKind.internalTransfer => 'Between your accounts',
         MessageKind.refund => 'Refund',
         MessageKind.declined => 'Declined',
       };
@@ -64,6 +75,7 @@ enum MessageKind {
         MessageKind.transferOut => 'expense',
         MessageKind.transferIn => 'income',
         MessageKind.payment => 'transfer',
+        MessageKind.internalTransfer => 'transfer',
         MessageKind.refund => 'income',
         MessageKind.declined => 'expense',
       };
@@ -75,6 +87,7 @@ enum MessageKind {
         MessageKind.transferOut => 'variable',
         MessageKind.transferIn => 'income',
         MessageKind.payment => 'transfer',
+        MessageKind.internalTransfer => 'transfer',
         MessageKind.refund => 'reimbursement',
         MessageKind.declined => null,
       };
@@ -87,8 +100,9 @@ enum MessageKind {
   /// keys, account transfers and QR — most of what a Colombian account
   /// actually pays with — could never be automated.
   ///
-  /// [payment] stays out because a card payment is a real two-leg transfer
-  /// between accounts, and the far leg cannot be derived from one line.
+  /// [payment] and [internalTransfer] stay out because both are real two-leg
+  /// transfers between accounts, and the far leg cannot be derived from one
+  /// line.
   bool get isAutoPostable =>
       this == MessageKind.purchase ||
       this == MessageKind.withdrawal ||
