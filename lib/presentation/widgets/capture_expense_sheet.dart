@@ -30,6 +30,9 @@ Future<void> showCaptureExpenseSheet(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
+      // The root navigator, or the shell's bottom navigation bar draws over
+      // the sheet and swallows the Camera / Gallery / Speak row.
+      useRootNavigator: true,
       builder: (_) => CaptureExpenseSheet(startWith: startWith),
     );
 

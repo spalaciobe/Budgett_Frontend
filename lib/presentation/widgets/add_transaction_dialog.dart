@@ -179,9 +179,21 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
 
     if (draft.amount != null) {
       // Whole pesos lose the trailing ",00" every Colombian amount carries.
-      _amountController.text = draft.amount! % 1 == 0
+      final raw = draft.amount! % 1 == 0
           ? draft.amount!.toStringAsFixed(0)
           : draft.amount!.toStringAsFixed(2);
+
+      // Through the field's own formatter, not straight into the controller.
+      // An input formatter only runs on typing, so a seeded amount came out
+      // as a bare "3060000" next to every hand-typed "$3.060.000".
+      _amountController.value = CurrencyInputFormatter(currency: draft.currency)
+          .formatEditUpdate(
+        TextEditingValue.empty,
+        TextEditingValue(
+          text: raw,
+          selection: TextSelection.collapsed(offset: raw.length),
+        ),
+      );
     }
     _descriptionController.text = draft.description ?? draft.merchant ?? '';
     _selectedDate = draft.date;

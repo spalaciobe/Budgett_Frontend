@@ -54,13 +54,23 @@ final _textualDate =
 final _numericDate =
     RegExp(r'(\d{4})-(\d{2})-(\d{2})|(\d{1,2})/(\d{1,2})/(\d{2,4})');
 
-/// Chrome the OS and the app draw around the movements, never a movement.
+/// Buttons, tabs and headings the app draws around the movements. Matched as
+/// a prefix, because they are whole lines with nothing worth keeping on them.
 final _chrome = RegExp(
     r'^(detalles|movimientos|consultar comprobantes|transferir plata|'
     r'ir a dia a dia|bolsillos|ready|share|listo|compartir|aprobado|approved|'
     r'cuenta de ahorros|cuenta corriente|saldo|disponible|available|'
-    r'transaction no|numero de transaccion|type of transaction|'
-    r'tipo de transaccion|date|fecha|hora|\d{1,2}:\d{2}|volver|back)\b');
+    r'\d{1,2}:\d{2}|volver|back)\b');
+
+/// Labels in a detail table, which carry their value beside them.
+///
+/// These must match the WHOLE line. Reading order now joins a label to its
+/// value — "Date 2026-10-05 18:43:02" arrives as one line — so dropping
+/// anything that merely starts with "Date" threw the date away with it, and
+/// a RappiCuenta movement from the 5th was filed on the 6th.
+final _detailLabel = RegExp(
+    r'^(date|fecha|hora|time|transaction no|numero de transaccion|'
+    r'type of transaction|tipo de transaccion|referencia|reference)$');
 
 /// The phone's own status bar, which OCR reads along with everything else.
 ///
@@ -90,6 +100,7 @@ List<ExpenseDraft> parseScreenshot(String text, {DateTime? capturedAt}) {
       .map((l) => l.trim())
       .where((l) => l.isNotEmpty)
       .where((l) => !_chrome.hasMatch(normalizeForMatch(l)))
+      .where((l) => !_detailLabel.hasMatch(normalizeForMatch(l)))
       .where((l) => !_statusBar.hasMatch(normalizeForMatch(l)))
       .toList();
 

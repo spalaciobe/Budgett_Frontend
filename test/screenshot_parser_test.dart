@@ -131,6 +131,75 @@ void main() {
     });
   });
 
+  group('what the camera really returns', () {
+    // Lifted off the device rather than typed by eye. Reading order now
+    // joins a label to its value, which is what the parser has to cope with.
+    const realImg1 = '''
+13:15 A9 l100
+Cuenta de Ahorros
+Detalles Movimientos
+Consultar comprobantes
+30 SEPT 2026
+PAGO QR MOTOS GP ITAG
+cOP -\$ 557.000,00
+29 SEPT 2026
+TRANSFERENCIA CTA SUC VIRTUAL
+cOP \$ 720.000,oo
+29 SEPT 2026
+PAGO PSE BANCO FALABELLA S A
+Transferir plata Ira Día a Día Bolsillos
+''';
+
+    test('reads all three rows out of the real text', () {
+      final drafts = parseScreenshot(realImg1, capturedAt: _captured);
+      expect(drafts, hasLength(3));
+      expect(drafts[0].amount, 557000);
+      expect(drafts[1].amount, 720000);
+      expect(drafts[2].amount, isNull);
+    });
+
+    test('"cOP" and ",oo" do not change the figure', () {
+      // OCR reads the capital O as a lowercase c and the zeros as letters.
+      final drafts = parseScreenshot(realImg1, capturedAt: _captured);
+      expect(drafts[1].amount, 720000);
+      expect(drafts[1].kind.transactionType, 'income');
+    });
+
+    test('a detail label keeps the value beside it', () {
+      // Joining a row put "Date" and its value on one line. Dropping
+      // anything starting with "Date" threw the date away, and a
+      // RappiCuenta movement from the 5th was filed on the 6th.
+      const confirmation = '''
+RappiCuenta
+Withdraw from bolsillo
+\$3.060.000
+Approved
+Date 2026-10-05 18:43:02
+Type of transaction Pocket withdrawal
+Transaction No 7598344
+''';
+      final draft = parseScreenshot(confirmation, capturedAt: _captured).single;
+      expect(draft.date, DateTime(2026, 10, 5));
+      expect(draft.amount, 3060000);
+      expect(draft.kind.transactionType, 'transfer');
+    });
+
+    test('a bare label on its own line is still dropped', () {
+      const split = '''
+RappiCuenta
+Deposit to bolsillo
+\$500.000
+Date
+2026-10-04 09:00:00
+Transaction No
+123456
+''';
+      final draft = parseScreenshot(split, capturedAt: _captured).single;
+      expect(draft.date, DateTime(2026, 10, 4));
+      expect(draft.amount, 500000);
+    });
+  });
+
   group('what the status bar contributes', () {
     test('the battery reading is not a movement', () {
       // A real run filed a \$100 movement taken from the "100" beside the

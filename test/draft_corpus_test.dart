@@ -87,6 +87,35 @@ Bolsillos
     type: 'expense',
   ),
 
+  // ---- what ML Kit ACTUALLY returned for img1.png -------------------------
+  //
+  // Copied off the device, not transcribed by eye. The quirks are the point:
+  // "cOP" with a lowercase c, "720.000,oo" with letters where the zeros are,
+  // the status bar merged into one line, and "Date"/"Transferir plata" rows
+  // carrying their neighbours.
+  _Case(
+    'img1 as the camera really read it',
+    '''
+13:15 A9 l100
+Cuenta de Ahorros
+Detalles Movimientos
+Consultar comprobantes
+30 SEPT 2026
+PAGO QR MOTOS GP ITAG
+cOP -\$ 557.000,00
+29 SEPT 2026
+TRANSFERENCIA CTA SUC VIRTUAL
+cOP \$ 720.000,oo
+29 SEPT 2026
+PAGO PSE BANCO FALABELLA S A
+Transferir plata Ira Día a Día Bolsillos
+''',
+    movements: 3,
+    amount: 557000,
+    merchantContains: 'MOTOS GP ITAG',
+    type: 'expense',
+  ),
+
   // ---- real: res_AI_test/img2.jpeg, RappiCuenta pocket --------------------
   _Case(
     'rappi pocket withdrawal',
