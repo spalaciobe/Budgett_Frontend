@@ -100,6 +100,28 @@ final pendingCaptureCountProvider = FutureProvider<int>((ref) async {
   return pending.length;
 });
 
+/// Pushes the sources the user switched off down to the native side.
+///
+/// Without this, disabling a source only filtered it in Dart — after the
+/// phone had already captured the notification, taken a GPS fix, written it
+/// to the queue, uploaded it and parsed it. The native block list existed
+/// from the start and nothing ever wrote to it.
+///
+/// Watched from `BudgettApp`, the same way the credit-card alert scheduler is.
+final captureSourceSyncProvider = FutureProvider<void>((ref) async {
+  final service = ref.watch(messageCaptureServiceProvider);
+  if (!service.isSupported) return;
+
+  final sources = await ref.watch(captureSourcesProvider.future);
+  final blocked = sources
+      .where((source) => !source.isEnabled)
+      .map((source) => source.sourceKey)
+      .toSet()
+      .toList();
+
+  await service.applyConfig(blockedSources: blocked);
+});
+
 final captureIngestServiceProvider = Provider<CaptureIngestService>((ref) {
   return CaptureIngestService(
     captureRepo: ref.watch(messageCaptureRepositoryProvider),
@@ -149,10 +171,11 @@ class CaptureIngestController extends AsyncNotifier<CaptureIngestResult?> {
           const AsyncLoading<CaptureIngestResult?>().copyWithPrevious(state);
       // Independent fetches, so they overlap instead of costing three
       // sequential round trips.
-      final (accounts, banks, settings) = await (
+      final (accounts, banks, settings, recurring) = await (
         ref.read(accountsProvider.future),
         ref.read(banksFutureProvider.future),
         ref.read(captureSettingsProvider.future),
+        ref.read(recurringTransactionsProvider.future),
       ).wait;
 
       // Bounded: ingestion reverse-geocodes over the network, and an await
@@ -164,6 +187,7 @@ class CaptureIngestController extends AsyncNotifier<CaptureIngestResult?> {
           .ingest(
             accounts: accounts,
             banks: banks,
+            recurring: recurring,
             settings: settings,
           )
           .timeout(const Duration(seconds: 90));

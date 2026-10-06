@@ -24,6 +24,11 @@ import '../../core/utils/date_format.dart';
 /// The three "Remember" switches at the bottom are the whole point: a merchant
 /// confirmed once here becomes a `merchant_aliases` row, and the next message
 /// from that merchant is recorded without ever reaching this screen.
+/// Sentinel for the Type dropdown. Not a `transactions.type` value: a card
+/// payment is written by [FinanceRepository.payCreditCard], which posts
+/// both legs itself.
+const _kCardPayment = 'card_payment';
+
 class ReviewCaptureSheet extends ConsumerStatefulWidget {
   final CapturedMessage message;
 
@@ -38,6 +43,7 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _amountController;
   late final TextEditingController _nameController;
+  late final TextEditingController _descriptionController;
 
   late String _type;
   late String _currency;
@@ -45,6 +51,8 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
 
   String? _accountId;
   String? _targetAccountId;
+  /// The card being paid down, when this message is a card payment.
+  String? _cardAccountId;
   String? _categorySelection; // category id OR sub-category id
   String? _expenseGroupId;
 
@@ -75,9 +83,14 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
             ),
     );
     _nameController = TextEditingController(text: _message.headline);
+    // Starts empty: blank means 'same as the merchant', so the field only
+    // carries something when this purchase genuinely needs its own name.
+    _descriptionController = TextEditingController();
     // The "Remember" subtitles quote the name, so they have to follow typing.
     _nameController.addListener(_onNameChanged);
-    _type = _message.kind?.transactionType ?? 'expense';
+    _type = _message.kind == MessageKind.payment
+        ? _kCardPayment
+        : _message.kind?.transactionType ?? 'expense';
     _currency = _message.currency ?? 'COP';
     _occurredAt = _message.occurredAt;
   }
@@ -87,6 +100,7 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
     _amountController.dispose();
     _nameController.removeListener(_onNameChanged);
     _nameController.dispose();
+    _descriptionController.dispose();
     super.dispose();
   }
 
@@ -192,20 +206,35 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
               ),
               kGapXl,
 
-              // ── merchant / place name: the override the app will remember ──
+              // ── the merchant: stable, and what the alias is taught ──
               TextFormField(
                 controller: _nameController,
                 textCapitalization: TextCapitalization.words,
                 decoration: InputDecoration(
-                  labelText: 'Name',
+                  labelText: 'Merchant',
                   helperText: _merchantKey == null
                       ? 'No merchant found in the message'
                       : 'Bank sent: ${_message.merchantRaw}',
                   helperMaxLines: 2,
                   border: const OutlineInputBorder(),
                 ),
-                validator: (value) =>
-                    (value == null || value.trim().isEmpty) ? 'Enter a name' : null,
+                validator: (value) => (value == null || value.trim().isEmpty)
+                    ? 'Enter a merchant'
+                    : null,
+              ),
+              kGapXl,
+
+              // ── what this one purchase was for: never taught ──
+              TextFormField(
+                controller: _descriptionController,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: InputDecoration(
+                  labelText: 'Description (optional)',
+                  hintText: _nameController.text.trim(),
+                  helperText: 'Just this expense — the merchant stays as above',
+                  helperMaxLines: 2,
+                  border: const OutlineInputBorder(),
+                ),
               ),
               kGapXl,
 
@@ -219,6 +248,11 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
                   DropdownMenuItem(value: 'expense', child: Text('Expense')),
                   DropdownMenuItem(value: 'income', child: Text('Income')),
                   DropdownMenuItem(value: 'transfer', child: Text('Transfer')),
+                  // Not a plain transfer: paying a card down has two legs and
+                  // its own billing-cycle bookkeeping, so it goes through
+                  // FinanceRepository.payCreditCard rather than a single row.
+                  DropdownMenuItem(
+                      value: _kCardPayment, child: Text('Credit card payment')),
                 ],
                 onChanged: (value) {
                   if (value == null) return;
@@ -226,6 +260,7 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
                     _type = value;
                     _categorySelection = null;
                     if (value != 'transfer') _targetAccountId = null;
+                    if (value != _kCardPayment) _cardAccountId = null;
                   });
                 },
               ),
@@ -249,6 +284,34 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
                     Text(friendlyError(e, action: 'load accounts')),
               ),
 
+              if (_type == _kCardPayment) ...[
+                kGapXl,
+                accountsAsync.when(
+                  data: (data) => DropdownButtonFormField<String>(
+                    value: _cardAccountId,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Card being paid',
+                      helperText: 'The money leaves the account above',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: _accountItems(
+                      _flatten(data)
+                          .where((a) => a.type == 'credit_card')
+                          .toList(),
+                      excludeId: _accountId,
+                    ),
+                    onChanged: (value) =>
+                        setState(() => _cardAccountId = value),
+                    validator: (value) =>
+                        value == null ? 'Select the card' : null,
+                  ),
+                  loading: () => const LinearProgressIndicator(),
+                  error: (e, _) =>
+                      Text(friendlyError(e, action: 'load accounts')),
+                ),
+              ],
+
               if (_type == 'transfer') ...[
                 kGapXl,
                 accountsAsync.when(
@@ -271,7 +334,7 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
                 ),
               ],
 
-              if (_type != 'transfer') ...[
+              if (_type != 'transfer' && _type != _kCardPayment) ...[
                 kGapXl,
                 categoriesAsync.when(
                   data: (categories) => DropdownButtonFormField<String>(
@@ -731,8 +794,12 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
     try {
       // 1. Write the memory first, so the rule survives even if the posting
       //    fails and the user retries.
-      if (key != null && key.isNotEmpty && _rememberName) {
-        await repository.upsertAlias(
+      MerchantAlias? savedAlias;
+      if (key != null &&
+          key.isNotEmpty &&
+          _rememberName &&
+          _type != _kCardPayment) {
+        savedAlias = await repository.upsertAlias(
           pattern: key,
           displayName: name,
           categoryId: category.categoryId,
@@ -751,8 +818,48 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
         );
       }
 
-      // 2. Post the transaction through the same path the automatic flow uses,
-      //    so a confirmed expense is shaped identically to an auto-posted one.
+      // 2a. A card payment is not a movement with a merchant: it moves money
+      //     between two of the user's own accounts and has to clear the card's
+      //     balance. FinanceRepository.payCreditCard writes both legs and the
+      //     billing-cycle fields, so it owns this path.
+      if (_type == _kCardPayment) {
+        await ref.read(financeRepositoryProvider).payCreditCard(
+              sourceAccountId: _accountId!,
+              cardAccountId: _cardAccountId!,
+              settleAmount: amount,
+              debtCurrency: _currency,
+              debitAmount: amount,
+              sourceCurrency: _currency,
+              date: _occurredAt,
+              notes: 'From ${_message.headline} · captured',
+            );
+
+        await repository.updateCapture(_message.id, {
+          'status': 'posted',
+          'merchant_display': name,
+          'amount': amount,
+          'currency': _currency,
+          'occurred_at': _occurredAt.toUtc().toIso8601String(),
+          'kind': MessageKind.payment.wireName,
+          'error': null,
+        });
+
+        ref.invalidate(pendingCapturesProvider);
+        ref.invalidate(captureHistoryProvider);
+        ref.invalidate(recentTransactionsProvider);
+        ref.invalidate(accountsProvider);
+
+        if (!mounted) return;
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Card payment recorded')),
+        );
+        return;
+      }
+
+      // 2b. Post the transaction through the same path the automatic flow
+      //     uses, so a confirmed expense is shaped identically to an
+      //     auto-posted one.
       final parsed = ParsedMessage(
         status: ParseStatus.parsed,
         kind: _kindForType(),
@@ -775,6 +882,7 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
                 parsed: parsed,
                 accountId: _accountId!,
                 merchantDisplay: name,
+                description: _descriptionController.text,
                 categoryId: category.categoryId,
                 subCategoryId: category.subCategoryId,
                 expenseGroupId: _expenseGroupId,
@@ -803,17 +911,83 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
       ref.invalidate(recentTransactionsProvider);
       ref.invalidate(accountsProvider);
 
+      // Offered before this dialog closes, so it still owns a live context.
+      // The rule just taught would have handled the other messages from this
+      // same shop, but they were captured before it existed — without this the
+      // same merchant has to be answered once per message.
+      var extra = 0;
+      if (savedAlias != null && key != null && key.isNotEmpty) {
+        extra = await _offerSiblings(key, savedAlias);
+      }
+
       if (!mounted) return;
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Recorded $name')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(extra > 0 ? 'Recorded $name and $extra more'
+                                : 'Recorded $name'),
+      ));
     } catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(friendlyError(e, action: 'record expense'))),
       );
+    }
+  }
+
+  /// Asks whether to settle the other pending messages from this merchant,
+  /// and returns how many were recorded.
+  ///
+  /// Each sibling keeps its own amount, time and place; only the
+  /// classification is shared. Anything the rule cannot answer is left
+  /// pending rather than guessed at.
+  Future<int> _offerSiblings(String merchantKey, MerchantAlias alias) async {
+    final service = ref.read(captureIngestServiceProvider);
+
+    final int waiting;
+    try {
+      waiting = await service.countPendingForMerchant(merchantKey, _message.id);
+    } catch (_) {
+      return 0;
+    }
+    if (waiting == 0 || !mounted) return 0;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('$waiting more from ${alias.displayName}'),
+        content: Text(waiting == 1
+            ? 'One more message from this merchant is waiting. Record it the '
+                'same way?'
+            : '$waiting more messages from this merchant are waiting. Record '
+                'them the same way?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Not now'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Record them'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return 0;
+
+    try {
+      final applied = await service.applyAliasToPending(
+        merchantKey: merchantKey,
+        alias: alias,
+        excludeCaptureId: _message.id,
+        accounts: ref.read(accountsProvider).valueOrNull ?? const [],
+        banks: ref.read(banksFutureProvider).valueOrNull ?? const [],
+      );
+      ref.invalidate(captureHistoryProvider);
+      return applied;
+    } catch (e) {
+      debugPrint('Could not apply the rule to the other messages: $e');
+      return 0;
     }
   }
 

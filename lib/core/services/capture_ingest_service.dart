@@ -6,11 +6,13 @@ import 'package:budgett_frontend/core/parsing/text_normalizer.dart';
 import 'package:budgett_frontend/core/services/message_capture_service.dart';
 import 'package:budgett_frontend/core/utils/capture_dedup.dart';
 import 'package:budgett_frontend/core/utils/credit_card_calculator.dart';
+import 'package:budgett_frontend/core/utils/recurring_match.dart';
 import 'package:budgett_frontend/data/models/account_model.dart';
 import 'package:budgett_frontend/data/models/bank_model.dart';
 import 'package:budgett_frontend/data/models/capture_source_model.dart';
 import 'package:budgett_frontend/data/models/captured_message_model.dart';
 import 'package:budgett_frontend/data/models/merchant_alias_model.dart';
+import 'package:budgett_frontend/data/models/recurring_transaction_model.dart';
 import 'package:budgett_frontend/data/repositories/finance_repository.dart';
 import 'package:budgett_frontend/data/repositories/message_capture_repository.dart';
 
@@ -121,6 +123,10 @@ class CaptureIngestService {
   Future<CaptureIngestResult> ingest({
     required List<Account> accounts,
     required List<Bank> banks,
+    /// Active recurring transactions. A capture that matches one must not
+    /// post itself: the recurring engine already generates that charge, so
+    /// automating the bank's alert for it would record the expense twice.
+    List<RecurringTransaction> recurring = const [],
     CaptureSettings settings = const CaptureSettings(),
   }) async {
     final raw = await platform.drain();
@@ -190,6 +196,7 @@ class CaptureIngestService {
           accountsById: accountsById,
           banksById: banksById,
           settings: settings,
+          recurring: recurring,
           batchCandidates: batchCandidates,
         );
 
@@ -230,6 +237,7 @@ class CaptureIngestService {
     required Map<String, Account> accountsById,
     required Map<String, Bank> banksById,
     required CaptureSettings settings,
+    required List<RecurringTransaction> recurring,
     required List<DedupCandidate> batchCandidates,
   }) async {
     final locationLabel = await _describeLocation(capture);
@@ -377,7 +385,16 @@ class CaptureIngestService {
           window: settings.dedupWindow,
         );
 
-    final canPost = _canAutoPost(
+    final recurringMatch = findRecurringMatch(
+      amount: parsed.amount,
+      transactionType: parsed.kind?.transactionType,
+      merchantKey: parsed.merchantKey,
+      recurring: recurring,
+    );
+
+    final canPost = recurringMatch != null
+        ? false
+        : _canAutoPost(
       parsed: parsed,
       alias: alias,
       accountId: accountId,
@@ -385,10 +402,14 @@ class CaptureIngestService {
       settings: settings,
     );
 
+    final note = recurringMatch != null
+        ? 'Looks like your recurring "${recurringMatch.label}"'
+        : collision?.reason.label;
+
     final message = await captureRepo.insertCapture({
       ...row,
       'status': 'pending',
-      if (collision != null) 'error': collision.reason.label,
+      if (note != null) 'error': note,
     });
     batchCandidates.add(candidate);
 
@@ -426,6 +447,110 @@ class CaptureIngestService {
     }
   }
 
+  /// Posts every other pending capture from the same merchant, using the rule
+  /// that was just taught.
+  ///
+  /// Confirming one message teaches a rule that would have handled its
+  /// siblings, but they were already captured and sit in the inbox untouched —
+  /// so the same shop had to be answered once per message. This applies the
+  /// decision across them in one step.
+  ///
+  /// Each is posted with its OWN amount, time and place; only the
+  /// classification is shared. Anything the rule cannot answer (a different
+  /// kind, no resolvable account) is left pending rather than guessed at.
+  Future<int> applyAliasToPending({
+    required String merchantKey,
+    required MerchantAlias alias,
+    required String? excludeCaptureId,
+    required List<Account> accounts,
+    required List<Bank> banks,
+  }) async {
+    final pending = await captureRepo.getCaptures(statuses: const ['pending']);
+    final accountsById = {
+      for (final account in _flatten(accounts)) account.id: account
+    };
+    final banksById = {for (final bank in banks) bank.id: bank};
+    final cardMap = await captureRepo.getCardMappings();
+
+    var applied = 0;
+    for (final message in pending) {
+      if (message.id == excludeCaptureId) continue;
+      if (message.merchantRaw == null) continue;
+      if (normalizeMerchant(message.merchantRaw!) != merchantKey) continue;
+      if (message.amount == null || message.kind == null) continue;
+      if (!message.kind!.isAutoPostable) continue;
+
+      final accountId = alias.accountId ??
+          _accountFromCard(message, cardMap, accountsById);
+      if (accountId == null) continue;
+
+      final parsed = ParsedMessage(
+        status: ParseStatus.parsed,
+        kind: message.kind,
+        issuerKey: message.issuerKey,
+        amount: message.amount,
+        currency: message.currency,
+        merchantRaw: message.merchantRaw,
+        merchantKey: merchantKey,
+        cardLast4: message.cardLast4,
+        occurredAt: message.occurredAt,
+        confidence: message.confidence ?? 1.0,
+      );
+
+      try {
+        final transactionId = await postTransaction(
+          message: message,
+          parsed: parsed,
+          accountId: accountId,
+          merchantDisplay: alias.displayName,
+          categoryId: alias.categoryId,
+          subCategoryId: alias.subCategoryId,
+          expenseGroupId: alias.expenseGroupId,
+          movementType: alias.movementType ?? message.kind!.movementType,
+          accountsById: accountsById,
+          banksById: banksById,
+        );
+        await captureRepo.updateCapture(message.id, {
+          'status': 'posted',
+          'transaction_id': transactionId,
+          'merchant_display': alias.displayName,
+          'matched_alias_id': alias.id,
+        });
+        applied++;
+      } catch (e) {
+        // One failure must not abandon the rest; the message stays pending.
+        debugPrint('Could not apply alias to ${message.id}: $e');
+      }
+    }
+    return applied;
+  }
+
+  /// How many other pending captures the merchant rule would cover.
+  Future<int> countPendingForMerchant(
+      String merchantKey, String? excludeCaptureId) async {
+    final pending = await captureRepo.getCaptures(statuses: const ['pending']);
+    return pending
+        .where((m) =>
+            m.id != excludeCaptureId &&
+            m.merchantRaw != null &&
+            normalizeMerchant(m.merchantRaw!) == merchantKey)
+        .length;
+  }
+
+  String? _accountFromCard(
+    CapturedMessage message,
+    Map<String, String> cardMap,
+    Map<String, Account> accountsById,
+  ) {
+    final last4 = message.cardLast4;
+    if (last4 == null) return null;
+    for (final key in ['${message.issuerKey ?? ''}|$last4', '|$last4', last4]) {
+      final id = cardMap[key];
+      if (id != null && accountsById.containsKey(id)) return id;
+    }
+    return null;
+  }
+
   /// Builds and inserts the transaction for [message]. Public so the inbox can
   /// reuse the exact same payload shape when the user confirms by hand.
   Future<String> postTransaction({
@@ -433,6 +558,14 @@ class CaptureIngestService {
     required ParsedMessage parsed,
     required String accountId,
     required String merchantDisplay,
+    /// What this particular purchase was for. Defaults to the merchant.
+    ///
+    /// The two are separate on purpose: `place` is the merchant's identity and
+    /// has to stay stable, because it is what the alias is taught against and
+    /// what later messages match on. The description belongs to this one
+    /// movement — the same shop can be "Compras para el viaje" today and
+    /// "Desayuno" tomorrow without disturbing anything the app has learned.
+    String? description,
     String? categoryId,
     String? subCategoryId,
     String? expenseGroupId,
@@ -448,7 +581,9 @@ class CaptureIngestService {
     final data = <String, dynamic>{
       'account_id': accountId,
       'amount': parsed.amount,
-      'description': merchantDisplay,
+      'description': (description?.trim().isNotEmpty ?? false)
+          ? description!.trim()
+          : merchantDisplay,
       'date': occurredAt.toIso8601String().split('T')[0],
       'occurred_at': occurredAt.toUtc().toIso8601String(),
       'type': kind.transactionType,

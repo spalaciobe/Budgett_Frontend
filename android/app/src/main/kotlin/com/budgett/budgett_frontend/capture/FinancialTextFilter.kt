@@ -20,14 +20,42 @@ object FinancialTextFilter {
     private val amountPattern =
         Regex("""(?:\$|cop|usd|us\$)\s*\d""", RegexOption.IGNORE_CASE)
 
+    /**
+     * Phrases that mean a movement ALREADY HAPPENED.
+     *
+     * Tuned against 40 days of this user's captures, where the earlier list
+     * let marketing through by matching bare nouns. "compra", "pago",
+     * "tarjeta", "credito", "aprobada", "envio" and "cargo" all appear in
+     * promotional copy — "Compra +$400K: recibe $10K", "compras desde
+     * $120.000", "Envío gratis desde $80K", a job alert matching "cargo" —
+     * and every one of those reached the review inbox carrying a money
+     * amount.
+     *
+     * So the test is past-tense verbs and bank-specific phrases, not nouns.
+     * An advertisement invites a purchase; a bank alert reports one.
+     */
     private val actionWords = listOf(
-        "compra", "compraste", "pagaste", "pago", "pagado",
-        "retiro", "retiraste", "avance",
-        "transferencia", "transferiste", "enviaste", "envio",
-        "recibiste", "consignacion", "abono", "consignaron", "transfirieron",
-        "cargo", "debito", "credito", "tarjeta",
-        "aprobada", "aprobado", "rechazada", "declinada",
-        "movimiento", "transaccion", "reverso", "devolucion",
+        // Past tense: the movement is done.
+        "compraste", "pagaste", "transferiste", "retiraste", "enviaste",
+        // Possessive + preposition: a 3-D Secure prompt ("valida tu compra
+        // en @AWAKE por valor de $520.000") is sometimes the only notice of
+        // a purchase. "compras desde", "compras mayores a" and the rest of
+        // the promotional copy never phrase it this way.
+        "tu compra en", "su compra en",
+        "recibiste", "realizaste", "compro", "pago por valor",
+        // Bank phrasing around an approval.
+        "compra por", "compra de", "compra aprobada", "pago aprobado",
+        "pago exitoso", "transaccion aprobada", "transaccion exitosa",
+        "retiro por", "avance por", "avance en efectivo",
+        "cargo por", "cargo a tu", "cargo a su",
+        // Money arriving.
+        "te enviaron", "te consignaron", "te transfirieron", "te abonaron",
+        "consignacion por", "abono por", "nomina por",
+        // Card payments and reversals.
+        "pago de tu tarjeta", "pago de tarjeta", "pago a tu tarjeta",
+        "abono a tu tarjeta", "reverso", "devolucion por", "anulacion",
+        // Rejections are still movements worth seeing.
+        "rechazada", "declinada", "fondos insuficientes",
     )
 
     /** Strips accents and lowercases, so "débito" matches "debito". */

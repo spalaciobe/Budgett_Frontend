@@ -201,6 +201,10 @@ class _BudgettAppState extends ConsumerState<BudgettApp> {
     // Drains the native message-capture queue once the session is confirmed.
     ref.watch(captureIngestBootstrapProvider);
 
+    // Keeps the native block list in step with the sources switched off in
+    // settings, so a muted source stops costing the phone any work at all.
+    ref.watch(captureSourceSyncProvider);
+
     // Show an update modal once a session if a newer APK is available on
     // GitHub Releases. Resolves to null on non-Android, when up-to-date, or
     // when the user already dismissed this build.

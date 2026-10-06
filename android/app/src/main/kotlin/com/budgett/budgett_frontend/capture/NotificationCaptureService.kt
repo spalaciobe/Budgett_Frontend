@@ -3,6 +3,7 @@ package com.budgett.budgett_frontend.capture
 import android.app.Notification
 import android.content.pm.PackageManager
 import android.os.Build
+import android.provider.Telephony
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
@@ -35,6 +36,18 @@ class NotificationCaptureService : NotificationListenerService() {
         // Never capture our own notifications — that would feed the pipeline
         // its own output.
         if (packageName == applicationContext.packageName) return
+
+        // The messaging app mirrors every bank SMS as a notification, so the
+        // same payment was captured twice: once here and once by
+        // SmsCaptureReceiver. Over 40 days that was 59 captures of which 57
+        // were duplicates — half the deduplicator's workload existed only
+        // because of this. The SMS receiver is the better source anyway: it
+        // reports the short code, which identifies the bank.
+        if (CaptureStore.isSmsEnabled(applicationContext) &&
+            packageName == defaultSmsPackage()
+        ) {
+            return
+        }
 
         // Group summaries repeat their children's text, and ongoing
         // notifications (media players, downloads) are not events.
@@ -95,6 +108,12 @@ class NotificationCaptureService : NotificationListenerService() {
     override fun onDestroy() {
         worker.shutdown()
         super.onDestroy()
+    }
+
+    private fun defaultSmsPackage(): String? = try {
+        Telephony.Sms.getDefaultSmsPackage(applicationContext)
+    } catch (e: Exception) {
+        null
     }
 
     private fun isGroupSummary(notification: Notification): Boolean =

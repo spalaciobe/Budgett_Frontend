@@ -272,6 +272,36 @@ void main() {
     });
   });
 
+  group('incoming transfers name the sender, not the sales pitch', () {
+    test('the trailing pitch is not a counterparty', () {
+      // Six real transfers were recorded as "Una Y Gratis": the sender's name
+      // sits BEFORE the amount here, so the search of the text after it found
+      // "Con llaves es de una y gratis" and took that.
+      final result = _parse(
+        'Alertas y Notificaciones Bancolombia: SEBASTIAN, recibiste una '
+        'transferencia de LAURA MARIA MORALES MONSALVE por \$60,000.00 en tu '
+        'cuenta *1951 conectada a la llave 1001687721 el 04/10/26 a las 19:10. '
+        'Con llaves es de una y gratis. Dudas al 018000912345.',
+        receivedAt: DateTime(2026, 10, 4, 19, 11),
+      );
+
+      expect(result.kind, MessageKind.transferIn);
+      expect(result.amount, 60000.0);
+      expect(result.merchantKey, 'LAURA MARIA MORALES MONSALVE');
+    });
+
+    test('the account the money landed in is not part of the name', () {
+      final result = _parse(
+        'Bancolombia: Recibiste una transferencia por \$38,000 de FERNANDO '
+        'PALACIO en tu cuenta **1951, el 27/09/2026 a las 17:50.',
+        receivedAt: DateTime(2026, 9, 27, 17, 51),
+      );
+
+      expect(result.amount, 38000.0);
+      expect(result.merchantKey, 'FERNANDO PALACIO');
+    });
+  });
+
   group('other issuers', () {
     test('Nequi outgoing transfer', () {
       final result = _parse(

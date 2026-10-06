@@ -679,10 +679,17 @@ class _AliasTile extends ConsumerWidget {
     final categoryName =
         categories.where((c) => c.id == alias.categoryId).firstOrNull?.name;
 
+    // Spelled out rather than implied by the icon. "Always ask" is what a
+    // merchant that bills before the final amount is known needs — Uber and
+    // Didi authorise up front and settle later — and the capability existed
+    // from the start without ever saying so.
     final details = <String>[
-      alias.pattern,
+      alias.autoPost ? 'Records itself' : 'Always asks first',
       if (categoryName != null) categoryName,
       if (alias.hitCount > 0) 'used ${alias.hitCount}×',
+      // Last, so it truncates first: the raw text the rule matches on only
+      // matters when wondering why a merchant is not being recognised.
+      alias.pattern,
     ];
 
     return ListTile(
@@ -694,7 +701,7 @@ class _AliasTile extends ConsumerWidget {
       subtitle: Text(details.join(' · '),
           maxLines: 2, overflow: TextOverflow.fade),
       trailing: IconButton(
-        tooltip: 'Forget',
+        tooltip: 'Forget this merchant',
         icon: const Icon(Icons.delete_outline),
         onPressed: () => _confirmDelete(context, ref),
       ),

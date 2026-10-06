@@ -238,7 +238,6 @@ DateTime? findOccurredAt(String text, DateTime receivedAt) {
       hour: ymd.group(4),
       minute: ymd.group(5),
       second: ymd.group(6),
-      fallback: receivedAt,
     );
   }
 
@@ -252,7 +251,6 @@ DateTime? findOccurredAt(String text, DateTime receivedAt) {
         hour: dmy.group(4),
         minute: dmy.group(5),
         second: dmy.group(6),
-        fallback: receivedAt,
       );
     }
   }
@@ -272,7 +270,6 @@ DateTime? findOccurredAt(String text, DateTime receivedAt) {
           hour: textual.group(4),
           minute: textual.group(5),
           second: null,
-          fallback: receivedAt,
         );
       }
     }
@@ -307,7 +304,6 @@ DateTime? _build({
   required String? hour,
   required String? minute,
   required String? second,
-  required DateTime fallback,
 }) {
   // A date with no time is not an instant. Email receipts carry only a date,
   // and reading that as midnight put the same payment twelve hours away from
@@ -316,7 +312,7 @@ DateTime? _build({
   // fall back to the arrival time, which is within minutes of the event.
   if (hour == null) return null;
   if (month < 1 || month > 12 || day < 1 || day > 31) return null;
-  final h = hour == null ? 0 : int.tryParse(hour) ?? 0;
+  final h = int.tryParse(hour) ?? 0;
   final m = minute == null ? 0 : int.tryParse(minute) ?? 0;
   final s = second == null ? 0 : int.tryParse(second) ?? 0;
   if (h > 23 || m > 59 || s > 59) return null;
@@ -331,6 +327,9 @@ final _merchantTerminator = RegExp(
   r'\s+\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}'          // a date
   r'|\s*[,;:\n]'                                    // punctuation
   r'|\.\s'                                          // end of sentence
+  r'|\s+(?:en|a)\s+(?:tu|su)\s+cuenta'                 // "… en tu cuenta *1951"
+  r'|\s+conectad[ao]\s+a'                               // "… conectada a la llave"
+  r'|\s+por\s+(?:\$|cop|usd|valor)'                     // "NOMBRE por $60.000"
   r'|\s+(?:con|desde|hacia|para|tarjeta|producto|t\.?\s*(?:credito|debito)'
   r'|saldo|tu\s+saldo|su\s+saldo|el\s+dia|a\s+las|hora|ref\.?|referencia'
   r'|aprobad[oa]|exitos[oa]|valor|por\s+valor|cuota|cuotas|nro|numero'
@@ -449,6 +448,16 @@ String? findMerchant(String text, int searchFrom, MessageKind kind) {
 
   // A bare number or reference is not a name.
   if (RegExp(r'^[\d\s*#.:-]+$').hasMatch(normalized)) return null;
+
+  // Banks capitalise the counterparty — "LAURA MARIA MORALES MONSALVE",
+  // "BANCO FALABELLA S A", "HELADERIA MIMOS". Surrounding prose does not, and
+  // without this test the trailing sales pitch won: six real transfers were
+  // recorded as "Una Y Gratis", taken from "Con llaves es de una y gratis",
+  // and email boilerplate produced merchants like "través de llamadas o links
+  // recibidos vía correo electrónico".
+  //
+  // Checked on the ORIGINAL text, since `normalized` is lowercased.
+  if (!RegExp(r'^[A-ZÁÉÍÓÚÑÜ]').hasMatch(candidate)) return null;
 
   // Re-cut the original text to the same length so the raw casing survives.
   final articleLength = candidate.length - normalized.length;
