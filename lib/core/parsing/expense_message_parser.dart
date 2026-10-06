@@ -186,9 +186,15 @@ final _last4Patterns = <RegExp>[
   RegExp(r'(?:terminad[ao]\s+en|termina\s+en|final(?:izad[ao])?\s+en)\s*[*xX]*(\d{3,4})',
       caseSensitive: false),
   // Issuers abbreviate heavily: "T.Credito", "T.Cred", "T.Deb", "Tarjeta".
-  RegExp(r'(?:tarjeta|producto|cuenta|t\.?\s*(?:cred(?:ito)?|deb(?:ito)?)|tc|td)\s*(?:n[o°.]?\s*)?[*xX#]*(\d{3,4})\b',
+  // The card brand may sit between the noun and the digits — Google Wallet
+  // writes "with Tarjeta Visa ••1673" — and the mask is sometimes drawn with
+  // bullets rather than asterisks.
+  RegExp(r'(?:tarjeta|producto|cuenta|t\.?\s*(?:cred(?:ito)?|deb(?:ito)?)|tc|td)\s*'
+      r'(?:visa|mastercard|master|amex|american\s+express|maestro|debito|credito)?\s*'
+      r'(?:n[o°.]?\s*)?[*xX#•·•·]*(\d{3,4})\b',
       caseSensitive: false),
   RegExp(r'[*]{1,4}\s?(\d{3,4})\b'),
+  RegExp(r'[•·•·]{1,4}\s?(\d{3,4})\b'),
   RegExp(r'[xX]{2,4}\s?(\d{3,4})\b'),
 ];
 
@@ -467,6 +473,31 @@ String? findMerchant(String text, int searchFrom, MessageKind kind) {
   return (kind: _CounterpartyKind.name, value: raw.isEmpty ? candidate : raw);
 }
 
+/// Tap-to-pay wallets announce a payment with no verb at all.
+///
+/// Google Wallet posts the merchant as the notification TITLE and nothing but
+/// "COP27,500.00 with Tarjeta Visa ••1673" as the body, so neither the action
+/// keyword nor the "en <merchant>" preposition the bank alerts rely on is
+/// there. It is a fixed structure rather than a bank's prose, so it is read
+/// as a structure: contactless is how this user pays in person, and every one
+/// of those was landing in the inbox unreadable.
+final _walletPackages = RegExp(r'walletnfcrel|google\.android\.apps\.wallet|'
+    r'com\.apple\.Passbook|samsung\.*pay');
+
+/// "<amount> with <card>" / "<amount> con <tarjeta>" and nothing else.
+/// The card noun is required: "con" alone would match "$50.000 con
+/// descuento" in any advertisement, and this has to agree with the native
+/// filter, which decides whether the message is stored at all.
+final _walletBodyShape = RegExp(
+    r'^\s*(?:COP|USD|US\$|\$)?\s*[\d.,]+\s+(?:with|con)\s+'
+    r'(?:tarjeta|card|visa|mastercard|master|amex|debito|credito)',
+    caseSensitive: false);
+
+/// True when this message is a wallet payment confirmation. [title] then holds
+/// the merchant.
+bool isTapToPayShape({required String sourceKey, required String body}) =>
+    _walletPackages.hasMatch(sourceKey) && _walletBodyShape.hasMatch(body);
+
 // ─── entry point ─────────────────────────────────────────────────────────────
 
 class ExpenseMessageParser {
@@ -504,11 +535,17 @@ class ExpenseMessageParser {
       }
     }
 
-    MessageKind? kind;
-    for (final (phrase, candidate) in _kindRules) {
-      if (normalized.contains(phrase)) {
-        kind = candidate;
-        break;
+    // A wallet confirmation carries no verb, so it is recognised by shape
+    // before the keyword rules get a chance to find nothing.
+    final tapToPay = isTapToPayShape(sourceKey: sourceKey, body: body);
+
+    MessageKind? kind = tapToPay ? MessageKind.purchase : null;
+    if (kind == null) {
+      for (final (phrase, candidate) in _kindRules) {
+        if (normalized.contains(phrase)) {
+          kind = candidate;
+          break;
+        }
       }
     }
 
@@ -525,7 +562,12 @@ class ExpenseMessageParser {
       );
     }
 
-    final merchantRaw = findMerchant(combined, amount.end, kind);
+    // The wallet puts the merchant in the title verbatim; looking for a
+    // preposition in "COP27,500.00 with Tarjeta Visa ••1673" would only find
+    // the card.
+    final merchantRaw = tapToPay && title.trim().isNotEmpty
+        ? title.trim()
+        : findMerchant(combined, amount.end, kind);
     final merchantKey =
         merchantRaw == null ? null : normalizeMerchant(merchantRaw);
     final last4 = findCardLast4(combined);
@@ -547,6 +589,11 @@ class ExpenseMessageParser {
     // gets reviewed instead of guessed at.
     var confidence = 0.45;
     if (issuerKey != null) confidence += 0.15;
+    // A wallet confirmation is a fixed structure, not prose, so merchant and
+    // amount are unambiguous even though the package is not a bank we know.
+    // Without this it scores 0.73 and asks every single time, which for the
+    // way this user pays in person would mean reviewing almost every expense.
+    if (tapToPay && issuerKey == null) confidence += 0.15;
     if (merchantKey != null && merchantKey.isNotEmpty) confidence += 0.15;
     if (last4 != null) confidence += 0.08;
     if (occurredAt != null) confidence += 0.07;

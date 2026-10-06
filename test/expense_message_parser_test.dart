@@ -451,6 +451,77 @@ void main() {
     });
   });
 
+  group('tap-to-pay wallets', () {
+    // Verbatim from this user's inbox. It had sat unparsed because the body
+    // carries no action verb and no "en <merchant>" — the merchant is the
+    // notification title.
+    const walletPackage = 'com.google.android.apps.walletnfcrel';
+
+    test('reads a Google Wallet payment', () {
+      final result = _parse(
+        'COP27,500.00 with Tarjeta Visa •1673',
+        sourceKey: walletPackage,
+        title: 'REST Y CAFET EL PIEL R',
+      );
+
+      expect(result.status, ParseStatus.parsed);
+      expect(result.kind, MessageKind.purchase);
+      expect(result.amount, 27500);
+      expect(result.currency, 'COP');
+      expect(result.merchantRaw, 'REST Y CAFET EL PIEL R');
+      expect(result.cardLast4, '1673');
+    });
+
+    test('scores high enough to teach itself a rule', () {
+      // The structure is unambiguous even though the package is not a bank,
+      // so it must not be condemned to a review every time.
+      final result = _parse(
+        'COP27,500.00 with Tarjeta Visa •1673',
+        sourceKey: walletPackage,
+        title: 'REST Y CAFET EL PIEL R',
+      );
+      expect(result.confidence, greaterThanOrEqualTo(0.8));
+    });
+
+    test('a wallet message that is not a payment stays unparsed', () {
+      final result = _parse(
+        'Agregaste una tarjeta nueva a tu wallet',
+        sourceKey: walletPackage,
+        title: 'Google Wallet',
+      );
+      expect(result.status, isNot(ParseStatus.parsed));
+    });
+
+    test('the shape alone does not fire outside a wallet package', () {
+      // Same body from Gmail is a receipt, and the title is the sender.
+      final result = _parse(
+        'COP27,500.00 with Tarjeta Visa •1673',
+        sourceKey: 'com.google.android.gm',
+        title: 'Recibos',
+      );
+      expect(result.merchantRaw, isNot('Recibos'));
+    });
+  });
+
+  group('card digits', () {
+    test('reads a bullet mask with the brand in between', () {
+      expect(findCardLast4('with Tarjeta Visa •1673'), '1673');
+      expect(findCardLast4('Mastercard ••8844'), '8844');
+    });
+
+    test('still reads the asterisk masks the banks use', () {
+      expect(findCardLast4('con tu T.Cred *8225'), '8225');
+      expect(findCardLast4('Tarjeta terminada en 4821'), '4821');
+    });
+
+    test('a full account number is not a card mask', () {
+      // "transferiste a la cuenta *01768288204" is a destination, not four
+      // digits to map an account to — reading it as one would link the wrong
+      // account to every transfer.
+      expect(findCardLast4('cuenta *01768288204'), isNull);
+    });
+  });
+
   group('confidence', () {
     test('a bare alert stays below the auto-post threshold', () {
       // No issuer, no card, no timestamp: the pipeline must ask.

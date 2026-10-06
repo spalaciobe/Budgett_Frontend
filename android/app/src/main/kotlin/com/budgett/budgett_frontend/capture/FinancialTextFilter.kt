@@ -58,6 +58,24 @@ object FinancialTextFilter {
         "rechazada", "declinada", "fondos insuficientes",
     )
 
+    /**
+     * Tap-to-pay wallets report a payment without a verb.
+     *
+     * Google Wallet's whole notification body is "COP27,500.00 with Tarjeta
+     * Visa •1673" — an amount, a joining word, a card. No past-tense verb
+     * exists to match, yet contactless is how this user pays in person, so
+     * every one of those was being dropped here before Dart ever saw it.
+     *
+     * The card noun is required, which is what keeps this from re-opening the
+     * gate: "con" alone would match "$50.000 con descuento" in any
+     * advertisement.
+     */
+    private val walletShape = Regex(
+        """(?:\$|cop|usd|us\$)\s*[\d.,]+\s+(?:with|con)\s+""" +
+            """(?:tarjeta|card|visa|mastercard|master|amex|debito|credito)""",
+        RegexOption.IGNORE_CASE,
+    )
+
     /** Strips accents and lowercases, so "débito" matches "debito". */
     private fun normalize(input: String): String =
         Normalizer.normalize(input, Normalizer.Form.NFD)
@@ -68,6 +86,7 @@ object FinancialTextFilter {
         if (text.isBlank()) return false
         if (!amountPattern.containsMatchIn(text)) return false
         val normalized = normalize(text)
+        if (walletShape.containsMatchIn(normalized)) return true
         return actionWords.any { normalized.contains(it) }
     }
 
