@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:budgett_frontend/core/parsing/issuer_registry.dart';
+import 'package:budgett_frontend/core/parsing/preauth_merchants.dart';
 import 'package:budgett_frontend/core/services/capture_ingest_service.dart';
 import 'package:budgett_frontend/core/services/message_capture_service.dart';
 import 'package:budgett_frontend/core/utils/error_messages.dart';
@@ -852,8 +853,14 @@ class _EditMerchantSheetState extends ConsumerState<EditMerchantSheet> {
               contentPadding: EdgeInsets.zero,
               title: const Text('Record without asking'),
               subtitle: Text(
+                // Ride-hailing and fuel authorise an estimate and settle
+                // later, so say so here rather than letting the user discover
+                // it through a wrong amount.
                 _autoPost
-                    ? 'Purchases here are filed straight away.'
+                    ? (!chargesInAdvance(widget.alias.pattern)
+                        ? 'Purchases here are filed straight away.'
+                        : 'Filed straight away — but this merchant charges '
+                            'before the final amount is known.')
                     : 'Purchases here wait in the inbox for review.',
                 style: AppText.caption.copyWith(color: muted),
               ),

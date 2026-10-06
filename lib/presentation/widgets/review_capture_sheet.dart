@@ -6,6 +6,7 @@ import 'package:budgett_frontend/core/app_text.dart';
 import 'package:budgett_frontend/core/parsing/expense_message_parser.dart';
 import 'package:budgett_frontend/core/parsing/issuer_registry.dart';
 import 'package:budgett_frontend/core/parsing/message_kind.dart';
+import 'package:budgett_frontend/core/parsing/preauth_merchants.dart';
 import 'package:budgett_frontend/core/parsing/text_normalizer.dart';
 import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:budgett_frontend/data/models/account_model.dart';
@@ -57,7 +58,9 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
   String? _expenseGroupId;
 
   bool _rememberName = true;
-  bool _autoPostNext = true;
+  /// Off by default for merchants that authorise before they settle —
+  /// see [chargesInAdvance]. Set in initState, once the merchant is known.
+  late bool _autoPostNext;
   bool _rememberCard = true;
   bool _showRawMessage = false;
   bool _saving = false;
@@ -73,6 +76,7 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
   @override
   void initState() {
     super.initState();
+    _autoPostNext = !chargesInAdvance(_merchantKey);
     _amountController = TextEditingController(
       text: _message.amount == null
           ? ''
@@ -602,8 +606,9 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
               : (value) => setState(() => _autoPostNext = value),
           title: const Text('Record future ones automatically',
               style: AppText.subtitle),
-          subtitle: const Text(
-            'Skips this review when the next message matches',
+          subtitle: Text(
+            preauthReason(key) ??
+                'Skips this review when the next message matches',
             style: AppText.caption,
           ),
           contentPadding: EdgeInsets.zero,
