@@ -224,6 +224,8 @@ int _normalizeYear(int year) => year >= 100 ? year : 2000 + year;
 /// Returns null when the message carries no timestamp, or when the timestamp
 /// it carries is more than two days away from [receivedAt] — that is almost
 /// always a due date or a statement date rather than the payment instant.
+///
+/// A date with no time of day is also rejected: see [_build].
 DateTime? findOccurredAt(String text, DateTime receivedAt) {
   DateTime? candidate;
 
@@ -307,6 +309,12 @@ DateTime? _build({
   required String? second,
   required DateTime fallback,
 }) {
+  // A date with no time is not an instant. Email receipts carry only a date,
+  // and reading that as midnight put the same payment twelve hours away from
+  // the bank's own SMS — outside the dedup window. That is how one credit-card
+  // payment reached the inbox three times. Returning null here lets the caller
+  // fall back to the arrival time, which is within minutes of the event.
+  if (hour == null) return null;
   if (month < 1 || month > 12 || day < 1 || day > 31) return null;
   final h = hour == null ? 0 : int.tryParse(hour) ?? 0;
   final m = minute == null ? 0 : int.tryParse(minute) ?? 0;
@@ -516,9 +524,13 @@ class ExpenseMessageParser {
 
     // Currency: an explicit marker on the number wins; otherwise infer from
     // wording ("10 dolares") and default to COP.
-    final currency = amount.currency == 'USD'
-        ? 'USD'
-        : inferCurrency(normalized);
+    // The marker attached to the number is authoritative. Inferring from the
+    // wider text read "Compraste COP2.672,98 en UBER BV USD-USD COLO" as
+    // dollars, because the merchant's NAME contains "USD" — turning a ~$2,700
+    // peso ride into 2,672.98 dollars, and hiding it from every budget
+    // aggregation, which all filter on currency='COP'.
+    final currency =
+        amount.hasMarker ? amount.currency : inferCurrency(normalized);
 
     // Base plus a point per corroborating signal. A fully-formed alert
     // (known bank, merchant, card, timestamp) lands around 0.95; a bare

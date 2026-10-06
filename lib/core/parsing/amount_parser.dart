@@ -16,11 +16,18 @@ class AmountMatch {
   final int start;
   final int end;
 
+  /// True when the number itself carried a currency marker (`$`, `COP`,
+  /// `US$`). Without this the caller cannot tell an explicit `COP2.672,98`
+  /// from a bare `2.672,98`, and would let an unrelated "USD" elsewhere in
+  /// the message override the bank's own marker.
+  final bool hasMarker;
+
   const AmountMatch({
     required this.value,
     required this.currency,
     required this.start,
     required this.end,
+    this.hasMarker = false,
   });
 }
 
@@ -88,6 +95,7 @@ AmountMatch? findAmount(String text) {
       currency: currency,
       start: m.start,
       end: m.end,
+      hasMarker: marker != null,
     );
 
     if (marker != null) {

@@ -333,6 +333,36 @@ void main() {
     });
   });
 
+  group('currency comes from the marker, not the prose', () {
+    // Verbatim. The merchant's NAME contains "USD", and inferring currency
+    // from the whole text read a ~24,000 peso ride as 23,916 dollars — a
+    // 4,000x overstatement that also hid it from every budget aggregation,
+    // since those all filter on currency='COP'.
+    const uber =
+        'Bancolombia: Compraste COP23.916,36 en UBER BV USD-USD COLO, el '
+        '29/09/2026 a las 09:49. Esta compra esta asociada a T.Cred *8225.';
+
+    test('an explicit COP marker beats a stray USD in the merchant name', () {
+      final result = _parse(uber, receivedAt: DateTime(2026, 9, 29, 9, 50));
+      expect(result.amount, 23916.36);
+      expect(result.currency, 'COP');
+    });
+
+    test('wording still decides when the number carries no marker', () {
+      // 120, not 25: a bare number under 100 is rejected as implausible for
+      // money, so a smaller figure would test the plausibility rule instead.
+      final result = _parse('Compra por 120 dolares en SPOTIFY');
+      expect(result.amount, 120);
+      expect(result.currency, 'USD');
+    });
+
+    test('an explicit US\$ marker is honoured', () {
+      final result = _parse('Compra por US\$12.50 en SPOTIFY');
+      expect(result.currency, 'USD');
+      expect(result.amount, 12.5);
+    });
+  });
+
   group('messages that are not movements', () {
     test('one-time passwords are ignored, digits and all', () {
       final result = _parse(
