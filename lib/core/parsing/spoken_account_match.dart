@@ -14,9 +14,14 @@ import 'package:budgett_frontend/core/parsing/text_normalizer.dart';
 import 'package:budgett_frontend/data/models/account_model.dart';
 
 /// Words in account names that identify no account on their own.
+///
+/// "Efectivo" is deliberately NOT here. It is a generic word in a sentence
+/// but an exact account name in this app, and "pagué en efectivo" means that
+/// account and nothing else. Two accounts that both contain it still cancel
+/// out, which is the right answer when there really is a choice.
 const _genericAccountWords = {
   'CUENTA', 'AHORRO', 'AHORROS', 'CORRIENTE', 'DEBITO', 'CREDITO',
-  'TARJETA', 'EFECTIVO', 'CASH', 'ACCOUNT', 'SAVINGS', 'CARD', 'MI', 'DE',
+  'TARJETA', 'ACCOUNT', 'SAVINGS', 'CARD', 'MI', 'DE',
   'LA', 'EL', 'MY', 'THE', 'USD', 'COP',
 };
 

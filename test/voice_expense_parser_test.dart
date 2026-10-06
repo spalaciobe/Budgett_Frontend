@@ -211,6 +211,25 @@ void _sample() {
       );
     });
 
+    test('"en efectivo" picks the Efectivo account', () {
+      // Generic as a word, exact as an account name in this app.
+      expect(
+        parseVoiceExpense('pague veinte mil en efectivo',
+                now: _now, accounts: _accounts)
+            .accountId,
+        'acc-cash',
+      );
+    });
+
+    test('but "cuenta" still matches nothing', () {
+      expect(
+        parseVoiceExpense('gaste veinte mil de la cuenta de ahorros',
+                now: _now, accounts: _accounts)
+            .accountId,
+        isNull,
+      );
+    });
+
     test('a distinctive name matches', () {
       expect(
         parseVoiceExpense('pague treinta mil con Nu',
