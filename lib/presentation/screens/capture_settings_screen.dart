@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:budgett_frontend/core/parsing/issuer_registry.dart';
@@ -123,7 +124,9 @@ class _SourcesAndPermissions extends ConsumerWidget {
           const Divider(height: 1),
           ListTile(
             leading: Icon(
-              status.notificationAccess ? Icons.check_circle : Icons.circle_outlined,
+              status.notificationAccess
+                  ? Icons.check_circle
+                  : Icons.circle_outlined,
               color: status.notificationAccess
                   ? Theme.of(context).colorScheme.primary
                   : Theme.of(context).colorScheme.outline,
@@ -278,8 +281,7 @@ class _AutomationCard extends ConsumerWidget {
     final controller = TextEditingController(
       text: current <= 0
           ? ''
-          : CurrencyFormatter.format(current,
-              includeSymbol: false),
+          : CurrencyFormatter.format(current, includeSymbol: false),
     );
 
     final result = await showDialog<double>(
@@ -321,7 +323,8 @@ class _AutomationCard extends ConsumerWidget {
     );
 
     if (result != null) {
-      await ref.read(captureSettingsProvider.notifier)
+      await ref
+          .read(captureSettingsProvider.notifier)
           .setAutoPostMaxAmount(result);
     }
   }
@@ -405,8 +408,7 @@ class _KnownSourcesCard extends ConsumerWidget {
               }
               return Column(
                 children: [
-                  for (final source in sources)
-                    _SourceTile(source: source),
+                  for (final source in sources) _SourceTile(source: source),
                 ],
               );
             },
@@ -428,9 +430,8 @@ class _SourceTile extends ConsumerWidget {
     final flattened = <Account>[
       for (final account in accounts) ...[account, ...account.pockets]
     ];
-    final defaultAccount = flattened
-        .where((a) => a.id == source.defaultAccountId)
-        .firstOrNull;
+    final defaultAccount =
+        flattened.where((a) => a.id == source.defaultAccountId).firstOrNull;
 
     final details = <String>[
       if (source.hasOverride) source.detectedName ?? source.sourceKey,
@@ -442,13 +443,11 @@ class _SourceTile extends ConsumerWidget {
     return ListTile(
       leading: Icon(
         source.isSms ? Icons.sms_outlined : Icons.notifications_outlined,
-        color: source.isEnabled
-            ? null
-            : Theme.of(context).colorScheme.outline,
+        color: source.isEnabled ? null : Theme.of(context).colorScheme.outline,
       ),
       title: Text(source.effectiveName),
-      subtitle: Text(details.join(' · '),
-          maxLines: 2, overflow: TextOverflow.fade),
+      subtitle:
+          Text(details.join(' · '), maxLines: 2, overflow: TextOverflow.fade),
       trailing: Switch(
         value: source.isEnabled,
         onChanged: (value) => _toggle(context, ref, value),
@@ -644,8 +643,8 @@ class _RememberedMerchantsCard extends ConsumerWidget {
             ),
             error: (error, _) => Padding(
               padding: kCardPadding,
-              child:
-                  Text(friendlyError(error, action: 'load remembered merchants')),
+              child: Text(
+                  friendlyError(error, action: 'load remembered merchants')),
             ),
             data: (aliases) {
               if (aliases.isEmpty) {
@@ -703,8 +702,8 @@ class _AliasTile extends ConsumerWidget {
         color: alias.autoPost ? Theme.of(context).colorScheme.primary : null,
       ),
       title: Text(alias.displayName),
-      subtitle: Text(details.join(' · '),
-          maxLines: 2, overflow: TextOverflow.fade),
+      subtitle:
+          Text(details.join(' · '), maxLines: 2, overflow: TextOverflow.fade),
       trailing: IconButton(
         tooltip: 'Forget this merchant',
         icon: const Icon(Icons.delete_outline),
@@ -755,7 +754,6 @@ class _AliasTile extends ConsumerWidget {
     }
   }
 }
-
 
 /// Renaming a remembered merchant, and deciding what happens to the movements
 /// already recorded under the old name.
@@ -955,7 +953,6 @@ class _EditMerchantSheetState extends ConsumerState<EditMerchantSheet> {
   }
 }
 
-
 /// The optional on-device model, for receipts and dictation.
 ///
 /// Presented as what it is: a large, slow download that helps with the
@@ -969,9 +966,27 @@ class _LocalModelCard extends ConsumerStatefulWidget {
 }
 
 class _LocalModelCardState extends ConsumerState<_LocalModelCard> {
+  static const _tokenKey = 'hugging_face_token';
+
   double? _progress;
   bool _downloading = false;
   String? _error;
+  final _tokenController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    SharedPreferences.getInstance().then((prefs) {
+      if (!mounted) return;
+      setState(() => _tokenController.text = prefs.getString(_tokenKey) ?? '');
+    });
+  }
+
+  @override
+  void dispose() {
+    _tokenController.dispose();
+    super.dispose();
+  }
 
   Future<void> _download(LocalModelOption option) async {
     setState(() {
@@ -980,16 +995,26 @@ class _LocalModelCardState extends ConsumerState<_LocalModelCard> {
       _error = null;
     });
     try {
+      final token = _tokenController.text.trim();
+      if (token.isNotEmpty) {
+        // Remembered so a 3 GB download that drops halfway does not also
+        // mean pasting the token again.
+        (await SharedPreferences.getInstance()).setString(_tokenKey, token);
+      }
       await ref.read(localLlmServiceProvider).download(
-            option,
-            onProgress: (fraction, _) {
-              if (mounted) setState(() => _progress = fraction);
-            },
-          );
+        option,
+        token: token.isEmpty ? null : token,
+        onProgress: (fraction, _) {
+          if (mounted) setState(() => _progress = fraction);
+        },
+      );
       ref.invalidate(localModelInstalledProvider);
       ref.invalidate(localModelSizeProvider);
     } catch (e) {
-      if (mounted) setState(() => _error = 'The download failed: $e');
+      if (mounted) {
+        setState(() => _error =
+            e is LocalLlmUnavailable ? e.message : 'The download failed: $e');
+      }
     } finally {
       if (mounted) setState(() => _downloading = false);
     }
@@ -1008,7 +1033,8 @@ class _LocalModelCardState extends ConsumerState<_LocalModelCard> {
     if (!ref.watch(localLlmServiceProvider).isSupported) {
       return const SizedBox.shrink();
     }
-    final installed = ref.watch(localModelInstalledProvider).valueOrNull ?? false;
+    final installed =
+        ref.watch(localModelInstalledProvider).valueOrNull ?? false;
     final size = ref.watch(localModelSizeProvider).valueOrNull ?? 0;
 
     return Card(
@@ -1032,7 +1058,8 @@ class _LocalModelCardState extends ConsumerState<_LocalModelCard> {
                   kGapSm,
                   Text(
                     'Installed · ${(size / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB',
-                    style: AppText.caption.copyWith(color: theme.colorScheme.primary),
+                    style: AppText.caption
+                        .copyWith(color: theme.colorScheme.primary),
                   ),
                 ],
               ],
@@ -1059,8 +1086,40 @@ class _LocalModelCardState extends ConsumerState<_LocalModelCard> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: kSpaceXl),
               child: Text(_error!,
-                  style: AppText.caption.copyWith(color: theme.colorScheme.error)),
+                  style:
+                      AppText.caption.copyWith(color: theme.colorScheme.error)),
             ),
+          if (!installed) ...[
+            Padding(
+              padding:
+                  const EdgeInsets.fromLTRB(kSpaceXl, 0, kSpaceXl, kSpaceLg),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'These weights are gated by Google. Open the model page, '
+                    'accept the licence, then create a read token at '
+                    'huggingface.co/settings/tokens and paste it here.',
+                    style: AppText.caption.copyWith(color: muted),
+                  ),
+                  kGapSm,
+                  TextField(
+                    controller: _tokenController,
+                    enabled: !_downloading,
+                    obscureText: true,
+                    autocorrect: false,
+                    enableSuggestions: false,
+                    decoration: const InputDecoration(
+                      labelText: 'Hugging Face token',
+                      hintText: 'hf_…',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           if (installed)
             ListTile(
               leading: const Icon(Icons.delete_outline),
@@ -1076,9 +1135,11 @@ class _LocalModelCardState extends ConsumerState<_LocalModelCard> {
                 leading: const Icon(Icons.download_outlined),
                 title: Text(option.name),
                 subtitle: Text(
-                  '${option.approxSizeLabel} · ${option.description}',
+                  '${option.approxSizeLabel} · ${option.description}\n'
+                  '${option.licencePage}',
                   style: AppText.caption.copyWith(color: muted),
                 ),
+                isThreeLine: true,
                 onTap: _downloading ? null : () => _download(option),
               ),
             ),

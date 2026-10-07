@@ -34,7 +34,9 @@ class _FakeLlm implements LocalLlmService {
   Future<void> remove() async {}
   @override
   Future<void> download(LocalModelOption option,
-          {DownloadProgress? onProgress, Object? client}) async =>
+          {DownloadProgress? onProgress,
+          Object? client,
+          String? token}) async =>
       throw UnimplementedError();
 }
 

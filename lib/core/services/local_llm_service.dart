@@ -36,12 +36,17 @@ class LocalModelOption {
 
   final String description;
 
+  /// Where to accept the licence. Shown because the download cannot work
+  /// until the user has, and a 401 says nothing about why.
+  final String licencePage;
+
   const LocalModelOption({
     required this.id,
     required this.name,
     required this.approxBytes,
     required this.url,
     required this.description,
+    required this.licencePage,
   });
 
   String get approxSizeLabel =>
@@ -57,6 +62,7 @@ const kLocalModels = <LocalModelOption>[
     url: 'https://huggingface.co/google/gemma-3n-E2B-it-litert-preview/'
         'resolve/main/gemma-3n-E2B-it-int4.task',
     description: 'Smaller and quicker. Enough for reading receipts.',
+    licencePage: 'https://huggingface.co/google/gemma-3n-E2B-it-litert-preview',
   ),
   LocalModelOption(
     id: 'gemma3n-e4b',
@@ -65,6 +71,7 @@ const kLocalModels = <LocalModelOption>[
     url: 'https://huggingface.co/google/gemma-3n-E4B-it-litert-preview/'
         'resolve/main/gemma-3n-E4B-it-int4.task',
     description: 'Better at messy text, and noticeably slower.',
+    licencePage: 'https://huggingface.co/google/gemma-3n-E4B-it-litert-preview',
   ),
 ];
 
@@ -119,6 +126,10 @@ class LocalLlmService {
     LocalModelOption option, {
     DownloadProgress? onProgress,
     http.Client? client,
+
+    /// A Hugging Face access token. Required: Gemma's weights are gated
+    /// behind Google's licence, and without one the download is a 401.
+    String? token,
   }) async {
     if (!isSupported) {
       throw UnsupportedError('A local model only runs on Android');
@@ -136,7 +147,24 @@ class LocalLlmService {
     IOSink? sink;
     try {
       final request = http.Request('GET', Uri.parse(option.url));
+      // Gemma's weights sit behind Google's licence on Hugging Face, so an
+      // anonymous GET is refused. The token is sent to huggingface.co and
+      // nowhere else.
+      if (token != null && token.trim().isNotEmpty) {
+        request.headers['Authorization'] = 'Bearer ${token.trim()}';
+      }
+      // Hugging Face answers with a redirect to a CDN; following it by hand
+      // would drop the header, and dropping it is a 401 on the second hop.
+      request.followRedirects = true;
       final response = await httpClient.send(request);
+
+      if (response.statusCode == 401 || response.statusCode == 403) {
+        throw const LocalLlmUnavailable(
+          'Hugging Face refused the download. These weights are gated: open '
+          'the model page in a browser, accept Google\'s licence, then paste '
+          'an access token below.',
+        );
+      }
       if (response.statusCode != 200) {
         throw HttpException(
           'The download failed (HTTP ${response.statusCode})',
