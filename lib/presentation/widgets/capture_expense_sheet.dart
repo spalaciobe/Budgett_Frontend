@@ -129,7 +129,14 @@ class _CaptureExpenseSheetState extends ConsumerState<CaptureExpenseSheet> {
     );
     if (picked == null) return const [];
 
-    if (mounted) setState(() => _status = 'Reading the image…');
+    // The model only runs on what the rules could not read, but when it
+    // does it takes seconds. Saying so beats a spinner that looks stuck.
+    final withModel = await ref.read(localLlmServiceProvider).isInstalled();
+    if (mounted) {
+      setState(() => _status = withModel
+          ? 'Reading the image… the on-device model may take a few seconds'
+          : 'Reading the image…');
+    }
     return ref.read(draftsFromImageProvider(picked.path).future);
   }
 

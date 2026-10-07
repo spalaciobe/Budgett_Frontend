@@ -32,11 +32,16 @@ class LocalLlmBridge(private val context: Context) : MethodChannel.MethodCallHan
         private const val MODEL_FILE = "local_model.task"
 
         /**
-         * Generation is bounded hard. The answer wanted is a few dozen
-         * characters of JSON; without a cap a small model will happily
-         * explain itself for a thousand tokens while the user waits.
+         * The whole context window — prompt AND answer — not a cap on the
+         * answer alone. That distinction matters: the extraction prompt is
+         * about 250 tokens before the receipt text is appended, so the 256
+         * this used to be left the model no room to reply at all.
+         *
+         * A thousand covers the prompt, a screenshot's worth of OCR, and the
+         * line of JSON wanted back, without reserving memory for a
+         * conversation this never has.
          */
-        private const val MAX_TOKENS = 256
+        private const val MAX_TOKENS = 1024
     }
 
     /**
