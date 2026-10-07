@@ -48,6 +48,16 @@ class DraftCaptureBridge(private val context: Context) : MethodChannel.MethodCal
             11, 12, 13,
             SpeechRecognizer.ERROR_NETWORK,
         )
+
+        /**
+         * Failures that mean the recogniser stopped before the speaker did.
+         * If a partial transcription survives, it is worth more than the
+         * error: half a sentence still usually carries the amount.
+         */
+        private val CUT_SHORT_ERRORS = setOf(
+            SpeechRecognizer.ERROR_NO_MATCH,
+            SpeechRecognizer.ERROR_SPEECH_TIMEOUT,
+        )
     }
 
     var activity: Activity? = null
@@ -257,13 +267,18 @@ class DraftCaptureBridge(private val context: Context) : MethodChannel.MethodCal
             val recognizer = SpeechRecognizer.createSpeechRecognizer(context)
             speechRecognizer = recognizer
 
+            // The best transcription seen so far. A pause mid-sentence makes
+            // the recogniser give up with ERROR_NO_MATCH, and without this
+            // everything already said went with it.
+            var heardSoFar = ""
+
             recognizer.setRecognitionListener(object : RecognitionListener {
                 override fun onResults(results: Bundle?) {
                     val text = results
                         ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                         ?.firstOrNull()
                         .orEmpty()
-                    finish { it.success(text) }
+                    finish { it.success(if (text.isNotBlank()) text else heardSoFar) }
                 }
 
                 override fun onError(error: Int) {
@@ -272,7 +287,24 @@ class DraftCaptureBridge(private val context: Context) : MethodChannel.MethodCal
                         listen(attempts, index + 1)
                         return
                     }
+                    // Cut short, but something was understood. Handing back
+                    // half a sentence beats handing back "nothing was heard"
+                    // and losing the amount with it.
+                    if (error in CUT_SHORT_ERRORS && heardSoFar.isNotBlank()) {
+                        finish { it.success(heardSoFar) }
+                        return
+                    }
                     finish { it.error("speech_error", describe(error), null) }
+                }
+
+                override fun onPartialResults(partialResults: Bundle?) {
+                    val partial = partialResults
+                        ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                        ?.firstOrNull()
+                        .orEmpty()
+                    // Longest wins: a later partial is sometimes a re-guess of
+                    // the last word rather than the whole utterance.
+                    if (partial.length > heardSoFar.length) heardSoFar = partial
                 }
 
                 override fun onReadyForSpeech(params: Bundle?) = Unit
@@ -280,7 +312,6 @@ class DraftCaptureBridge(private val context: Context) : MethodChannel.MethodCal
                 override fun onRmsChanged(rmsdB: Float) = Unit
                 override fun onBufferReceived(buffer: ByteArray?) = Unit
                 override fun onEndOfSpeech() = Unit
-                override fun onPartialResults(partialResults: Bundle?) = Unit
                 override fun onEvent(eventType: Int, params: Bundle?) = Unit
             })
 
@@ -292,6 +323,31 @@ class DraftCaptureBridge(private val context: Context) : MethodChannel.MethodCal
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE, locale)
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, locale)
                 putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+                // Partials are what make a cut-off recoverable.
+                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+
+                // Android stops listening after about a second of silence,
+                // which means dictating an expense has to be done in one
+                // breath. Someone saying "Mariana me envió un pago… de un
+                // préstamo" pauses in the middle and loses the rest.
+                //
+                // These are a request, not a guarantee — the recogniser may
+                // ignore them — which is why the partial-result fallback
+                // above exists as well.
+                putExtra(
+                    RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,
+                    3000L,
+                )
+                putExtra(
+                    RecognizerIntent
+                        .EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS,
+                    3000L,
+                )
+                putExtra(
+                    RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS,
+                    4000L,
+                )
+
                 if (offline) {
                     putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
                 }

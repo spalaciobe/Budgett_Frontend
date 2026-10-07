@@ -179,9 +179,14 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
 
     if (draft.amount != null) {
       // Whole pesos lose the trailing ",00" every Colombian amount carries.
-      final raw = draft.amount! % 1 == 0
+      // The decimal separator has to be the one the field's formatter keeps.
+      // For COP that is the COMMA: it strips everything else, so seeding
+      // "65545.94" lost the dot and became $6.554.594 — a 65-thousand-peso
+      // refund entered as six and a half million.
+      var raw = draft.amount! % 1 == 0
           ? draft.amount!.toStringAsFixed(0)
           : draft.amount!.toStringAsFixed(2);
+      if (draft.currency != 'USD') raw = raw.replaceAll('.', ',');
 
       // Through the field's own formatter, not straight into the controller.
       // An input formatter only runs on typing, so a seeded amount came out
