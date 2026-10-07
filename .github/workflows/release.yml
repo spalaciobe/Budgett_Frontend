@@ -8,6 +8,18 @@ on:
 permissions:
   contents: write
 
+# One release at a time, queued rather than cancelled.
+#
+# The build number is read from pubspec.yaml when a run starts, so two runs
+# that overlap both compute the same one: the first publishes v1.0.0+62 and
+# the second dies pushing a tag that already exists, discarding an APK it had
+# already signed. Retrying the push cannot fix that — the number was decided
+# minutes earlier. Serialising is what actually fixes it, and queueing rather
+# than cancelling means no commit goes unreleased.
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
