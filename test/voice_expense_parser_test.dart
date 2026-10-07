@@ -112,6 +112,58 @@ void main() {
 
   _sample();
 
+
+  group('the sentence the phone actually transcribed', () {
+    // Verbatim, once the Spanish pack was installed.
+    const spoken =
+        'Mariana me envió un pago de un préstamo por \$200,000 a bancolombia';
+
+    ExpenseDraft read() =>
+        parseVoiceExpense(spoken, now: _now, accounts: _accounts);
+
+    test('"un" is an article, not the number one', () {
+      // It had been read as 1, which then became 1.000 by the
+      // under-a-thousand rule, and the scan stopped at the first word.
+      expect(read().amount, 200000);
+    });
+
+    test('"me envió" is money arriving', () {
+      expect(read().kind.transactionType, 'income');
+    });
+
+    test('the person is the name and the reason is the description', () {
+      final draft = read();
+      expect(draft.merchant, 'Mariana');
+      expect(draft.description, 'Pago de un prestamo');
+    });
+
+    test('the named account is selected', () {
+      expect(read().accountId, 'acc-banco');
+    });
+  });
+
+  group('who is named', () {
+    test('a sentence that starts with the verb names nobody', () {
+      final draft =
+          parseVoiceExpense('me pagaron dos millones', now: _now);
+      expect(draft.merchant, isNull);
+      expect(draft.amount, 2000000);
+    });
+
+    test('a name after the verb still works', () {
+      final draft = parseVoiceExpense('le transferi cincuenta mil a Mariana',
+          now: _now);
+      expect(draft.merchant, 'Mariana');
+    });
+
+    test('a spending sentence keeps its description', () {
+      final draft =
+          parseVoiceExpense('gaste veinte mil en el almuerzo', now: _now);
+      expect(draft.merchant, isNull);
+      expect(draft.description, 'Almuerzo');
+    });
+  });
+
   group('currency', () {
     test('pesos unless dollars are said', () {
       expect(_parse('gaste veinte mil').currency, 'COP');

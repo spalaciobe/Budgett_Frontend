@@ -13,7 +13,7 @@ library;
 import 'package:budgett_frontend/core/parsing/text_normalizer.dart';
 
 const _units = <String, int>{
-  'cero': 0, 'un': 1, 'uno': 1, 'una': 1, 'dos': 2, 'tres': 3, 'cuatro': 4,
+  'cero': 0, 'dos': 2, 'tres': 3, 'cuatro': 4,
   'cinco': 5, 'seis': 6, 'siete': 7, 'ocho': 8, 'nueve': 9, 'diez': 10,
   'once': 11, 'doce': 12, 'trece': 13, 'catorce': 14, 'quince': 15,
   'dieciseis': 16, 'diecisiete': 17, 'dieciocho': 18, 'diecinueve': 19,
@@ -36,6 +36,20 @@ const _units = <String, int>{
 ///
 /// Only honoured immediately before a scale word. "Send to Mariana" keeps
 /// its preposition; "to hundred thousand" is two hundred thousand.
+/// Words that are a number only in front of a scale word.
+///
+/// "un" is an article far more often than it is the number one. "Mariana me
+/// envió un pago de un préstamo por \$200,000" was read as one peso — the
+/// article stopped the scan dead at the first word — while "un millón" has
+/// to keep working.
+const _articleNumbers = <String, int>{
+  'un': 1,
+  'uno': 1,
+  'una': 1,
+  'a': 1,
+  'an': 1,
+};
+
 const _mishearings = <String, int>{
   'to': 2,
   'too': 2,
@@ -130,6 +144,19 @@ double? parseSpokenAmount(String text) {
       group = (group == 0 ? 1 : group) * 100;
       sawAnything = true;
       continue;
+    }
+
+    final article = _articleNumbers[word];
+    if (article != null) {
+      final next = i + 1 < words.length ? words[i + 1] : '';
+      if (_multipliers.containsKey(next) || _hundredWords.contains(next)) {
+        group += article;
+        sawAnything = true;
+        continue;
+      }
+      // An article in the middle of a sentence ends nothing; it is simply
+      // not part of the number.
+      if (!sawAnything) continue;
     }
 
     final misheard = _mishearings[word];

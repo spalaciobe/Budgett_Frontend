@@ -25,6 +25,15 @@ const _kindVerbs = <(String, MessageKind)>[
   ('me transfirieron', MessageKind.transferIn),
   ('me consignaron', MessageKind.transferIn),
   ('me enviaron', MessageKind.transferIn),
+  // Singular, which is how it comes out when one person sent it: "Mariana me
+  // envió un pago de un préstamo".
+  ('me envio', MessageKind.transferIn),
+  ('me mando', MessageKind.transferIn),
+  ('me transfirio', MessageKind.transferIn),
+  ('me consigno', MessageKind.transferIn),
+  ('me devolvio', MessageKind.transferIn),
+  ('me abono', MessageKind.transferIn),
+  ('me presto', MessageKind.transferIn),
   ('me llego', MessageKind.transferIn),
   ('me entro', MessageKind.transferIn),
   ('me devolvieron', MessageKind.transferIn),
@@ -156,11 +165,13 @@ ExpenseDraft parseVoiceExpense(
     // only a transfer's counterparty is treated as a merchant, since that is
     // a name worth remembering a rule against.
     merchant: kind == MessageKind.transferOut || kind == MessageKind.transferIn
-        ? subject
+        ? (_leadingName(spoken, verbEnd) ?? subject)
         : null,
     description: kind == MessageKind.transferOut ||
             kind == MessageKind.transferIn
-        ? null
+        // When the sender was named, the reason is still worth keeping; it
+        // just belongs in the description rather than in the name.
+        ? (_leadingName(spoken, verbEnd) == null ? null : subject)
         : subject,
     kind: kind ?? MessageKind.purchase,
     accountId: accountId,
@@ -187,6 +198,13 @@ DateTime _resolveDay(String normalized, DateTime at) {
 /// What the money was for: the words after the preposition that follows the
 /// amount.
 String? _findSubject(String normalized, int searchFrom) {
+  // What the money was FOR often sits between the verb and the figure, not
+  // after it: "me envió un pago de un préstamo por \$200,000 a bancolombia".
+  // Looking only after the amount took "a bancolombia" — the account — and
+  // threw the reason away.
+  final between = _subjectBeforeAmount(normalized, searchFrom);
+  if (between != null) return between;
+
   // Start after the number, so "en" inside "veinte" cannot match and the
   // preposition found is the one introducing the subject.
   final amountEnd = _endOfAmount(normalized, searchFrom);
@@ -264,3 +282,87 @@ String _titleCase(String input) => input
     .split(' ')
     .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
     .join(' ');
+
+/// The reason, when it sits between the verb and the figure.
+///
+/// Returns null unless there is something there worth keeping, so the
+/// ordinary "gasté veinte mil en el almuerzo" — where the gap is empty —
+/// falls through to the search after the amount.
+String? _subjectBeforeAmount(String normalized, int verbEnd) {
+  final figure = RegExp(r'(?:\$|cop|usd)?\s*\d|' + _spokenNumberWord)
+      .firstMatch(normalized.substring(verbEnd));
+  if (figure == null) return null;
+
+  final region = normalized.substring(verbEnd, verbEnd + figure.start);
+  final words = region
+      .split(RegExp(r'[^a-z0-9]+'))
+      .where((w) => w.isNotEmpty)
+      .where((w) => !_subjectStopWords.contains(w))
+      .toList();
+
+  // Trim the articles and prepositions off both ends; they introduce the
+  // phrase rather than belong to it.
+  while (words.isNotEmpty && _phraseEdgeWords.contains(words.first)) {
+    words.removeAt(0);
+  }
+  while (words.isNotEmpty && _phraseEdgeWords.contains(words.last)) {
+    words.removeLast();
+  }
+
+  // One word of substance at least, and never a run-on.
+  if (words.where((w) => w.length >= 4).isEmpty) return null;
+  if (words.length > 5) return null;
+
+  return _sentenceCase(words.join(' '));
+}
+
+/// Articles and prepositions that top and tail a phrase without being part
+/// of it.
+const _phraseEdgeWords = {
+  'un', 'una', 'uno', 'el', 'la', 'los', 'las', 'de', 'del', 'por', 'para',
+  'a', 'al', 'en', 'con', 'the', 'of', 'for', 'to', 'on', 'at',
+};
+
+/// The first word of a spoken number, used to find where the figure starts.
+const _spokenNumberWord =
+    r'\b(?:cero|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|'
+    r'trece|catorce|quince|dieci\w+|veinti\w+|veinte|treinta|cuarenta|'
+    r'cincuenta|sesenta|setenta|ochenta|noventa|cien|ciento|\w*cientos|'
+    r'\w*cientas|mil|millon|millones|lucas?|palos?|one|two|three|four|five|'
+    r'six|seven|eight|nine|ten|twenty|thirty|forty|fifty|hundred|thousand|'
+    r'million)\b';
+
+/// Capitalises the first letter only. A dictated reason is a phrase, not a
+/// name, and "Pago De Un Prestamo" reads like a headline.
+String _sentenceCase(String input) =>
+    input.isEmpty ? input : '${input[0].toUpperCase()}${input.substring(1)}';
+
+/// A person named before the verb: "Mariana me envió un pago…".
+///
+/// Only from the ORIGINAL text, because capitalisation is the whole signal
+/// and the normalised copy has none. Returns null when the sentence starts
+/// with the verb, which is the usual shape — "me pagaron dos millones" names
+/// nobody.
+String? _leadingName(String spoken, int verbEnd) {
+  if (verbEnd == 0) return null;
+
+  final words = spoken.trim().split(RegExp(r'\s+'));
+  if (words.isEmpty) return null;
+
+  const notNames = {
+    'me', 'mi', 'yo', 'le', 'les', 'la', 'el', 'un', 'una', 'hoy', 'ayer',
+    'antier', 'anteayer', 'i', 'my', 'the', 'a', 'an', 'today', 'yesterday',
+  };
+
+  final taken = <String>[];
+  for (final word in words.take(3)) {
+    final clean = word.replaceAll(RegExp(r'[^\p{L}\p{N}]', unicode: true), '');
+    if (clean.isEmpty) break;
+    if (notNames.contains(clean.toLowerCase())) break;
+    // A name is capitalised and is not the verb.
+    if (!RegExp(r'^[A-ZÁÉÍÓÚÑÜ]').hasMatch(clean)) break;
+    taken.add(clean);
+  }
+
+  return taken.isEmpty ? null : taken.join(' ');
+}

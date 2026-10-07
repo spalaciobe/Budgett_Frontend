@@ -322,6 +322,50 @@ cOP -\$ 5.000,00
     });
   });
 
+
+  group('the whole screen, exactly as the camera returned it', () {
+    // Copied from the device's "Text read" panel. Note that OCR spells the
+    // same month two different ways in one image — "0CT" with a zero and
+    // "OCT" with a letter — and runs "cOP-\$" together on the second row.
+    const real = """
+243 - 000019 - 51 O\$67.464,95
+Detalles Movimientos
+Consultar comprobantes
+06 0CT 2026
+DEVOLUCION ABONO TC
+cOP \$ 65.545,94
+06 OCT 2026
+RECARGA DE TARJETA CIVICA
+cOP-\$ 10.000,00
+Transferir plata Ira Día a Día Bolsillos
+""";
+
+    test('finds both movements and neither is the balance', () {
+      final drafts = parseScreenshot(real, capturedAt: _captured);
+      expect(drafts, hasLength(2));
+      expect(drafts.map((d) => d.amount), isNot(contains(67464.95)));
+    });
+
+    test('reads each one the way the bank drew it', () {
+      final drafts = parseScreenshot(real, capturedAt: _captured);
+
+      expect(drafts[0].amount, 65545.94);
+      expect(drafts[0].merchant, 'DEVOLUCION ABONO TC');
+      expect(drafts[0].kind.transactionType, 'income');
+
+      expect(drafts[1].amount, 10000);
+      expect(drafts[1].merchant, 'RECARGA DE TARJETA CIVICA');
+      expect(drafts[1].kind.transactionType, 'expense');
+    });
+
+    test('both months resolve despite the inconsistent spelling', () {
+      final drafts = parseScreenshot(real, capturedAt: _captured);
+      for (final draft in drafts) {
+        expect(draft.date, DateTime(2026, 10, 6));
+      }
+    });
+  });
+
   group('what the status bar contributes', () {
     test('the battery reading is not a movement', () {
       // A real run filed a \$100 movement taken from the "100" beside the

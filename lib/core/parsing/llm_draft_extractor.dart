@@ -122,11 +122,20 @@ Future<ExpenseDraft> completeWithModel(
   required LocalLlmService llm,
   String? textOverride,
 }) async {
-  // A draft the rules read confidently is left alone: running the model would
-  // cost seconds and could only make it worse.
-  if (draft.confidence >= kDraftReviewThreshold && draft.isUsable) {
-    return draft;
-  }
+  // The model runs when the rules left something blank, OR when they produced
+  // a label that is plainly not a name.
+  //
+  // The second case is the one this originally missed. "Mariana me envió un
+  // pago de un préstamo por $200,000 a bancolombia" gave the right amount,
+  // the right direction and the right account — so the draft was confident —
+  // and a merchant of "Un Prestamo Por $200,000 A Bancolombia". Gating on
+  // confidence alone meant the model never saw the one field it is actually
+  // better at.
+  final needsHelp = !draft.isUsable ||
+      draft.confidence < kDraftReviewThreshold ||
+      _labelLooksPoor(draft.merchant) ||
+      _labelLooksPoor(draft.description);
+  if (!needsHelp) return draft;
 
   final String answer;
   try {
@@ -143,15 +152,26 @@ Future<ExpenseDraft> completeWithModel(
   final read = parseModelAnswer(answer);
   if (read == null) return draft;
 
-  // Only blanks. An amount the rules took from a line that said "TOTAL A
-  // PAGAR" is better evidence than anything a 2B model infers.
+  // What the model is allowed to touch depends on what a mistake costs.
+  //
+  // The AMOUNT is the ledger. A figure the rules took off a line that said
+  // "TOTAL A PAGAR" is better evidence than anything a four-bit model
+  // infers, so the model may only supply one that is missing. Same for the
+  // currency, the date and the direction, which all follow the amount.
+  //
+  // The LABEL is free text. A bad one is visible at a glance and costs
+  // nothing to correct, and a garbled phrase is precisely what the rules are
+  // worst at and a model is best at. So the model may replace a label that
+  // plainly is not a name.
   final amount = draft.amount ?? read.amount;
-  final merchant = draft.merchant ?? read.merchant;
-  final filledSomething =
-      (draft.amount == null && read.amount != null) ||
-          (draft.merchant == null && read.merchant != null);
+  final merchant = _labelLooksPoor(draft.merchant)
+      ? (read.merchant ?? draft.merchant)
+      : (draft.merchant ?? read.merchant);
 
-  if (!filledSomething) return draft;
+  final filledAmount = draft.amount == null && read.amount != null;
+  final improvedLabel =
+      merchant != draft.merchant && (read.merchant?.isNotEmpty ?? false);
+  if (!filledAmount && !improvedLabel) return draft;
 
   return draft.copyWith(
     amount: amount,
@@ -160,11 +180,40 @@ Future<ExpenseDraft> completeWithModel(
     kind: draft.amount == null && read.moneyOut == false
         ? MessageKind.transferIn
         : null,
-    // Capped below the threshold on purpose: a draft the model had to rescue
-    // stays marked as needing a look, however sure the model sounded.
-    confidence: 0.55,
-    warning: 'Read by the on-device model — check the amount',
+    // A draft the model had to supply a FIGURE for stays below the threshold,
+    // however sure the model sounded. One where it only tidied the label
+    // keeps the confidence the rules earned — the number was never in doubt.
+    confidence: filledAmount ? 0.55 : draft.confidence,
+    warning: filledAmount
+        ? 'Read by the on-device model — check the amount'
+        : draft.warning,
   );
+}
+
+/// True when a label is clearly not the name of who was paid.
+///
+/// Dictation produces these: the rules take whatever sits after a
+/// preposition, which for "un pago de un préstamo por \$200,000 a
+/// bancolombia" is the rest of the sentence, amount and all. A name does not
+/// contain a currency figure, does not run past a handful of words, and is
+/// not a lone article.
+bool _labelLooksPoor(String? label) {
+  if (label == null) return false;
+  final trimmed = label.trim();
+  if (trimmed.isEmpty) return true;
+
+  // A figure inside a name means the sentence was swallowed whole.
+  if (RegExp(r'[\$]|\b\d{3,}\b').hasMatch(trimmed)) return true;
+
+  final words = trimmed.split(RegExp(r'\s+'));
+  if (words.length > 5) return true;
+
+  // Nothing but filler.
+  const filler = {
+    'un', 'una', 'uno', 'el', 'la', 'los', 'las', 'de', 'del', 'por', 'para',
+    'a', 'en', 'the', 'of', 'for', 'to',
+  };
+  return words.every((w) => filler.contains(w.toLowerCase()));
 }
 
 /// The first balanced `{...}` in [answer].
