@@ -260,8 +260,18 @@ final _identifierLine = RegExp(
 _SignedAmount? _readSignedAmount(List<String> lines) {
   for (final line in lines) {
     if (_identifierLine.hasMatch(normalizeForMatch(line))) continue;
+    // A date is not an amount. "06 OCT 2026" was being read as 2.026 pesos
+    // whenever the screen held one movement, because the single-movement
+    // path searches every line and the year is a plausible figure.
+    if (_readDate(line, DateTime.now()) != null && _isDateOnly(line)) continue;
+
     final amount = findAmount(line);
     if (amount == null) continue;
+    // On a bank screen every figure that is money says so — "COP", "$",
+    // "USD". A bare number is a date, a reference, a card mask or a
+    // quantity, and treating one as an amount is how a year became a
+    // transaction.
+    if (!amount.hasMarker) continue;
 
     final before = line.substring(0, amount.start);
     // "-$ 557.000" and "- $557.000" both mean out; a dash used as a separator

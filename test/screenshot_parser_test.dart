@@ -200,6 +200,76 @@ Transaction No
     });
   });
 
+  group('a date is not an amount', () {
+    test('a single movement does not read its year as the figure', () {
+      // Verbatim from a cropped screenshot the user sent: one movement, so
+      // the single-movement path searches every line, and "06 OCT 2026"
+      // came back as \$2.026.
+      const cropped = '''
+06 OCT 2026
+DEVOLUCION ABONO TC
+COP \$ 65.545,94
+''';
+      final draft = parseScreenshot(cropped, capturedAt: _captured).single;
+      expect(draft.amount, 65545.94);
+      expect(draft.date, DateTime(2026, 10, 6));
+    });
+
+    test('a bare number on a bank screen is never money', () {
+      // Reference numbers, card masks and quantities all look like figures.
+      // On these screens real money always says COP, USD or \$.
+      const noisy = '''
+Bancolombia
+Comprobante 4458219
+Cuenta 9876
+COP -\$ 45.000,00
+''';
+      final draft = parseScreenshot(noisy, capturedAt: _captured).single;
+      expect(draft.amount, 45000);
+    });
+
+    test('a decimal amount keeps its cents', () {
+      const withCents = '''
+06 OCT 2026
+DEVOLUCION ABONO TC
+COP \$ 65.545,94
+05 OCT 2026
+RECARGA DE TARJETA CIVICA
+COP -\$ 10.000,00
+''';
+      final drafts = parseScreenshot(withCents, capturedAt: _captured);
+      expect(drafts, hasLength(2));
+      expect(drafts[0].amount, 65545.94);
+      expect(drafts[0].kind.transactionType, 'income');
+      expect(drafts[1].amount, 10000);
+      expect(drafts[1].kind.transactionType, 'expense');
+    });
+  });
+
+  group('two movements on the same day', () {
+    test('a repeated date still starts a new row', () {
+      // Both of these are 06 OCT 2026; nothing but the repeated heading
+      // separates them.
+      const sameDay = '''
+06 OCT 2026
+DEVOLUCION ABONO TC
+COP \$ 65.545,94
+06 OCT 2026
+RECARGA DE TARJETA CIVICA
+COP -\$ 10.000,00
+Transferir plata Ir a Día a Día Bolsillos
+''';
+      final drafts = parseScreenshot(sameDay, capturedAt: _captured);
+      expect(drafts, hasLength(2));
+      expect(drafts[0].amount, 65545.94);
+      expect(drafts[0].merchant, 'DEVOLUCION ABONO TC');
+      expect(drafts[0].kind.transactionType, 'income');
+      expect(drafts[1].amount, 10000);
+      expect(drafts[1].merchant, 'RECARGA DE TARJETA CIVICA');
+      expect(drafts[1].kind.transactionType, 'expense');
+    });
+  });
+
   group('what the status bar contributes', () {
     test('the battery reading is not a movement', () {
       // A real run filed a \$100 movement taken from the "100" beside the
