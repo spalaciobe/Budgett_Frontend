@@ -22,7 +22,34 @@ const _units = <String, int>{
   'veintisiete': 27, 'veintiocho': 28, 'veintinueve': 29,
   'treinta': 30, 'cuarenta': 40, 'cincuenta': 50, 'sesenta': 60,
   'setenta': 70, 'ochenta': 80, 'noventa': 90,
+  // English. The recogniser uses it whenever the Spanish pack is missing.
+  'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5, 'six': 6,
+  'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10, 'eleven': 11, 'twelve': 12,
+  'thirteen': 13, 'fourteen': 14, 'fifteen': 15, 'sixteen': 16,
+  'seventeen': 17, 'eighteen': 18, 'nineteen': 19, 'twenty': 20,
+  'thirty': 30, 'forty': 40, 'fifty': 50, 'sixty': 60, 'seventy': 70,
+  'eighty': 80, 'ninety': 90,
 };
+
+/// Words an English recogniser hears for a number when the speaker is not
+/// speaking English.
+///
+/// Only honoured immediately before a scale word. "Send to Mariana" keeps
+/// its preposition; "to hundred thousand" is two hundred thousand.
+const _mishearings = <String, int>{
+  'to': 2,
+  'too': 2,
+  'for': 4,
+  'free': 3,
+  'ate': 8,
+  'won': 1,
+};
+
+/// Words that scale what came before by a hundred: "two hundred thousand".
+///
+/// Apart from the Spanish hundreds, which are values in their own right —
+/// "doscientos" IS two hundred, while "hundred" is a multiplier.
+const _hundredWords = {'hundred', 'hundreds'};
 
 const _hundreds = <String, int>{
   'cien': 100, 'ciento': 100, 'doscientos': 200, 'doscientas': 200,
@@ -39,6 +66,14 @@ const _multipliers = <String, int>{
   'miles': 1000,
   'millon': 1000000,
   'millones': 1000000,
+  // English, because the recogniser falls back to it when the phone has no
+  // Spanish pack: a real dictation came back as "Just Send to Hundred
+  // Thousand pesos", and without these it carried no amount at all.
+  'thousand': 1000,
+  'thousands': 1000,
+  'million': 1000000,
+  'millions': 1000000,
+  'grand': 1000,
   // "20 lucas" is how a Colombian says twenty thousand pesos.
   'luca': 1000,
   'lucas': 1000,
@@ -87,6 +122,24 @@ double? parseSpokenAmount(String text) {
       group += _units[word]!;
       sawAnything = true;
       continue;
+    }
+
+    // "two hundred thousand" is 200,000: the hundred scales what precedes
+    // it, where "doscientos" simply IS two hundred.
+    if (_hundredWords.contains(word)) {
+      group = (group == 0 ? 1 : group) * 100;
+      sawAnything = true;
+      continue;
+    }
+
+    final misheard = _mishearings[word];
+    if (misheard != null) {
+      final next = i + 1 < words.length ? words[i + 1] : '';
+      if (_multipliers.containsKey(next) || _hundredWords.contains(next)) {
+        group += misheard;
+        sawAnything = true;
+        continue;
+      }
     }
     if (_hundreds.containsKey(word)) {
       group += _hundreds[word]!;

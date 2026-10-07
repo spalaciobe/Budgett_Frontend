@@ -47,8 +47,28 @@ const _months = <String, int>{
 };
 
 /// "30 SEPT 2026", "5 oct", "30 de septiembre de 2026".
+///
+/// The month token allows digits because OCR puts them there: a real
+/// screenshot came back as "06 0CT 2026", with a zero for the O. The token is
+/// repaired and looked up before any of this counts as a date, so a line of
+/// pure numbers still fails.
 final _textualDate =
-    RegExp(r'^(\d{1,2})\s*(?:de\s+)?([a-zA-Z]{3,10})\.?\s*(?:de\s+)?(\d{4})?$');
+    RegExp(r'^(\d{1,2})\s*(?:de\s+)?([a-zA-Z0-9]{3,10})\.?\s*(?:de\s+)?(\d{4})?$');
+
+/// Digits OCR substitutes for letters in a month name.
+const _ocrDigitToLetter = {
+  '0': 'o', '1': 'i', '5': 's', '8': 'b', '6': 'g', '2': 'z',
+};
+
+/// The month a token names, after repairing OCR's digit-for-letter slips.
+int? _monthFrom(String token) {
+  final repaired = normalizeForMatch(token)
+      .split('')
+      .map((c) => _ocrDigitToLetter[c] ?? c)
+      .join();
+  if (repaired.length < 3) return null;
+  return _months[repaired.substring(0, 3)];
+}
 
 /// "2026-10-05", "05/10/2026".
 final _numericDate =
@@ -105,7 +125,14 @@ List<ExpenseDraft> parseScreenshot(String text, {DateTime? capturedAt}) {
       .toList();
 
   final rows = _splitIntoRows(lines, at);
-  if (rows.length >= 2) {
+
+  // One dated row with a figure in it is already a statement, and reading it
+  // as one is what keeps the header out. A real screenshot put the account's
+  // balance — "243 - 000019 - 51 O\$67.464,95" — above the only movement, and
+  // the single-movement path, which looks at every line, filed the balance as
+  // the expense. Everything above the first date heading is furniture.
+  final dated = rows.any((row) => _readSignedAmount(row.lines) != null);
+  if (rows.length >= 2 || dated) {
     // A minus on ANY row means this screen marks direction with signs, so a
     // row without one is money arriving. If no row has a sign the app is not
     // using them, and the direction of every row is genuinely unknown —
@@ -252,9 +279,9 @@ class _SignedAmount {
 /// A Colombian invoice leads with a nine-digit NIT, and a confirmation screen
 /// ends with a transaction number.
 final _identifierLine = RegExp(
-    r'(nit|c\.?c\.?|rut|cedula|resolucion|autorizacion|cufe|'
+    r'\b(nit|c\.?c\.?|rut|cedula|resolucion|autorizacion|cufe|'
     r'transaction\s*no|numero\s*de\s*transaccion|referencia|ref|'
-    r'telefono|tel|celular|cel|factura|pedido|orden)',
+    r'telefono|tel|celular|cel|factura|pedido|orden)\b',
     caseSensitive: false);
 
 _SignedAmount? _readSignedAmount(List<String> lines) {
@@ -298,6 +325,18 @@ MessageKind _kindFor({required String description, required bool? negative}) {
   // "withdraw", but it is not cash out of a machine, and "Transferencia entre
   // cuentas" is not money leaving the user's finances.
   if (_ownTransfer.hasMatch(normalized)) return MessageKind.internalTransfer;
+  // Money coming back. Worth its own reading because a cropped row carries
+  // no sign, and OCR never sees that the bank drew it in green: without this
+  // "DEVOLUCION ABONO TC" was filed as a purchase.
+  if (RegExp(r'\b(devolucion|reembolso|reverso|anulacion|refund|reversal)\b')
+      .hasMatch(normalized)) {
+    return MessageKind.refund;
+  }
+  if (RegExp(r'\b(abono|consignacion|nomina|deposito)\b')
+      .hasMatch(normalized)) {
+    return MessageKind.transferIn;
+  }
+
   // A confirmation screen states the direction in one word above the figure:
   // "Recibiste", "Enviaste". Checked before the sign, because these screens
   // print no sign at all.
@@ -326,15 +365,17 @@ bool _isDateOnly(String line) {
       .replaceAll(RegExp(r'\d{1,2}:\d{2}(:\d{2})?'), '')
       .trim();
   if (stripped.isEmpty) return true;
-  return _textualDate.hasMatch(line.trim());
+  // A real month, not merely the shape of one: the token now admits digits,
+  // so "12 2026 2026" would otherwise pass for a date heading.
+  final textual = _textualDate.firstMatch(line.trim());
+  return textual != null && _monthFrom(textual.group(2)!) != null;
 }
 
 /// A date written any of the ways a bank app writes one.
 DateTime? _readDate(String line, DateTime at) {
   final textual = _textualDate.firstMatch(line.trim());
   if (textual != null) {
-    final month = _months[
-        normalizeForMatch(textual.group(2)!).substring(0, 3).toLowerCase()];
+    final month = _monthFrom(textual.group(2)!);
     if (month != null) {
       final day = int.parse(textual.group(1)!);
       final year = int.tryParse(textual.group(3) ?? '') ?? at.year;

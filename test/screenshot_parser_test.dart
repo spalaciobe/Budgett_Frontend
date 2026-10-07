@@ -270,6 +270,58 @@ Transferir plata Ir a Día a Día Bolsillos
     });
   });
 
+
+  group('the balance is not a movement', () {
+    // Both of these came off the device's own "Text read" panel.
+
+    test('a cropped single movement reads its own figure', () {
+      // "06 0CT 2026" — the O of OCT is a ZERO. Without repairing it the
+      // line is not a date, no row is formed, and the whole screen is read
+      // as one movement.
+      const cropped = """
+06 0CT 2026
+DEVOLUCION ABONO TC
+cOP \$ 65.545,94
+""";
+      final draft = parseScreenshot(cropped, capturedAt: _captured).single;
+      expect(draft.amount, 65545.94);
+      expect(draft.date, DateTime(2026, 10, 6));
+      expect(draft.kind.transactionType, 'income');
+    });
+
+    test('the account balance above the list is not the amount', () {
+      // "243 - 000019 - 51 O\\$67.464,95" is the account number and the
+      // available balance on one line. It was being filed as the expense.
+      const withHeader = """
+21:46
+( Volver
+Cuenta de Ahorros
+Número de cuenta Saldo disponible
+243 - 000019 - 51 O\$67.464,95
+Detalles Movimientos
+Consultar comprobantes
+06 0CT 2026
+DEVOLUCION ABONO TC
+cOP \$ 65.545,94
+""";
+      final drafts = parseScreenshot(withHeader, capturedAt: _captured);
+      expect(drafts, hasLength(1));
+      expect(drafts.single.amount, 65545.94);
+      expect(drafts.single.merchant, 'DEVOLUCION ABONO TC');
+    });
+
+    test('a month of pure digits is still not a date', () {
+      // The month token now admits digits, so this must not pass for one.
+      const notADate = """
+12 2026 2026
+ALGO
+cOP -\$ 5.000,00
+""";
+      final drafts = parseScreenshot(notADate, capturedAt: _captured);
+      expect(drafts.single.date, _captured);
+    });
+  });
+
   group('what the status bar contributes', () {
     test('the battery reading is not a movement', () {
       // A real run filed a \$100 movement taken from the "100" beside the

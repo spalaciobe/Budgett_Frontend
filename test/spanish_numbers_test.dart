@@ -61,6 +61,36 @@ void main() {
       expect(parseSpokenAmount('950'), 950);
     });
 
+    group('English, which is what the recogniser falls back to', () {
+      test('reads the real dictation that came back from the phone', () {
+        // Verbatim: an English recogniser transcribing Spanish speech.
+        // "to" is "two", and without it this carried no amount at all.
+        expect(
+          parseSpokenAmount(
+              'Mariana Just Send to Hundred Thousand pesos for a rainboardsment o'),
+          200000,
+        );
+      });
+
+      test('a hundred scales what comes before it', () {
+        expect(parseSpokenAmount('two hundred thousand'), 200000);
+        expect(parseSpokenAmount('three hundred'), 300000);
+        expect(parseSpokenAmount('hundred thousand'), 100000);
+      });
+
+      test('reads plain English figures', () {
+        expect(parseSpokenAmount('fifty thousand'), 50000);
+        expect(parseSpokenAmount('twenty thousand pesos'), 20000);
+        expect(parseSpokenAmount('two million'), 2000000);
+      });
+
+      test('a mishearing only counts in front of a scale word', () {
+        // "Send to Mariana" keeps its preposition.
+        expect(parseSpokenAmount('i sent to Mariana'), isNull);
+        expect(parseSpokenAmount('i paid for a coffee'), isNull);
+      });
+    });
+
     test('returns null when nothing is a number', () {
       expect(parseSpokenAmount('almuerzo en el centro'), isNull);
       expect(parseSpokenAmount(''), isNull);
