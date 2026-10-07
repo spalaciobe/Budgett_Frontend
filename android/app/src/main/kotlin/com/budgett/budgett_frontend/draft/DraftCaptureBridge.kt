@@ -36,6 +36,18 @@ class DraftCaptureBridge(private val context: Context) : MethodChannel.MethodCal
     companion object {
         const val CHANNEL = "budgett/draft_capture"
         private const val SPEECH_PERMISSION_REQUEST = 7311
+
+        /**
+         * Failures that mean "not with this language, like this" rather than
+         * "not at all", so they are worth one retry online with a broader
+         * tag. 11 is SERVER_DISCONNECTED, 12 LANGUAGE_NOT_SUPPORTED, 13
+         * LANGUAGE_UNAVAILABLE — numeric because the constants arrived in
+         * API 33 and this project builds against an older minSdk.
+         */
+        private val LANGUAGE_ERRORS = setOf(
+            11, 12, 13,
+            SpeechRecognizer.ERROR_NETWORK,
+        )
     }
 
     var activity: Activity? = null
@@ -211,6 +223,35 @@ class DraftCaptureBridge(private val context: Context) : MethodChannel.MethodCal
         pendingSpeech?.error("cancelled", "Replaced by a new dictation", null)
         pendingSpeech = result
 
+        // Spanish first and offline first, then progressively less fussy.
+        //
+        // The on-device recogniser only has the language packs the phone has
+        // downloaded, and this phone is set to English, so asking for es-CO
+        // offline failed outright. Falling back through the broader tag, then
+        // online, then whatever the device itself is set to, means dictation
+        // works today and gets better the moment a Spanish pack is installed
+        // — and the parser reads English anyway.
+        val attempts = buildList {
+            add(locale to true)
+            val broad = broaden(locale)
+            if (broad != locale) add(broad to true)
+            add(broad to false)
+            val device = Locale.getDefault().toLanguageTag()
+            if (broaden(device) != broad) add(device to false)
+        }
+        listen(attempts, 0)
+    }
+
+    /**
+     * Runs [attempts] in order until one is heard.
+     *
+     * Each is a language tag and whether to insist the audio stays on the
+     * phone. Only a language or availability failure moves to the next one:
+     * "nothing was heard" is an answer, and retrying it would make the user
+     * wait three times over for the same silence.
+     */
+    private fun listen(attempts: List<Pair<String, Boolean>>, index: Int) {
+        val (locale, offline) = attempts[index]
         main.post {
             stopRecognizer()
             val recognizer = SpeechRecognizer.createSpeechRecognizer(context)
@@ -226,6 +267,11 @@ class DraftCaptureBridge(private val context: Context) : MethodChannel.MethodCal
                 }
 
                 override fun onError(error: Int) {
+                    if (error in LANGUAGE_ERRORS && index + 1 < attempts.size) {
+                        stopRecognizer()
+                        listen(attempts, index + 1)
+                        return
+                    }
                     finish { it.error("speech_error", describe(error), null) }
                 }
 
@@ -246,11 +292,17 @@ class DraftCaptureBridge(private val context: Context) : MethodChannel.MethodCal
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE, locale)
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, locale)
                 putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-                putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+                if (offline) {
+                    putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+                }
             }
             recognizer.startListening(intent)
         }
     }
+
+    /** "es-CO" becomes "es": the region is what the device usually lacks. */
+    private fun broaden(locale: String): String =
+        locale.substringBefore('-').substringBefore('_')
 
     /** Answers the pending call exactly once and tears the recogniser down. */
     private fun finish(reply: (MethodChannel.Result) -> Unit) {
@@ -285,9 +337,17 @@ class DraftCaptureBridge(private val context: Context) : MethodChannel.MethodCal
         SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "The recogniser is busy"
         SpeechRecognizer.ERROR_SERVER -> "The speech service failed"
         SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech detected"
+        // Numeric rather than by constant: these arrived in API 33 and this
+        // project compiles against an older minSdk, where the symbols do not
+        // exist. A bare "code 12" is what sent the first real attempt back
+        // with nothing to act on.
+        10 -> "Too many requests just now — try again in a moment"
+        11 -> "The speech service disconnected"
+        12, 13 -> "Spanish speech recognition is not installed on this phone. " +
+            "Add it in Settings › General management › Voice input."
+        14 -> "Could not check which languages are available"
+        15 -> "Could not follow the language download"
         else -> "Speech recognition failed (code $error)"
     }
 
-    @Suppress("unused")
-    private fun defaultLocale(): String = Locale.getDefault().toLanguageTag()
 }
