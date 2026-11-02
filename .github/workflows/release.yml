@@ -14,8 +14,12 @@ permissions:
 # that overlap both compute the same one: the first publishes v1.0.0+62 and
 # the second dies pushing a tag that already exists, discarding an APK it had
 # already signed. Retrying the push cannot fix that — the number was decided
-# minutes earlier. Serialising is what actually fixes it, and queueing rather
-# than cancelling means no commit goes unreleased.
+# minutes earlier. Serialising is half the fix, and queueing rather than
+# cancelling means no commit goes unreleased.
+#
+# The other half is the checkout below: a queued run still checked out the
+# commit that TRIGGERED it, whose pubspec predates the previous run's bump,
+# so v1.0.0+64 was computed twice even with runs strictly one after another.
 concurrency:
   group: release-main
   cancel-in-progress: false
@@ -27,6 +31,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          # The tip of main, not the triggering commit. By the time a queued
+          # run starts, main carries the previous run's version bump, and only
+          # the tip has it. The tip also contains the triggering commit, so
+          # nothing that was pushed goes unbuilt.
+          ref: main
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -63,6 +72,15 @@ jobs:
           # version: 1.2.3+45  →  name=1.2.3, build=45
           NAME=$(echo "$CURRENT_LINE" | sed -E 's/^version:\s*([^+]+)\+([0-9]+).*/\1/')
           BUILD=$(echo "$CURRENT_LINE" | sed -E 's/^version:\s*([^+]+)\+([0-9]+).*/\2/')
+          # Never below a build that is already tagged: pubspec can lag the
+          # tags (a bump that reached the tag but not main, a manual release),
+          # and reusing a number fails the run after the APK is signed.
+          TAGGED=$(git tag --list "v${NAME}+*" | sed -E 's/.*\+([0-9]+)$/\1/' \
+            | grep -E '^[0-9]+$' | sort -n | tail -1)
+          if [ -n "$TAGGED" ] && [ "$TAGGED" -gt "$BUILD" ]; then
+            echo "pubspec says +$BUILD but v${NAME}+$TAGGED exists; continuing from the tag"
+            BUILD=$TAGGED
+          fi
           NEW_BUILD=$((BUILD + 1))
           NEW_VERSION="${NAME}+${NEW_BUILD}"
           sed -i -E "s/^version:\s.*/version: ${NEW_VERSION}/" pubspec.yaml
