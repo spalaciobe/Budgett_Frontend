@@ -473,6 +473,55 @@ String? findMerchant(String text, int searchFrom, MessageKind kind) {
   return (kind: _CounterpartyKind.name, value: raw.isEmpty ? candidate : raw);
 }
 
+/// Field labels that name the counterparty in an email receipt, by kind.
+///
+/// Receipts are laid out as a form rather than a sentence — RappiCard sends
+/// "Comercio" on one line and "GOOGLE Google One" on the next — so there is no
+/// `en <merchant>` for [findMerchant] to find, and the merchant was lost.
+const _merchantLabels = <MessageKind, List<String>>{
+  MessageKind.transferIn: ['remitente', 'ordenante', 'origen'],
+  MessageKind.transferOut: ['destinatario', 'beneficiario', 'destino'],
+};
+const _purchaseLabels = [
+  'nombre del comercio',
+  'comercio',
+  'establecimiento',
+  'lugar de compra',
+];
+
+/// A separator rule the receipt draws between fields ("______").
+final _separatorLine = RegExp(r'^[\s_\-=—–.*]*$');
+
+/// Reads the value of a labelled field: "Comercio\nGOOGLE Google One" or
+/// "Comercio: GOOGLE Google One". Null when the message has no such field.
+String? findLabeledMerchant(String text, MessageKind kind) {
+  final labels = _merchantLabels[kind] ?? _purchaseLabels;
+  final alternation = labels.map(RegExp.escape).join('|');
+  final pattern = RegExp(
+    '^[ \\t]*(?:$alternation)[ \\t]*(?::[ \\t]*([^\\r\\n]*))?\\r?\$',
+    caseSensitive: false,
+    multiLine: true,
+  );
+
+  for (final match in pattern.allMatches(text)) {
+    var value = match.group(1)?.trim() ?? '';
+    if (value.isEmpty) {
+      // The value sits on the next non-blank line.
+      final following = text
+          .substring(match.end)
+          .split(RegExp(r'\r?\n'))
+          .map((line) => line.trim())
+          .where((line) => line.isNotEmpty)
+          .firstOrNull;
+      value = following ?? '';
+    }
+    if (value.length < 2 || _separatorLine.hasMatch(value)) continue;
+    if (RegExp(r'^[\d\s*#.:-]+$').hasMatch(value)) continue;
+    return value;
+  }
+  return null;
+}
+
 /// Tap-to-pay wallets announce a payment with no verb at all.
 ///
 /// Google Wallet posts the merchant as the notification TITLE and nothing but
@@ -565,9 +614,12 @@ class ExpenseMessageParser {
     // The wallet puts the merchant in the title verbatim; looking for a
     // preposition in "COP27,500.00 with Tarjeta Visa ••1673" would only find
     // the card.
+    // A labelled field is the receipt saying outright who was paid, so it
+    // outranks a preposition guessed out of the prose.
     final merchantRaw = tapToPay && title.trim().isNotEmpty
         ? title.trim()
-        : findMerchant(combined, amount.end, kind);
+        : findLabeledMerchant(combined, kind) ??
+            findMerchant(combined, amount.end, kind);
     final merchantKey =
         merchantRaw == null ? null : normalizeMerchant(merchantRaw);
     final last4 = findCardLast4(combined);

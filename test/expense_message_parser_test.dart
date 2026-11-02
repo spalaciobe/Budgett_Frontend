@@ -522,6 +522,64 @@ void main() {
     });
   });
 
+  group('labelled email receipts', () {
+    // RappiCard's Gmail receipt: a form, not a sentence — the merchant sits
+    // on the line after "Comercio" and there is no "en <merchant>" at all.
+    const rappiReceipt = '''
+RappiCard - Resumen de transacción
+
+¡Hola, SEBASTIAN PALACIO BETANCUR!
+Realizaste una compra con tu RappiCard.
+Detalle de tu transacción:
+Monto
+\$20.000
+______________________________
+Método de pago
+*1673
+______________________________
+No. de autorización
+829263
+______________________________
+Comercio
+GOOGLE Google One
+______________________________
+Fecha de la transacción
+2026-10-20 08:16:44
+¿Necesitas ayuda?
+Escríbenos desde tu app, estamos 24/7.
+Producto de Davivienda S.A.''';
+
+    test('reads the merchant from the line after its label', () {
+      final result = _parse(
+        rappiReceipt,
+        sourceKey: 'com.google.android.gm',
+        title: 'RappiCard',
+        receivedAt: DateTime(2026, 10, 20, 8, 17),
+      );
+      expect(result.kind, MessageKind.purchase);
+      expect(result.amount, 20000.0);
+      expect(result.merchantRaw, 'GOOGLE Google One');
+      expect(result.cardLast4, '1673');
+      expect(result.confidence, greaterThanOrEqualTo(0.8));
+    });
+
+    test('reads a label and value on the same line', () {
+      expect(
+        findLabeledMerchant('Compra aprobada\nComercio: EXITO CALLE 80\n',
+            MessageKind.purchase),
+        'EXITO CALLE 80',
+      );
+    });
+
+    test('skips a label whose value is only a separator or a number', () {
+      expect(
+          findLabeledMerchant('Comercio\n______\n', MessageKind.purchase),
+          isNull);
+      expect(findLabeledMerchant('Destino\n*1234\n', MessageKind.transferOut),
+          isNull);
+    });
+  });
+
   group('confidence', () {
     test('a bare alert stays below the auto-post threshold', () {
       // No issuer, no card, no timestamp: the pipeline must ask.

@@ -30,6 +30,11 @@ import '../../core/utils/date_format.dart';
 /// both legs itself.
 const _kCardPayment = 'card_payment';
 
+/// Sentinel for the Type dropdown: income with `movement_type='reimbursement'`.
+/// It is filed against the EXPENSE category it pays back, so it offsets that
+/// category's spend instead of counting as income — see AddTransactionDialog.
+const _kReimbursement = 'reimbursement';
+
 class ReviewCaptureSheet extends ConsumerStatefulWidget {
   final CapturedMessage message;
 
@@ -92,9 +97,11 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
     _descriptionController = TextEditingController();
     // The "Remember" subtitles quote the name, so they have to follow typing.
     _nameController.addListener(_onNameChanged);
-    _type = _message.kind == MessageKind.payment
-        ? _kCardPayment
-        : _message.kind?.transactionType ?? 'expense';
+    _type = switch (_message.kind) {
+      MessageKind.payment => _kCardPayment,
+      MessageKind.refund => _kReimbursement,
+      final kind => kind?.transactionType ?? 'expense',
+    };
     _currency = _message.currency ?? 'COP';
     _occurredAt = _message.occurredAt;
   }
@@ -251,6 +258,8 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
                 items: const [
                   DropdownMenuItem(value: 'expense', child: Text('Expense')),
                   DropdownMenuItem(value: 'income', child: Text('Income')),
+                  DropdownMenuItem(
+                      value: _kReimbursement, child: Text('Reimbursement')),
                   DropdownMenuItem(value: 'transfer', child: Text('Transfer')),
                   // Not a plain transfer: paying a card down has two legs and
                   // its own billing-cycle bookkeeping, so it goes through
@@ -344,13 +353,25 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
                   data: (categories) => DropdownButtonFormField<String>(
                     value: _categorySelection,
                     isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Category',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: _type == _kReimbursement
+                          ? 'Category being reimbursed'
+                          : 'Category',
+                      helperText: _type == _kReimbursement
+                          ? 'Offsets this expense category instead of '
+                              'counting as income'
+                          : null,
+                      helperMaxLines: 2,
+                      border: const OutlineInputBorder(),
                     ),
                     items: _categoryItems(categories),
                     onChanged: (value) =>
                         setState(() => _categorySelection = value),
+                    // Without the category a reimbursement offsets nothing.
+                    validator: (value) =>
+                        _type == _kReimbursement && value == null
+                            ? 'Select the category being reimbursed'
+                            : null,
                   ),
                   loading: () => const LinearProgressIndicator(),
                   error: (e, _) =>
@@ -696,6 +717,7 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
 
   /// Mirrors `AddTransactionDialog`: sub-categories are offered as
   /// "Parent > Child" entries carrying the sub-category id as the value.
+  /// A reimbursement lists expense categories, like any expense.
   List<DropdownMenuItem<String>> _categoryItems(List<Category> categories) {
     final wanted = _type == 'income' ? 'income' : 'expense';
     final items = <DropdownMenuItem<String>>[];
@@ -811,7 +833,11 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
           subCategoryId: category.subCategoryId,
           expenseGroupId: _expenseGroupId,
           accountId: _accountId,
-          movementType: _kindForType().movementType,
+          // The alias is replayed onto this merchant's later PURCHASES, and an
+          // expense tagged 'reimbursement' would drop out of every total.
+          movementType: _type == _kReimbursement
+              ? null
+              : _kindForType().movementType,
           autoPost: _autoPostNext,
         );
       }
@@ -1002,8 +1028,15 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
   /// type — otherwise switching an income message to "Expense" would post an
   /// income row, because `transactionType` comes off the kind.
   MessageKind _kindForType() {
+    // Refund is the kind whose movement type is 'reimbursement'.
+    if (_type == _kReimbursement) return MessageKind.refund;
     final guess = _message.kind;
-    if (guess != null && guess.transactionType == _type) return guess;
+    // A refund switched to plain "Income" must not stay a reimbursement.
+    if (guess != null &&
+        guess != MessageKind.refund &&
+        guess.transactionType == _type) {
+      return guess;
+    }
     return switch (_type) {
       'income' => MessageKind.transferIn,
       'transfer' => MessageKind.payment,
