@@ -15,6 +15,7 @@ DedupCandidate _candidate({
   String? merchantKey = 'EXITO SUPER CL 80',
   String? cardLast4 = '1234',
   String? issuerKey = 'bancolombia',
+  String? senderText,
   DateTime? occurredAt,
   bool dayPrecisionOnly = false,
 }) =>
@@ -25,6 +26,7 @@ DedupCandidate _candidate({
       merchantKey: merchantKey,
       cardLast4: cardLast4,
       issuerKey: issuerKey,
+      senderText: senderText,
       occurredAt: occurredAt ?? _base,
       dayPrecisionOnly: dayPrecisionOnly,
     );
@@ -167,6 +169,86 @@ void main() {
             window: const Duration(minutes: 30)),
         isNotNull,
       );
+    });
+  });
+
+  group('a merchant receipt next to its card charge', () {
+    // RappiCard charges the card; Rappi emails the order receipt. Nothing
+    // they print matches: the receipt has no card and names the restaurant,
+    // the charge has the card and names Rappi (or nothing).
+    DedupCandidate charge({String? merchantKey, String issuerKey = 'rappi'}) =>
+        _candidate(
+          id: 'charge',
+          amount: 73200,
+          merchantKey: merchantKey,
+          cardLast4: '1673',
+          issuerKey: issuerKey,
+          senderText: 'RappiCard',
+        );
+    DedupCandidate receipt({Duration after = const Duration(minutes: 1)}) =>
+        _candidate(
+          id: 'receipt',
+          amount: 73200,
+          merchantKey: 'MR BUFFALO ALITAS COSTILLAS',
+          cardLast4: null,
+          issuerKey: null,
+          senderText: 'Recibos de Rappi',
+          occurredAt: _base.add(after),
+        );
+
+    test('is one purchase when the sender names the card issuer', () {
+      final verdict = findDuplicateCapture(receipt(), [charge()]);
+      expect(verdict?.matchId, 'charge');
+      expect(verdict?.reason, DuplicateReason.receiptForCardCharge);
+      expect(verdict?.isConclusive, isTrue);
+    });
+
+    test('is one purchase when the sender names the charge merchant', () {
+      final verdict = findDuplicateCapture(
+          receipt(), [charge(merchantKey: 'RAPPI COLOMBIA', issuerKey: 'nu')]);
+      expect(verdict?.reason, DuplicateReason.receiptForCardCharge);
+    });
+
+    test('matches in either arrival order', () {
+      final verdict = findDuplicateCapture(charge(), [receipt()]);
+      expect(verdict?.matchId, 'receipt');
+      expect(verdict?.reason, DuplicateReason.receiptForCardCharge);
+    });
+
+    test('spans the gap between placing and delivering the order', () {
+      final verdict = findDuplicateCapture(
+          receipt(after: const Duration(minutes: 24)), [charge()]);
+      expect(verdict?.reason, DuplicateReason.receiptForCardCharge);
+    });
+
+    test('but not a different day', () {
+      expect(
+          findDuplicateCapture(
+              receipt(after: const Duration(hours: 5)), [charge()]),
+          isNull);
+    });
+
+    test('a sender that names someone else proves nothing', () {
+      final other = _candidate(
+        id: 'receipt',
+        amount: 73200,
+        merchantKey: 'MR BUFFALO ALITAS COSTILLAS',
+        cardLast4: null,
+        issuerKey: null,
+        senderText: 'Recibos de iFood',
+      );
+      expect(findDuplicateCapture(other, [charge()]), isNull);
+    });
+
+    test("the bank's own push without the card stays a weak match", () {
+      // Push vs SMS from the same bank keeps its old, cautious verdict.
+      final push = _candidate(
+          id: 'push', merchantKey: null, cardLast4: null,
+          senderText: 'Bancolombia');
+      final sms = _candidate(id: 'sms', senderText: '890255');
+      final verdict = findDuplicateCapture(push, [sms]);
+      expect(verdict?.reason, DuplicateReason.sameIssuerAndAmount);
+      expect(verdict?.isConclusive, isFalse);
     });
   });
 

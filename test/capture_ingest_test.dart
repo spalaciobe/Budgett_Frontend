@@ -44,6 +44,7 @@ RawCapture _capture({
   String channel = 'notification',
   String sourceKey = 'com.bancolombia.olimpia',
   String? sourceName = 'Bancolombia',
+  String title = 'Bancolombia',
   String body = _bancolombiaPurchase,
   DateTime? receivedAt,
   double? latitude,
@@ -53,7 +54,7 @@ RawCapture _capture({
       channel: channel,
       sourceKey: sourceKey,
       sourceName: sourceName,
-      title: 'Bancolombia',
+      title: title,
       body: body,
       receivedAt: receivedAt ?? _receivedAt,
       latitude: latitude,
@@ -516,6 +517,79 @@ void main() {
       // Only the taught merchant posts; the new one waits for review.
       expect(run.result.posted, 1);
       expect(run.result.pending, 1);
+    });
+
+    group('a card charge and the shop receipt for it', () {
+      const rappiCardCharge = '''
+RappiCard - Resumen de transacción
+Realizaste una compra con tu RappiCard.
+Monto
+\$73.200
+Método de pago
+*1673
+Comercio
+RAPPI
+Fecha de la transacción
+2026-10-26 20:05:10
+Producto de Davivienda S.A.''';
+
+      const rappiOrderReceipt = '''
+Tu pedido de Mr. Buffalo Alitas & Costillas - Sabaneta fue entregado
+Orden # 2517802655
+2026-10-26 20:04:55
+Total pagado
+\$73.200
+26 de oct. de 2026 20:28
+¿Ya estás antojado de nuevo?
+Promos en WhatsApp
+Recibiste este mail porque eres nuestro usuario.''';
+
+      Future<_FakeCaptureRepository> ingestBoth() async {
+        final run = await _ingest([
+          _capture(
+            sourceKey: 'com.google.android.gm',
+            sourceName: 'Gmail',
+            title: 'RappiCard',
+            body: rappiCardCharge,
+            receivedAt: DateTime(2026, 10, 26, 20, 5, 30),
+          ),
+          _capture(
+            sourceKey: 'com.google.android.gm',
+            sourceName: 'Gmail',
+            title: 'Recibos de Rappi',
+            body: rappiOrderReceipt,
+            receivedAt: DateTime(2026, 10, 26, 20, 28),
+            latitude: 6.1514,
+            longitude: -75.6166,
+          ),
+        ], locationLabel: 'Carrera 43A #64 S-65, Sabaneta');
+        expect(run.result.duplicates, 1);
+        return run.captures;
+      }
+
+      test('files the receipt as a copy of the charge', () async {
+        final captures = await ingestBoth();
+        final receipt = captures.inserted.last;
+        expect(receipt.status, 'duplicate');
+        expect(receipt.duplicateOf, 'cap-1');
+        expect(receipt.error, DuplicateReason.receiptForCardCharge.label);
+      });
+
+      test('the charge takes the restaurant from the receipt', () async {
+        final charge = (await ingestBoth()).rowById('cap-1')!;
+        expect(charge.status, 'pending');
+        expect(charge.merchantRaw,
+            'Mr. Buffalo Alitas & Costillas - Sabaneta');
+        // Its own half is kept.
+        expect(charge.cardLast4, '1673');
+        expect(charge.issuerKey, 'rappi');
+      });
+
+      test('the charge takes the location only the receipt had', () async {
+        final charge = (await ingestBoth()).rowById('cap-1')!;
+        expect(charge.latitude, 6.1514);
+        expect(charge.locationLabel, 'Carrera 43A #64 S-65, Sabaneta');
+      });
     });
 
     test('a capture already ingested is skipped on the next drain', () async {

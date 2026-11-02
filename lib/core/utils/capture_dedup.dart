@@ -8,8 +8,9 @@
 ///
 /// Time cannot go into a hash — the copies land seconds to minutes apart — so
 /// matching is a windowed comparison instead: identical amount, close in time,
-/// plus at least one corroborating signal (same card, same merchant, or the
-/// same issuer when one copy omitted the merchant).
+/// plus at least one corroborating signal (same card, same merchant, the
+/// same issuer when one copy omitted the merchant, or a merchant's receipt
+/// whose sender names the card issuer or merchant of the charge).
 ///
 /// The bias is deliberately towards NOT declaring a duplicate. A false
 /// positive silently swallows a real expense; a false negative shows up as two
@@ -29,6 +30,11 @@ class DedupCandidate {
   final String? issuerKey;
   final DateTime occurredAt;
 
+  /// Who sent the message — the notification title, which for an email is
+  /// the sender's display name ("Recibos de Rappi"). Lets a merchant's own
+  /// receipt be tied to the card charge it accompanies.
+  final String? senderText;
+
   /// True when the timestamp is only accurate to the day — the case for
   /// transactions whose `occurred_at` is null and only `date` is known.
   final bool dayPrecisionOnly;
@@ -41,6 +47,7 @@ class DedupCandidate {
     this.merchantKey,
     this.cardLast4,
     this.issuerKey,
+    this.senderText,
     this.dayPrecisionOnly = false,
   });
 }
@@ -56,6 +63,11 @@ enum DuplicateReason {
   /// merchant. Weaker, but the common push-vs-SMS shape.
   sameIssuerAndAmount,
 
+  /// A merchant's own receipt and the card charge for it: one side carries a
+  /// card and the other does not, and the receipt's sender names the card's
+  /// issuer or merchant — "Recibos de Rappi" next to a RappiCard charge.
+  receiptForCardCharge,
+
   /// An amount already recorded on the same day by a transaction that did not
   /// come from this capture pipeline (typed by hand, most likely).
   existingTransactionSameDay;
@@ -64,6 +76,8 @@ enum DuplicateReason {
         DuplicateReason.sameCardAndAmount => 'Same card and amount',
         DuplicateReason.sameMerchantAndAmount => 'Same merchant and amount',
         DuplicateReason.sameIssuerAndAmount => 'Same bank and amount',
+        DuplicateReason.receiptForCardCharge =>
+          'Receipt for the same card charge',
         DuplicateReason.existingTransactionSameDay =>
           'An expense with this amount is already recorded today',
       };
@@ -87,6 +101,11 @@ class DuplicateVerdict {
 
 /// Default tolerance between two copies of the same payment.
 const kDefaultDedupWindow = Duration(minutes: 10);
+
+/// Window for a merchant's receipt against its card charge. A delivery order
+/// carries two instants — placed and delivered, 24 minutes apart on a real
+/// Rappi receipt — and the card may be charged at either.
+const kReceiptDedupWindow = Duration(hours: 2);
 
 /// Amounts are compared with a one-peso tolerance: issuers sometimes round the
 /// figure differently between the push and the SMS.
@@ -133,6 +152,38 @@ bool merchantsMatch(String? a, String? b) {
   return longer == shorter || longer.startsWith('$shorter ');
 }
 
+/// Words of a sender name worth matching on: four letters or more, so "de"
+/// and "la" never tie two messages together.
+Set<String> _senderWords(String? sender) => sender == null
+    ? const {}
+    : sender
+        .toLowerCase()
+        .split(RegExp(r'[^a-z0-9áéíóúñü]+'))
+        .where((w) => w.length >= 4)
+        .toSet();
+
+/// True when [sender] names the issuer or the merchant of [charge] — the
+/// merchant counts by its first word, the brand ("RAPPI" of "RAPPI COLOMBIA").
+bool senderNames(String? sender, DedupCandidate charge) {
+  final words = _senderWords(sender);
+  if (words.isEmpty) return false;
+  final issuer = charge.issuerKey?.toLowerCase();
+  if (issuer != null && words.contains(issuer)) return true;
+  final brand = charge.merchantKey?.toLowerCase().split(' ').first;
+  return brand != null && brand.length >= 4 && words.contains(brand);
+}
+
+/// True when [receipt] is a merchant's receipt for the card charge [charge].
+/// Only the side WITHOUT a card can be the receipt: two card messages with
+/// different cards are two payments, whatever the sender says. And it must
+/// not come from the charge's own bank — a bank's push without the card next
+/// to its SMS with it stays the weaker [DuplicateReason.sameIssuerAndAmount].
+bool isReceiptForCharge(DedupCandidate receipt, DedupCandidate charge) =>
+    receipt.cardLast4 == null &&
+    charge.cardLast4 != null &&
+    (receipt.issuerKey == null || receipt.issuerKey != charge.issuerKey) &&
+    senderNames(receipt.senderText, charge);
+
 /// Looks for an earlier capture that [candidate] duplicates.
 ///
 /// [existing] should already be narrowed to the same user and a sensible date
@@ -148,7 +199,21 @@ DuplicateVerdict? findDuplicateCapture(
   for (final other in existing) {
     if (other.id == candidate.id) continue;
     if (!_amountsMatch(candidate, other)) continue;
-    if (!_withinWindow(candidate, other, window)) continue;
+    if (!_withinWindow(candidate, other, window)) {
+      // Only the receipt signal is trusted beyond the ordinary window.
+      final receiptWindow =
+          window > kReceiptDedupWindow ? window : kReceiptDedupWindow;
+      if (_withinWindow(candidate, other, receiptWindow) &&
+          (isReceiptForCharge(candidate, other) ||
+              isReceiptForCharge(other, candidate))) {
+        return DuplicateVerdict(
+          matchId: other.id,
+          reason: DuplicateReason.receiptForCardCharge,
+          isConclusive: true,
+        );
+      }
+      continue;
+    }
 
     final sameCard = candidate.cardLast4 != null &&
         candidate.cardLast4 == other.cardLast4;
@@ -164,6 +229,18 @@ DuplicateVerdict? findDuplicateCapture(
       return DuplicateVerdict(
         matchId: other.id,
         reason: DuplicateReason.sameMerchantAndAmount,
+        isConclusive: true,
+      );
+    }
+
+    // Conclusive: the receipt names the shop it came from, which never
+    // matches the card's merchant text, so nothing else ties the two — and
+    // they are the same purchase by construction.
+    if (isReceiptForCharge(candidate, other) ||
+        isReceiptForCharge(other, candidate)) {
+      return DuplicateVerdict(
+        matchId: other.id,
+        reason: DuplicateReason.receiptForCardCharge,
         isConclusive: true,
       );
     }

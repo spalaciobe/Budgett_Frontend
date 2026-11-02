@@ -42,6 +42,15 @@ const kIssuers = <Issuer>[
     sourceHints: ['daviplata'],
     textHints: ['daviplata'],
   ),
+  // RappiCard is issued by Davivienda and every receipt says so ("Producto de
+  // Davivienda S.A."), so it has to be tested first — otherwise RappiCard
+  // emails resolved as Davivienda and no longer matched the RappiCard push.
+  Issuer(
+    key: 'rappi',
+    displayName: 'RappiCard',
+    sourceHints: ['rappi'],
+    textHints: ['rappicard', 'rappi card', 'tu rappicard'],
+  ),
   Issuer(
     key: 'bancolombia',
     displayName: 'Bancolombia',
@@ -78,12 +87,6 @@ const kIssuers = <Issuer>[
     sourceHints: ['falabella'],
     textHints: ['banco falabella'],
   ),
-  Issuer(
-    key: 'rappi',
-    displayName: 'RappiCard',
-    sourceHints: ['rappi'],
-    textHints: ['rappicard', 'rappi card', 'tu rappicard'],
-  ),
 ];
 
 final Map<String, Issuer> _byKey = {for (final i in kIssuers) i.key: i};
@@ -105,15 +108,23 @@ String? issuerFromSourceKey(String sourceKey) {
 
 /// Resolves the issuer from the message itself. Falls back on this when the
 /// sender is an opaque short code.
+///
+/// Hints match whole words only. As plain substrings, Nu's "de nu" fired on
+/// "antojado de nuevo" in every Rappi receipt, filing them as Nu.
 String? issuerFromText(String title, String body) {
   final haystack = normalizeForMatch('$title $body');
   for (final issuer in kIssuers) {
     for (final hint in issuer.textHints) {
-      if (haystack.contains(hint)) return issuer.key;
+      if (_wholeWords(hint).hasMatch(haystack)) return issuer.key;
     }
   }
   return null;
 }
+
+final _hintPatterns = <String, RegExp>{};
+
+RegExp _wholeWords(String hint) => _hintPatterns[hint] ??=
+    RegExp('(?<![a-z0-9])${RegExp.escape(hint)}(?![a-z0-9])');
 
 /// Best-effort issuer for a capture. [pinned] is the user's choice stored on
 /// the source row and always wins.

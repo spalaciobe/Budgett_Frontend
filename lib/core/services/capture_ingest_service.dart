@@ -317,6 +317,7 @@ class CaptureIngestService {
       merchantKey: parsed.merchantKey,
       cardLast4: parsed.cardLast4,
       issuerKey: parsed.issuerKey,
+      senderText: capture.title,
       occurredAt: parsed.occurredAt,
     );
 
@@ -368,6 +369,24 @@ class CaptureIngestService {
       batchCandidates.add(candidate);
       debugPrint('Capture ${message.id} filed as duplicate: '
           '${duplicate.reason.label}');
+
+      final original =
+          stored.where((m) => m.id == duplicate.matchId).firstOrNull;
+      if (original != null) {
+        final patch = _complement(
+          original: original,
+          copy: candidate,
+          capture: capture,
+          parsed: parsed,
+          locationLabel: locationLabel,
+          merchantDisplay: merchantDisplay,
+          aliasId: alias?.id,
+          reason: duplicate.reason,
+        );
+        if (patch.isNotEmpty) {
+          await captureRepo.updateCapture(original.id, patch);
+        }
+      }
       return _Outcome.duplicate;
     }
 
@@ -654,6 +673,59 @@ class CaptureIngestService {
     }
 
     return financeRepo.addTransactionWithReturn(data);
+  }
+
+  /// What [copy] knows that [original] does not.
+  ///
+  /// The copies of one purchase each carry part of it: the card charge has
+  /// the card but often no shop ("RAPPI", or nothing at all), the merchant's
+  /// receipt names the restaurant but not the card, and only one of them may
+  /// have had a location fix. Filing the copy away used to throw its half
+  /// out; this hands it to the row the user will review.
+  ///
+  /// Only a row still waiting for review is completed — a posted one already
+  /// wrote its transaction, and changing the capture alone would make the two
+  /// disagree. Fields are only ever filled, never overwritten, except the
+  /// merchant of a card charge whose receipt names the actual shop.
+  Map<String, dynamic> _complement({
+    required CapturedMessage original,
+    required DedupCandidate copy,
+    required RawCapture capture,
+    required ParsedMessage parsed,
+    required String? locationLabel,
+    required String? merchantDisplay,
+    required String? aliasId,
+    required DuplicateReason reason,
+  }) {
+    if (!original.isPending) return const {};
+
+    final copyIsReceipt = reason == DuplicateReason.receiptForCardCharge &&
+        copy.cardLast4 == null;
+    final takeMerchant = parsed.merchantRaw != null &&
+        (original.merchantRaw == null || copyIsReceipt);
+
+    return {
+      if (takeMerchant) ...{
+        'merchant_raw': parsed.merchantRaw,
+        'merchant_display': merchantDisplay,
+        'matched_alias_id': aliasId,
+      },
+      if (original.cardLast4 == null && parsed.cardLast4 != null) ...{
+        'card_last4': parsed.cardLast4,
+        // The card is only meaningful with its issuer: the card map is keyed
+        // by both.
+        if (original.issuerKey == null && parsed.issuerKey != null)
+          'issuer_key': parsed.issuerKey,
+      },
+      if (!original.hasLocation &&
+          capture.latitude != null &&
+          capture.longitude != null) ...{
+        'latitude': capture.latitude,
+        'longitude': capture.longitude,
+        'location_accuracy_m': capture.locationAccuracyM,
+        'location_label': locationLabel,
+      },
+    };
   }
 
   String _buildNotes(

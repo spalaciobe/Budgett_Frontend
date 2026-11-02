@@ -96,6 +96,7 @@ class CapturedMessage {
         merchantKey: merchantKey,
         cardLast4: cardLast4,
         issuerKey: issuerKey,
+        senderText: title,
         occurredAt: occurredAt,
       );
 

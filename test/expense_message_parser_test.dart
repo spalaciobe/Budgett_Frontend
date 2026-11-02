@@ -354,6 +354,12 @@ void main() {
       expect(result.merchantKey, 'ARA CL 100');
     });
 
+    test('issuer hints match whole words only', () {
+      // "de nu" inside "antojado de nuevo" filed every Rappi receipt as Nu.
+      expect(issuerFromText('', '¿Ya estás antojado de nuevo?'), isNull);
+      expect(issuerFromText('', 'Compraste con tu tarjeta de Nu'), 'nu');
+    });
+
     test('a pinned issuer overrides detection', () {
       // An opaque short code the user mapped to their bank by hand.
       final result = _parse('Compra por \$10.000 en TIENDA',
@@ -563,6 +569,14 @@ Producto de Davivienda S.A.''';
       expect(result.confidence, greaterThanOrEqualTo(0.8));
     });
 
+    test('a RappiCard receipt is RappiCard, not the bank behind it', () {
+      // "Producto de Davivienda S.A." used to win and file it as Davivienda,
+      // so it no longer matched the RappiCard push for the same purchase.
+      final result = _parse(rappiReceipt,
+          sourceKey: 'com.google.android.gm', title: 'RappiCard');
+      expect(result.issuerKey, 'rappi');
+    });
+
     test('reads a label and value on the same line', () {
       expect(
         findLabeledMerchant('Compra aprobada\nComercio: EXITO CALLE 80\n',
@@ -577,6 +591,77 @@ Producto de Davivienda S.A.''';
           isNull);
       expect(findLabeledMerchant('Destino\n*1234\n', MessageKind.transferOut),
           isNull);
+    });
+  });
+
+  group('delivery-app order receipts', () {
+    // A real Rappi order email. It says "Recibiste este mail" in the footer
+    // and "Promos en WhatsApp" just above it — which once made it income from
+    // a merchant called WhatsApp.
+    const rappiOrder = '''
+Tu pedido de Mr. Buffalo Alitas & Costillas - Sabaneta fue entregado
+Mr. Buffalo Alitas & Costillas - Sabaneta
+Orden # 2517802655
+¡Sebastian, aquí están los detalles de tu pedido!
+Entregado con cambios
+Carrera 43A 64 S-65
+2026-10-26 20:04:55
+Total pagado
+\$73.200
+Cargo neto
+\$73.200
+26 de oct. de 2026 20:28
+\$73.200
+Productos:
+Alitas X 18
+\$79.500
+Antes \$79.500
+1
+Productos sustituidos:
+¿Ya estás antojado de nuevo?
+Ir a la app
+Únete a nuestros canales y
+recibe promos exclusivas
+Promos en WhatsApp
+________________________________
+Centro de ayuda | Aviso de privacidad | Términos y Condiciones
+Recibiste este mail porque eres nuestro usuario. Copyright © RAPPI S.A.S. Todos los derechos reservados.
+Aplican Términos y Condiciones |''';
+
+    ParsedMessage parseOrder() => _parse(
+          rappiOrder,
+          sourceKey: 'com.google.android.gm',
+          title: 'Recibos de Rappi',
+          receivedAt: DateTime(2026, 10, 26, 20, 28),
+        );
+
+    test('is an expense, not income from the footer', () {
+      expect(parseOrder().kind, MessageKind.purchase);
+    });
+
+    test('names the restaurant from the headline', () {
+      expect(parseOrder().merchantRaw,
+          'Mr. Buffalo Alitas & Costillas - Sabaneta');
+    });
+
+    test('takes the amount paid and the order time', () {
+      final result = parseOrder();
+      expect(result.amount, 73200.0);
+      expect(result.occurredAt, DateTime(2026, 10, 26, 20, 4, 55));
+    });
+
+    test('is not mistaken for the RappiCard itself', () {
+      // The receipt is the shop's, not the card's: tying it to RappiCard is
+      // the dedup's job, through the sender name.
+      expect(parseOrder().issuerKey, isNull);
+      expect(parseOrder().cardLast4, isNull);
+    });
+
+    test('a footer "recibiste este correo" never reads as money in', () {
+      final result = _parse(
+          'Compra por \$12.000 en TIENDA. Recibiste este correo porque eres '
+          'cliente.');
+      expect(result.kind, MessageKind.purchase);
     });
   });
 

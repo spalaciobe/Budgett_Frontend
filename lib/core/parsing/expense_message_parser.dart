@@ -138,6 +138,13 @@ const _kindRules = <(String, MessageKind)>[
   ('pago a tarjeta de credito', MessageKind.payment),
   ('abono a su tarjeta', MessageKind.payment),
 
+  // Delivery-app order receipts (Rappi, iFood, DiDi Food). Ahead of money-in:
+  // nothing in them says "compra", and the footer's "recibiste este mail" made
+  // a restaurant order arrive as income.
+  ('detalles de tu pedido', MessageKind.purchase),
+  ('tu pedido de', MessageKind.purchase),
+  ('total pagado', MessageKind.purchase),
+
   // Cash out.
   ('retiro', MessageKind.withdrawal),
   ('retiraste', MessageKind.withdrawal),
@@ -178,6 +185,12 @@ const _kindRules = <(String, MessageKind)>[
   ('cargo por', MessageKind.purchase),
   ('cargo a tu', MessageKind.purchase),
 ];
+
+/// Email footers that contain an action keyword but describe no movement
+/// ("Recibiste este mail porque eres nuestro usuario" is not money in).
+/// Removed from the normalised text before the kind rules run.
+final _boilerplate = RegExp(
+    r'(?:recibiste|recibes|recibio|has recibido) este (?:mail|correo|email|mensaje)');
 
 // ─── field extractors ────────────────────────────────────────────────────────
 
@@ -522,6 +535,24 @@ String? findLabeledMerchant(String text, MessageKind kind) {
   return null;
 }
 
+/// "Tu pedido de Mr. Buffalo Alitas & Costillas - Sabaneta fue entregado".
+///
+/// A delivery-app receipt names the restaurant in its headline and nowhere
+/// else as prose, so without this the preposition search ran on into the
+/// footer and picked "WhatsApp" out of "Promos en WhatsApp".
+final _orderHeadline = RegExp(
+  r'\bpedido\s+(?:de|en)\s+([^\n]+?)\s+'
+  r'(?:fue|ha\s+sido|est[aá]|va|lleg[oó]|se\s+entreg[oó]|ya)\b',
+  caseSensitive: false,
+);
+
+String? findOrderMerchant(String text) {
+  final match = _orderHeadline.firstMatch(text);
+  final value = match?.group(1)?.trim();
+  if (value == null || value.length < 2 || value.length > 80) return null;
+  return value;
+}
+
 /// Tap-to-pay wallets announce a payment with no verb at all.
 ///
 /// Google Wallet posts the merchant as the notification TITLE and nothing but
@@ -590,8 +621,9 @@ class ExpenseMessageParser {
 
     MessageKind? kind = tapToPay ? MessageKind.purchase : null;
     if (kind == null) {
+      final prose = normalized.replaceAll(_boilerplate, ' ');
       for (final (phrase, candidate) in _kindRules) {
-        if (normalized.contains(phrase)) {
+        if (prose.contains(phrase)) {
           kind = candidate;
           break;
         }
@@ -619,6 +651,7 @@ class ExpenseMessageParser {
     final merchantRaw = tapToPay && title.trim().isNotEmpty
         ? title.trim()
         : findLabeledMerchant(combined, kind) ??
+            findOrderMerchant(combined) ??
             findMerchant(combined, amount.end, kind);
     final merchantKey =
         merchantRaw == null ? null : normalizeMerchant(merchantRaw);
