@@ -8,11 +8,11 @@ import 'package:budgett_frontend/core/app_text.dart';
 import 'package:budgett_frontend/core/parsing/issuer_registry.dart';
 import 'package:budgett_frontend/core/services/message_capture_service.dart';
 import 'package:budgett_frontend/core/utils/error_messages.dart';
-import 'package:budgett_frontend/core/utils/maps_link.dart';
 import 'package:budgett_frontend/data/models/captured_message_model.dart';
 import 'package:budgett_frontend/presentation/providers/message_capture_provider.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:budgett_frontend/presentation/widgets/empty_state.dart';
+import 'package:budgett_frontend/presentation/widgets/maps_link.dart';
 import 'package:budgett_frontend/presentation/widgets/review_capture_sheet.dart';
 import '../widgets/skeleton.dart';
 import '../widgets/page_body.dart';
@@ -384,9 +384,9 @@ class CaptureCard extends ConsumerWidget {
                           message.hasLocation) ...[
                         kGapXs,
                         // Opens the measured coordinates in Maps.
-                        InkWell(
-                          onTap: () => openInMaps(
-                              message.latitude!, message.longitude!),
+                        MapsLink(
+                          latitude: message.latitude!,
+                          longitude: message.longitude!,
                           child: Row(
                             children: [
                               Icon(Icons.place_outlined,

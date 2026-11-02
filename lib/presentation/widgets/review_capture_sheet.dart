@@ -18,6 +18,7 @@ import 'package:budgett_frontend/data/repositories/bank_repository.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/presentation/providers/message_capture_provider.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
+import 'package:budgett_frontend/presentation/widgets/maps_link.dart';
 import '../../core/utils/date_format.dart';
 
 /// Confirms one captured message — and, more importantly, teaches the pipeline
@@ -584,16 +585,10 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
     final radius = accuracyLabel(_message.locationAccuracyM);
     final link = theme.colorScheme.primary;
 
-    return InkWell(
+    return MapsLink(
+      latitude: lat,
+      longitude: lng,
       borderRadius: BorderRadius.circular(kSpaceSm),
-      onTap: () async {
-        final opened = await openInMaps(lat, lng);
-        if (!opened && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Could not open Maps')),
-          );
-        }
-      },
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: kSpaceSm),
         child: Row(
