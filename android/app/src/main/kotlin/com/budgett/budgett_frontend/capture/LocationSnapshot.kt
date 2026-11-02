@@ -7,10 +7,12 @@ import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
+import android.location.LocationRequest
 import android.os.Build
 import android.os.CancellationSignal
 import android.os.Looper
 import android.util.Log
+import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -34,8 +36,18 @@ object LocationSnapshot {
     /** A cached fix this fresh is good enough — no need to wake the GPS. */
     private const val FRESH_ENOUGH_MS = 90_000L
 
-    /** Above this radius a cached fix is too vague to name a place. */
-    private const val USABLE_ACCURACY_M = 250f
+    /**
+     * Radius a cached fix needs to skip the live request. 250 m let a wifi or
+     * cell estimate through, and in a dense neighbourhood that is several
+     * blocks — a different street from the shop.
+     */
+    private const val PRECISE_ACCURACY_M = 50f
+
+    /**
+     * Oldest cached fix worth keeping as a fallback. Past this it is where the
+     * user was earlier, not where they paid — no location beats a wrong one.
+     */
+    private const val STALE_AFTER_MS = 5 * 60_000L
 
     data class Fix(val latitude: Double, val longitude: Double, val accuracy: Double?)
 
@@ -73,8 +85,17 @@ object LocationSnapshot {
         if (cached != null && isFreshAndPrecise(cached)) return cached.toFix()
 
         val live = requestSingleFix(manager, timeoutMs)
-        return (live ?: cached)?.toFix()
+        // The live fix is not automatically better: when GPS cannot lock in
+        // time the platform hands back a coarse network estimate, and a GPS
+        // fix from two minutes ago is closer to the till than that.
+        return listOfNotNull(live, cached).minByOrNull { it.radius() }?.toFix()
     }
+
+    /** Accuracy radius, with an unknown one ranked last. */
+    private fun Location.radius(): Float =
+        if (hasAccuracy()) accuracy else Float.MAX_VALUE
+
+    private fun Location.ageMs(): Long = System.currentTimeMillis() - time
 
     private fun Location.toFix() = Fix(
         latitude = latitude,
@@ -82,27 +103,28 @@ object LocationSnapshot {
         accuracy = if (hasAccuracy()) accuracy.toDouble() else null,
     )
 
-    private fun isFreshAndPrecise(location: Location): Boolean {
-        val age = System.currentTimeMillis() - location.time
-        val precise = !location.hasAccuracy() || location.accuracy <= USABLE_ACCURACY_M
-        return age in 0..FRESH_ENOUGH_MS && precise
-    }
+    private fun isFreshAndPrecise(location: Location): Boolean =
+        location.ageMs() in 0..FRESH_ENOUGH_MS &&
+            location.hasAccuracy() && location.accuracy <= PRECISE_ACCURACY_M
 
-    /** Freshest cached fix across every enabled provider. */
+    /**
+     * Most precise recent cached fix across every enabled provider.
+     *
+     * Ranked by accuracy, not recency: picking the newest let a cell-tower
+     * estimate a kilometre wide beat a GPS fix taken seconds earlier.
+     */
     @SuppressLint("MissingPermission") // callers check hasPermission() first
     private fun bestLastKnown(manager: LocationManager): Location? {
-        var best: Location? = null
-        for (provider in safeProviders(manager)) {
-            val candidate = try {
-                manager.getLastKnownLocation(provider)
-            } catch (e: SecurityException) {
-                null
-            } catch (e: Exception) {
-                null
-            } ?: continue
-            if (best == null || candidate.time > best!!.time) best = candidate
-        }
-        return best
+        return safeProviders(manager)
+            .mapNotNull { provider ->
+                try {
+                    manager.getLastKnownLocation(provider)
+                } catch (e: Exception) {
+                    null
+                }
+            }
+            .filter { it.ageMs() in 0..STALE_AFTER_MS }
+            .minByOrNull { it.radius() }
     }
 
     private fun safeProviders(manager: LocationManager): List<String> = try {
@@ -119,7 +141,9 @@ object LocationSnapshot {
         val provider = pickProvider(manager) ?: return null
 
         return try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                currentLocationApi31(manager, provider, timeoutMs)
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 currentLocationApi30(manager, provider, timeoutMs)
             } else {
                 singleUpdateLegacy(manager, provider, timeoutMs)
@@ -144,6 +168,43 @@ object LocationSnapshot {
             add(LocationManager.NETWORK_PROVIDER)
         }
         return preferred.firstOrNull { enabled.contains(it) } ?: enabled.firstOrNull()
+    }
+
+    /**
+     * Asks for high accuracy explicitly. Without a [LocationRequest] the fused
+     * provider answers at balanced-power quality — wifi and cell towers, often
+     * a hundred metres or more out — which is how payments were being placed
+     * a few streets away from the shop.
+     */
+    @RequiresApi(Build.VERSION_CODES.S)
+    @SuppressLint("MissingPermission") // callers check hasPermission() first
+    private fun currentLocationApi31(
+        manager: LocationManager,
+        provider: String,
+        timeoutMs: Long,
+    ): Location? {
+        val latch = CountDownLatch(1)
+        var result: Location? = null
+        val cancellation = CancellationSignal()
+        val request = LocationRequest.Builder(0L)
+            .setQuality(LocationRequest.QUALITY_HIGH_ACCURACY)
+            .setDurationMillis(timeoutMs)
+            .build()
+
+        manager.getCurrentLocation(
+            provider,
+            request,
+            cancellation,
+            { runnable -> runnable.run() },
+        ) { location ->
+            result = location
+            latch.countDown()
+        }
+
+        if (!latch.await(timeoutMs, TimeUnit.MILLISECONDS)) {
+            cancellation.cancel()
+        }
+        return result
     }
 
     @SuppressLint("MissingPermission") // callers check hasPermission() first

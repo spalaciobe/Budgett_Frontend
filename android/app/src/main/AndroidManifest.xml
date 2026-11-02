@@ -103,6 +103,11 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- "Open in Maps" on a captured payment's location (url_launcher). -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+        </intent>
         <!-- Android 11+ hides other packages, and SpeechRecognizer resolves
              to one. Without this the recogniser reports itself unavailable on
              a phone that has it installed. -->

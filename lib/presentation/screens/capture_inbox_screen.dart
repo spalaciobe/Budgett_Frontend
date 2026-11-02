@@ -8,6 +8,7 @@ import 'package:budgett_frontend/core/app_text.dart';
 import 'package:budgett_frontend/core/parsing/issuer_registry.dart';
 import 'package:budgett_frontend/core/services/message_capture_service.dart';
 import 'package:budgett_frontend/core/utils/error_messages.dart';
+import 'package:budgett_frontend/core/utils/maps_link.dart';
 import 'package:budgett_frontend/data/models/captured_message_model.dart';
 import 'package:budgett_frontend/presentation/providers/message_capture_provider.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
@@ -379,22 +380,33 @@ class CaptureCard extends ConsumerWidget {
                         overflow: TextOverflow.fade,
                         softWrap: false,
                       ),
-                      if (message.locationLabel != null) ...[
+                      if (message.locationLabel != null &&
+                          message.hasLocation) ...[
                         kGapXs,
-                        Row(
-                          children: [
-                            Icon(Icons.place_outlined, size: 12, color: muted),
-                            const SizedBox(width: 3),
-                            Expanded(
-                              child: Text(
-                                _shortPlace(message.locationLabel!),
-                                style: AppText.caption.copyWith(color: muted),
-                                maxLines: 1,
-                                overflow: TextOverflow.fade,
-                                softWrap: false,
+                        // Opens the measured coordinates in Maps.
+                        InkWell(
+                          onTap: () => openInMaps(
+                              message.latitude!, message.longitude!),
+                          child: Row(
+                            children: [
+                              Icon(Icons.place_outlined,
+                                  size: 12, color: theme.colorScheme.primary),
+                              const SizedBox(width: 3),
+                              Expanded(
+                                child: Text(
+                                  _shortPlace(message.locationLabel!),
+                                  style: AppText.caption.copyWith(
+                                    color: theme.colorScheme.primary,
+                                    decoration: TextDecoration.underline,
+                                    decorationColor: theme.colorScheme.primary,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.fade,
+                                  softWrap: false,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ],
                     ],

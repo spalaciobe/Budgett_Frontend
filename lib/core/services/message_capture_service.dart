@@ -4,6 +4,22 @@ import 'package:geocoding/geocoding.dart';
 
 import 'package:budgett_frontend/data/models/captured_message_model.dart';
 
+/// "Calle 20" + "43G-12" → "Calle 20 #43G-12". Null when there is no street.
+///
+/// Geocoders hand the house number back as "43G-12", "#43G-12" or
+/// "No. 43G-12", and sometimes already inside the street name; all of those
+/// collapse to one "#".
+String? formatStreet(String? thoroughfare, String? subThoroughfare) {
+  final street = thoroughfare?.trim() ?? '';
+  if (street.isEmpty) return null;
+  final number = (subThoroughfare ?? '')
+      .trim()
+      .replaceFirst(RegExp(r'^(?:#|n[o°º]\.?)\s*', caseSensitive: false), '');
+  if (number.isEmpty) return street;
+  if (street.toLowerCase().contains(number.toLowerCase())) return street;
+  return '$street #$number';
+}
+
 /// Everything the capture pipeline needs from the platform: permission state,
 /// the native configuration, and the queue of messages the notification
 /// listener and SMS receiver wrote while the app was closed.
@@ -247,12 +263,13 @@ class MessageCaptureService implements CapturePlatform {
       if (placemarks.isEmpty) return null;
       final p = placemarks.first;
 
-      // Street NAME only. `subThoroughfare` is the house number, which is
-      // noise for "where did I pay" and is also what the geocoder echoes back
-      // in `name`, producing labels like "25b-15, Carrera 63 25b-15, …".
-      final street = (p.thoroughfare?.trim().isNotEmpty ?? false)
-          ? p.thoroughfare!.trim()
-          : (p.name?.trim() ?? '');
+      // Built from the parts rather than taken from `name`, which echoes the
+      // house number on its own and produced "25b-15, Carrera 63 25b-15, …".
+      // The number is kept, written the Colombian way ("Calle 20 #43G-12"):
+      // without it the label named a street running across a whole
+      // neighbourhood, not the block the payment happened on.
+      final street = formatStreet(p.thoroughfare, p.subThoroughfare) ??
+          (p.name?.trim() ?? '');
 
       final parts = <String>[
         if (street.isNotEmpty) street,

@@ -374,6 +374,7 @@ CapturedMessage _capturedMessage({
       'occurred_at': '2026-09-17T20:44:00Z',
       'latitude': 4.6851,
       'longitude': -74.0546,
+      'location_accuracy_m': 18.0,
       'location_label': locationLabel,
       'parse_status': parseStatus,
       'issuer_key': 'bancolombia',

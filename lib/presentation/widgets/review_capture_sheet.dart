@@ -9,6 +9,7 @@ import 'package:budgett_frontend/core/parsing/message_kind.dart';
 import 'package:budgett_frontend/core/parsing/preauth_merchants.dart';
 import 'package:budgett_frontend/core/parsing/text_normalizer.dart';
 import 'package:budgett_frontend/core/utils/error_messages.dart';
+import 'package:budgett_frontend/core/utils/maps_link.dart';
 import 'package:budgett_frontend/data/models/account_model.dart';
 import 'package:budgett_frontend/data/models/captured_message_model.dart';
 import 'package:budgett_frontend/data/models/category_model.dart';
@@ -566,23 +567,65 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
         ),
         if (_message.hasLocation) ...[
           kGapLg,
-          Row(
-            children: [
-              Icon(Icons.place_outlined,
-                  size: 16, color: theme.colorScheme.onSurfaceVariant),
-              const SizedBox(width: kSpaceLg),
-              Expanded(
-                child: Text(
-                  _message.locationLabel ??
-                      '${_message.latitude!.toStringAsFixed(5)}, '
-                          '${_message.longitude!.toStringAsFixed(5)}',
-                  style: theme.textTheme.bodySmall,
-                ),
-              ),
-            ],
-          ),
+          _buildLocationLink(theme),
         ],
       ],
+    );
+  }
+
+  /// The place as a link to Maps, pinned on the measured coordinates — the
+  /// address is only the geocoder's nearest guess, so the pin is how to check
+  /// it. The radius says how far off the fix itself may be.
+  Widget _buildLocationLink(ThemeData theme) {
+    final lat = _message.latitude!;
+    final lng = _message.longitude!;
+    final label = _message.locationLabel ??
+        '${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}';
+    final radius = accuracyLabel(_message.locationAccuracyM);
+    final link = theme.colorScheme.primary;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(kSpaceSm),
+      onTap: () async {
+        final opened = await openInMaps(lat, lng);
+        if (!opened && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not open Maps')),
+          );
+        }
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: kSpaceSm),
+        child: Row(
+          children: [
+            Icon(Icons.place_outlined, size: 16, color: link),
+            const SizedBox(width: kSpaceLg),
+            Expanded(
+              child: Text.rich(
+                TextSpan(children: [
+                  TextSpan(
+                    text: label,
+                    style: TextStyle(
+                      color: link,
+                      decoration: TextDecoration.underline,
+                      decorationColor: link,
+                    ),
+                  ),
+                  if (radius != null)
+                    TextSpan(
+                      text: '  $radius',
+                      style: TextStyle(
+                          color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                ]),
+                style: theme.textTheme.bodySmall,
+              ),
+            ),
+            const SizedBox(width: kSpaceSm),
+            Icon(Icons.open_in_new, size: 14, color: link),
+          ],
+        ),
+      ),
     );
   }
 
