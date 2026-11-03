@@ -14,6 +14,33 @@ import '../../core/utils/date_format.dart';
 /// amount field, the date control and the collapsed section are defined once,
 /// a change to the pattern reaches all of them.
 
+/// Converts the amount in [controller] when its COP/USD toggle flips from
+/// [from] to [to], at [usdCop] (the TRM). Flipping the currency used to keep
+/// the digits and so silently change the value — $15.813 became US$15.81.
+///
+/// Without a rate the field is cleared rather than reinterpreted, and the
+/// user is told why.
+void convertAmountOnCurrencyToggle(
+  BuildContext context,
+  TextEditingController controller, {
+  required String from,
+  required String to,
+  required double? usdCop,
+}) {
+  final converted = CurrencyFormatter.convertInputText(
+    controller.text,
+    from: from,
+    to: to,
+    usdCop: usdCop,
+  );
+  controller.text = converted ?? '';
+  if (converted == null) {
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(const SnackBar(
+      content: Text('Exchange rate unavailable — enter the amount again'),
+    ));
+  }
+}
+
 /// Income / Expense / Transfer, as a segmented control.
 ///
 /// It goes first in every form that has it: it decides which of the fields

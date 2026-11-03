@@ -16,8 +16,10 @@ import 'package:budgett_frontend/data/models/category_model.dart';
 import 'package:budgett_frontend/data/models/merchant_alias_model.dart';
 import 'package:budgett_frontend/data/repositories/bank_repository.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
+import 'package:budgett_frontend/presentation/providers/fx_rate_provider.dart';
 import 'package:budgett_frontend/presentation/providers/message_capture_provider.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
+import 'package:budgett_frontend/presentation/widgets/form_fields.dart';
 import 'package:budgett_frontend/presentation/widgets/maps_link.dart';
 import '../../core/utils/date_format.dart';
 
@@ -136,6 +138,8 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
     // the field once the fetch landed.
     ref.watch(captureCardMappingsProvider);
     ref.watch(merchantAliasesProvider);
+    // Kept alive (it auto-disposes) so the COP/USD toggle has a rate to hand.
+    ref.watch(fxRateProvider);
 
     // Seed the account once the list is available: the alias, the card map or
     // the source default may already have picked one during ingestion.
@@ -210,7 +214,14 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
                         DropdownMenuItem(value: 'USD', child: Text('USD')),
                       ],
                       onChanged: (value) {
-                        if (value == null) return;
+                        if (value == null || value == _currency) return;
+                        convertAmountOnCurrencyToggle(
+                          context,
+                          _amountController,
+                          from: _currency,
+                          to: value,
+                          usdCop: ref.read(fxRateProvider).valueOrNull?.rate,
+                        );
                         setState(() => _currency = value);
                       },
                     ),

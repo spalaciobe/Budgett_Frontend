@@ -9,6 +9,7 @@ import 'package:budgett_frontend/data/models/recurring_transaction_model.dart';
 import 'package:budgett_frontend/data/repositories/bank_repository.dart';
 import 'package:budgett_frontend/core/utils/credit_card_calculator.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
+import 'package:budgett_frontend/presentation/providers/fx_rate_provider.dart';
 import 'package:budgett_frontend/presentation/widgets/credit_card_billing_simulator.dart';
 import '../../core/app_theme.dart';
 import '../../core/app_text.dart';
@@ -553,6 +554,8 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
 
   @override
   Widget build(BuildContext context) {
+    // Kept alive (it auto-disposes) so the COP/USD toggle has a rate to hand.
+    ref.watch(fxRateProvider);
     // Swap legs are part of a linked pair (shared swap_group_id) and must be
     // edited together, which this generic dialog doesn't support. Render a
     // read-only explanation instead of crashing on the type dropdown.
@@ -739,10 +742,18 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
                               ButtonSegment(value: 'USD', label: Text('USD')),
                             ],
                             selected: {_currency},
-                            onChanged: (v) => setState(() {
-                              _currency = v;
-                              _amountController.clear();
-                            }),
+                            onChanged: (v) {
+                              if (v == _currency) return;
+                              convertAmountOnCurrencyToggle(
+                                context,
+                                _amountController,
+                                from: _currency,
+                                to: v,
+                                usdCop:
+                                    ref.read(fxRateProvider).valueOrNull?.rate,
+                              );
+                              setState(() => _currency = v);
+                            },
                           ),
                         );
                       }),

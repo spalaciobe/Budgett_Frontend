@@ -7,6 +7,8 @@ import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:budgett_frontend/data/models/account_model.dart';
 import 'package:budgett_frontend/data/models/recurring_transaction_model.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
+import 'package:budgett_frontend/presentation/providers/fx_rate_provider.dart';
+import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import '../../core/app_text.dart';
 import '../../core/utils/date_format.dart';
 import 'package:budgett_frontend/presentation/widgets/form_fields.dart';
@@ -120,6 +122,25 @@ class _EditRecurringTransactionDialogState
     }
   }
 
+  /// This field holds a plain number rather than a formatted amount, so it
+  /// converts here instead of through [convertAmountOnCurrencyToggle].
+  void _convertAmount({required String to}) {
+    final amount = double.tryParse(_amountController.text.replaceAll(',', '.'));
+    if (amount == null || amount == 0) return;
+    final usdCop = ref.read(fxRateProvider).valueOrNull?.rate;
+    if (usdCop == null || usdCop <= 0) {
+      _amountController.clear();
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(const SnackBar(
+        content: Text('Exchange rate unavailable — enter the amount again'),
+      ));
+      return;
+    }
+    final converted = CurrencyFormatter.convert(amount,
+        from: _currency, to: to, usdCop: usdCop);
+    _amountController.text =
+        converted.toStringAsFixed(to == 'USD' ? 2 : 0);
+  }
+
   Future<void> _save() async {
     if (_isLoading) return;
     if (!_formKey.currentState!.validate()) return;
@@ -187,6 +208,8 @@ class _EditRecurringTransactionDialogState
   Widget build(BuildContext context) {
     final accountsAsync = ref.watch(accountsProvider);
     final categoriesAsync = ref.watch(categoriesProvider);
+    // Kept alive (it auto-disposes) so the COP/USD toggle has a rate to hand.
+    ref.watch(fxRateProvider);
 
     return AlertDialog(
       title: const Text('Edit Recurring Transaction'),
@@ -254,7 +277,11 @@ class _EditRecurringTransactionDialogState
                           DropdownMenuItem(value: 'COP', child: Text('COP')),
                           DropdownMenuItem(value: 'USD', child: Text('USD')),
                         ],
-                        onChanged: (v) => setState(() => _currency = v!),
+                        onChanged: (v) {
+                          if (v == null || v == _currency) return;
+                          _convertAmount(to: v);
+                          setState(() => _currency = v);
+                        },
                       ),
                     ),
                   ],

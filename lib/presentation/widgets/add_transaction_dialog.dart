@@ -6,6 +6,7 @@ import 'package:budgett_frontend/core/app_spacing.dart';
 import 'package:budgett_frontend/presentation/utils/currency_formatter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
+import 'package:budgett_frontend/presentation/providers/fx_rate_provider.dart';
 import 'package:budgett_frontend/data/models/recurring_transaction_model.dart';
 import 'package:budgett_frontend/data/models/expense_group_model.dart';
 import '../../core/utils/credit_card_calculator.dart';
@@ -224,10 +225,15 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
   }
 
   void _onCurrencyChanged(String newCurrency) {
-    setState(() {
-      _currency = newCurrency;
-      _amountController.clear();
-    });
+    if (newCurrency == _currency) return;
+    convertAmountOnCurrencyToggle(
+      context,
+      _amountController,
+      from: _currency,
+      to: newCurrency,
+      usdCop: ref.read(fxRateProvider).valueOrNull?.rate,
+    );
+    setState(() => _currency = newCurrency);
   }
 
   double? get _usdApplied {
@@ -711,6 +717,8 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
     final accountsAsync = ref.watch(accountsProvider);
     final categoriesAsync = ref.watch(categoriesProvider);
     final expenseGroupsAsync = ref.watch(expenseGroupsProvider);
+    // Kept alive (it auto-disposes) so the COP/USD toggle has a rate to hand.
+    ref.watch(fxRateProvider);
 
     return PopScope(
       canPop: false,

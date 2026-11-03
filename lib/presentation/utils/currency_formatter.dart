@@ -65,6 +65,42 @@ class CurrencyFormatter {
     }
   }
 
+  /// Re-expresses [amount] from [from] into [to] at [usdCop] (COP per 1 USD,
+  /// the TRM), rounded to the target currency's precision.
+  static double convert(
+    double amount, {
+    required String from,
+    required String to,
+    required double usdCop,
+  }) {
+    if (from == to) return amount;
+    final converted = from == 'USD' ? amount * usdCop : amount / usdCop;
+    return double.parse(converted.toStringAsFixed(to == 'USD' ? 2 : 0));
+  }
+
+  /// The text an amount field should show after its currency toggle flips
+  /// from [from] to [to], so the value is kept rather than the digits being
+  /// reinterpreted in the new currency.
+  ///
+  /// Empty when there is nothing to convert; null when it cannot be converted
+  /// because [usdCop] is unavailable — the caller decides what to do then.
+  static String? convertInputText(
+    String text, {
+    required String from,
+    required String to,
+    required double? usdCop,
+  }) {
+    final amount = parse(text, currency: from);
+    if (amount == 0) return '';
+    if (from == to) return text;
+    if (usdCop == null || usdCop <= 0) return null;
+    return format(
+      convert(amount, from: from, to: to, usdCop: usdCop),
+      currency: to,
+      includeSymbol: false,
+    );
+  }
+
   /// Returns the prefix text for a currency, for use in TextFormField.
   static String prefixFor(String currency) =>
       currency == 'USD' ? 'US\$' : '\$';

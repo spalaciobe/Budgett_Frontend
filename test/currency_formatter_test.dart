@@ -208,4 +208,46 @@ void main() {
       expect(result.selection.baseOffset, result.text.length);
     });
   });
+
+  group('CurrencyFormatter.convertInputText (COP/USD toggle)', () {
+    const trm = 4000.0;
+
+    test('COP to USD divides by the TRM and keeps cents', () {
+      expect(
+        CurrencyFormatter.convertInputText('15.813',
+            from: 'COP', to: 'USD', usdCop: trm),
+        '3.95',
+      );
+    });
+
+    test('USD to COP multiplies by the TRM with no centavos', () {
+      expect(
+        CurrencyFormatter.convertInputText('1,250.50',
+            from: 'USD', to: 'COP', usdCop: trm),
+        '5.002.000',
+      );
+    });
+
+    test('result round-trips through the field formatter and parser', () {
+      final text = CurrencyFormatter.convertInputText('1,250.50',
+          from: 'USD', to: 'COP', usdCop: trm)!;
+      expect(CurrencyFormatter.parse(text, currency: 'COP'), 5002000);
+    });
+
+    test('empty field stays empty, even without a rate', () {
+      expect(
+        CurrencyFormatter.convertInputText('',
+            from: 'COP', to: 'USD', usdCop: null),
+        '',
+      );
+    });
+
+    test('null when the rate is unavailable', () {
+      expect(
+        CurrencyFormatter.convertInputText('15.813',
+            from: 'COP', to: 'USD', usdCop: null),
+        isNull,
+      );
+    });
+  });
 }
