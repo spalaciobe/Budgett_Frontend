@@ -44,6 +44,10 @@ import 'package:budgett_frontend/data/models/merchant_alias_model.dart';
 import 'package:budgett_frontend/data/models/recurring_transaction_model.dart';
 import 'package:budgett_frontend/data/models/transaction_model.dart';
 import 'package:budgett_frontend/data/repositories/finance_repository.dart';
+import 'package:budgett_frontend/data/repositories/bank_repository.dart';
+import 'package:budgett_frontend/data/models/bank_model.dart';
+import 'package:budgett_frontend/core/utils/card_recommendation.dart';
+import 'package:budgett_frontend/presentation/widgets/best_card_today_card.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/presentation/providers/message_capture_provider.dart';
 import 'package:budgett_frontend/presentation/providers/settings_provider.dart';
@@ -342,10 +346,59 @@ class _FakeFinanceRepository extends FinanceRepository {
   @override
   Future<Map<String, double>> getCategoryAccumulatedBalances() async =>
       const {};
+  @override
+  Future<Map<int, ({DateTime cutoff, DateTime payment})>> getBillingCalendar(
+          String accountId, int year) async =>
+      const {};
 }
 
-List<Override> financeOverrides() => [
-      financeRepositoryProvider.overrideWithValue(_FakeFinanceRepository()),
+/// Two credit cards with real cut-off rules, so Home ranks them through the
+/// same providers and calculator the app uses. The fixture accounts above
+/// carry no rules, which only exercises the set-up state.
+class _CardsFinanceRepository extends _FakeFinanceRepository {
+  static Account _card(String id, String name, int cut, int pay,
+          {bool nextMonth = false}) =>
+      Account.fromJson({
+        'id': id,
+        'name': name,
+        'type': 'credit_card',
+        'balance': -350_000,
+        'credit_limit': 6_000_000,
+        'credit_card_details': {
+          'id': 'ccd-$id',
+          'account_id': id,
+          'banco_id': 'bank-1',
+          'tipo_corte': 'fijo',
+          'dia_corte_nominal': cut,
+          'tipo_pago': 'fijo',
+          'dia_pago_nominal': pay,
+          if (nextMonth) 'mes_pago': 'siguiente',
+        },
+      });
+
+  @override
+  Future<List<Account>> getAccounts() async => [
+        ...await super.getAccounts(),
+        _card('cc-bc', 'Mastercard Bancolombia', 15, 30),
+        _card('cc-dv', 'Visa Davivienda', 30, 15, nextMonth: true),
+        _card('cc-nu', 'Nu', 5, 20),
+      ];
+}
+
+final _banks = [
+  Bank(
+    id: 'bank-1',
+    name: 'Bancolombia',
+    code: 'BC',
+    adjustmentRuleCutoff: 'adelantar_dia_habil_anterior',
+    adjustmentRulePayment: 'postergar_dia_habil_siguiente',
+  ),
+];
+
+List<Override> financeOverrides({FinanceRepository? repository}) => [
+      financeRepositoryProvider
+          .overrideWithValue(repository ?? _FakeFinanceRepository()),
+      banksFutureProvider.overrideWith((ref) async => _banks),
     ];
 
 // -- message-capture fixtures -------------------------------------------------
@@ -504,7 +557,12 @@ class _StubCaptureSettings extends CaptureSettingsNotifier {
 class _Target {
   final Widget Function() builder;
   final List<Override> overrides;
-  const _Target(this.builder, {this.overrides = const []});
+
+  /// Runs after the providers settle and before the capture — to reach a
+  /// state only a gesture shows, like the second page of a carousel.
+  final Future<void> Function(WidgetTester tester)? interact;
+
+  const _Target(this.builder, {this.overrides = const [], this.interact});
 }
 
 Widget _wrap(Widget child, {double maxWidth = 380}) => Padding(
@@ -598,10 +656,44 @@ final _targets = <String, _Target>{
         maxWidth: 360,
       )),
 
+  'best_card_today': _Target(() => _wrap(BestCardTodayCard(
+        status: CardRecommendationStatus.ok,
+        ranked: rankCardsForPurchase(
+          accounts: [
+            _CardsFinanceRepository._card('a', 'Mastercard Bancolombia', 15, 30),
+            _CardsFinanceRepository._card('b', 'Visa Davivienda', 30, 15,
+                nextMonth: true),
+            _CardsFinanceRepository._card('c', 'Nu', 5, 20),
+          ],
+          banks: _banks,
+          purchaseDate: DateTime(2026, 11, 16),
+        ),
+      ))),
+  'best_card_today_setup': _Target(() => _wrap(const BestCardTodayCard(
+        status: CardRecommendationStatus.noRules,
+        ranked: [],
+      ))),
+
   // ─── screens (need provider overrides) ──
   'screen_home': _Target(
     () => const HomeScreen(),
-    overrides: financeOverrides(),
+    overrides: financeOverrides(repository: _CardsFinanceRepository()),
+  ),
+  // The month summary's second page on a phone. Desktop has no carousel, so
+  // there the drag lands on the list and the shot matches screen_home.
+  'screen_home_best_card_page': _Target(
+    () => const HomeScreen(),
+    overrides: financeOverrides(repository: _CardsFinanceRepository()),
+    interact: (tester) async {
+      final summary = find.text('left this month');
+      if (summary.evaluate().isEmpty) return;
+      await tester.drag(summary, const Offset(-300, 0));
+      // Long enough for the page snap to finish; pumpAndSettle would wait on
+      // the skeleton shimmer forever.
+      for (var i = 0; i < 15; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+    },
   ),
   // Home when the capture inbox has something waiting: the pill is the only
   // difference, and it has to stay a single row.
@@ -925,6 +1017,8 @@ void main() {
         for (var i = 0; i < 6; i++) {
           await tester.pump(const Duration(milliseconds: 100));
         }
+
+        await entry.value.interact?.call(tester);
 
         final out = await captureBoundary(tester, captureKey, '${entry.key}_$label');
         expect(out.existsSync(), isTrue);

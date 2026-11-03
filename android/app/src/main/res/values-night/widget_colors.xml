@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Lime palette (lib/core/app_palette.dart), dark variant. -->
+<resources>
+    <color name="widget_surface">#FF111111</color>
+    <color name="widget_outline">#FF262626</color>
+    <color name="widget_on_surface">#FFF2F4F0</color>
+    <color name="widget_muted">#FF8E948A</color>
+    <color name="widget_accent">#FFB8FF3C</color>
+</resources>

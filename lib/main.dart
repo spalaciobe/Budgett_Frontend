@@ -7,6 +7,9 @@ import 'package:budgett_frontend/presentation/navigation/app_router.dart';
 import 'package:budgett_frontend/core/app_theme.dart';
 import 'package:budgett_frontend/presentation/providers/settings_provider.dart';
 import 'package:budgett_frontend/core/services/notification_service.dart';
+import 'package:budgett_frontend/core/services/card_widget_service.dart';
+import 'package:budgett_frontend/core/utils/card_recommendation.dart';
+import 'package:budgett_frontend/presentation/providers/card_recommendation_provider.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/core/services/update_checker_service.dart';
 import 'package:budgett_frontend/presentation/providers/update_provider.dart';
@@ -98,6 +101,32 @@ final ccAlertSchedulerProvider = FutureProvider<void>((ref) async {
     daysBefore,
     overrideLookup: (id, y, m) => overrides[id]?[(year: y, month: m)],
   );
+});
+
+/// Pushes the "Best card today" schedule to the Android home-screen widget
+/// whenever the cards, the bank catalog or a billing-calendar override change.
+/// Signing out clears it, so the widget never shows someone else's cards.
+final cardWidgetSyncProvider = FutureProvider<void>((ref) async {
+  const service = CardWidgetService();
+  if (!service.isSupported) return;
+
+  final sessionAsync = ref.watch(_supabaseSessionProvider);
+  if (!sessionAsync.hasValue) return;
+  if (sessionAsync.value == null) {
+    await service.clear();
+    return;
+  }
+
+  // Same inputs as the in-app card, so the two never disagree.
+  final inputs = ref.watch(cardRankingInputsProvider).valueOrNull;
+  if (inputs == null) return;
+
+  await service.update(buildCardWidgetSnapshot(
+    accounts: inputs.accounts,
+    banks: inputs.banks,
+    from: DateTime.now(),
+    overrideLookup: inputs.overrides,
+  ));
 });
 
 /// Processes anything the notification listener / SMS receiver queued while the
@@ -195,6 +224,8 @@ class _BudgettAppState extends ConsumerState<BudgettApp> {
 
     // Watch the scheduler so it runs whenever dependencies change
     ref.watch(ccAlertSchedulerProvider);
+    // Keeps the "Best card today" home-screen widget current.
+    ref.watch(cardWidgetSyncProvider);
     // Catch-up overdue recurring transactions once per session.
     ref.watch(recurringAutoGenProvider);
 

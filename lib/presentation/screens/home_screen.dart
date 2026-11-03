@@ -20,6 +20,10 @@ import 'package:budgett_frontend/core/parsing/message_kind.dart';
 import '../widgets/screen_title.dart';
 import 'capture_inbox_screen.dart';
 import 'package:budgett_frontend/core/app_palette.dart';
+import 'package:budgett_frontend/core/responsive.dart';
+import 'package:budgett_frontend/core/utils/card_recommendation.dart';
+import 'package:budgett_frontend/presentation/providers/card_recommendation_provider.dart';
+import 'package:budgett_frontend/presentation/widgets/best_card_today_card.dart';
 
 String _formatDate(DateTime date) {
   const months = [
@@ -194,6 +198,124 @@ class _MonthSummaryCard extends ConsumerWidget {
         ),
       ),
       ),
+    );
+  }
+}
+
+/// The month summary, plus which credit card to use today.
+///
+/// On desktop the aside has height to spare, so the card sits under the
+/// summary. Below that the aside is stacked on top of the list, and a second
+/// card there would push the list a third of a phone further down — so it is
+/// a second page of the same block instead, one swipe away.
+class _SummaryAside extends ConsumerWidget {
+  const _SummaryAside();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final rec = ref.watch(cardRecommendationsTodayProvider).valueOrNull;
+    // No credit cards at all: nothing to recommend and nothing to set up.
+    final bestCard = rec == null || rec.status == CardRecommendationStatus.noCards
+        ? null
+        : BestCardTodayCard(status: rec.status, ranked: rec.ranked);
+
+    if (context.formFactor == FormFactor.desktop) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const _MonthSummaryCard(),
+          if (bestCard != null) ...[kGapXl, bestCard],
+        ],
+      );
+    }
+    if (bestCard == null) return const _MonthSummaryCard();
+    // One runner-up, not two: both pages take the taller one's height, and
+    // the summary should not grow just to make room for a list.
+    return _SwipePages(pages: [
+      const _MonthSummaryCard(),
+      BestCardTodayCard(
+          status: rec!.status, ranked: rec.ranked, maxRunnersUp: 1),
+    ]);
+  }
+}
+
+/// Full-width pages that swipe sideways and size to the tallest one.
+///
+/// Not a [PageView]: that needs a fixed height, and these cards grow with the
+/// text scale. A paged horizontal scroll over an [IntrinsicHeight] row keeps
+/// both cards the same height without guessing it.
+class _SwipePages extends StatefulWidget {
+  final List<Widget> pages;
+
+  const _SwipePages({required this.pages});
+
+  @override
+  State<_SwipePages> createState() => _SwipePagesState();
+}
+
+class _SwipePagesState extends State<_SwipePages> {
+  final _controller = ScrollController();
+  int _page = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(() {
+      final width = _controller.position.viewportDimension;
+      if (width <= 0) return;
+      final page = (_controller.offset / width).round();
+      if (page != _page) setState(() => _page = page);
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            controller: _controller,
+            scrollDirection: Axis.horizontal,
+            physics: const PageScrollPhysics(),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final page in widget.pages)
+                    SizedBox(width: constraints.maxWidth, child: page),
+                ],
+              ),
+            ),
+          ),
+        ),
+        kGapMd,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            for (var i = 0; i < widget.pages.length; i++)
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                width: i == _page ? 16 : 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: i == _page
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.outlineVariant,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -641,7 +763,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               // history on a phone without making the two any easier to tell
               // apart.
               stackedGap: kSpaceSection / 2,
-              aside: const _MonthSummaryCard(),
+              aside: const _SummaryAside(),
               main: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

@@ -3,6 +3,7 @@ package com.budgett.budgett_frontend
 import com.budgett.budgett_frontend.capture.MessageCaptureBridge
 import com.budgett.budgett_frontend.draft.DraftCaptureBridge
 import com.budgett.budgett_frontend.draft.LocalLlmBridge
+import com.budgett.budgett_frontend.widget.CardWidgetBridge
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -42,6 +43,12 @@ class MainActivity : FlutterActivity() {
             flutterEngine.dartExecutor.binaryMessenger,
             LocalLlmBridge.CHANNEL,
         ).setMethodCallHandler(llm)
+
+        // The "Best card today" home-screen widget's schedule.
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            CardWidgetBridge.CHANNEL,
+        ).setMethodCallHandler(CardWidgetBridge(applicationContext))
     }
 
     override fun onRequestPermissionsResult(

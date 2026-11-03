@@ -123,6 +123,51 @@ class CreditCardCalculator {
     }
   }
 
+  /// Cut-off and payment-due dates for a purchase made on [purchaseDate].
+  ///
+  /// Same cycle assignment as [determineBillingPeriod] (a purchase on the
+  /// cut-off day still belongs to that cycle), but compared by calendar day:
+  /// a purchase at 15:00 on the cut-off day is not "after" a cut-off stored as
+  /// midnight.
+  ///
+  /// [overrideFor] supplies the user-edited `bank_billing_calendar` entry for a
+  /// billing period, when there is one; it wins over the computed dates, as it
+  /// does for payment reminders.
+  static ({DateTime cutoff, DateTime payment}) scheduleForPurchase(
+    DateTime purchaseDate,
+    CreditCardRules rules,
+    Bank bank, {
+    ({DateTime cutoff, DateTime payment})? Function(int year, int month)?
+        overrideFor,
+  }) {
+    final day = _dateOnly(purchaseDate);
+    DateTime cutoffFor(int y, int m) =>
+        overrideFor?.call(y, m)?.cutoff ?? calculateCutoffDate(rules, bank, y, m);
+
+    var year = day.year;
+    var month = day.month;
+    var cutoff = cutoffFor(year, month);
+    if (day.isAfter(_dateOnly(cutoff))) {
+      final next = DateTime(year, month + 1);
+      year = next.year;
+      month = next.month;
+      cutoff = cutoffFor(year, month);
+    }
+
+    final payment = overrideFor?.call(year, month)?.payment ??
+        calculatePaymentDate(rules, bank, cutoff);
+    return (cutoff: _dateOnly(cutoff), payment: _dateOnly(payment));
+  }
+
+  /// Whole calendar days from [from] to [to], ignoring the time of day.
+  /// Counted in UTC so a DST shift can never turn a day into 23 hours.
+  static int daysBetween(DateTime from, DateTime to) =>
+      DateTime.utc(to.year, to.month, to.day)
+          .difference(DateTime.utc(from.year, from.month, from.day))
+          .inDays;
+
+  static DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+
   /// The three billing columns a credit-card transaction carries:
   /// `periodo_facturacion`, `fecha_corte_calculada`, `fecha_pago_calculada`.
   ///

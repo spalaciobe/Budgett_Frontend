@@ -56,6 +56,20 @@
             </intent-filter>
         </receiver>
 
+        <!-- "Best card today" home-screen widget. The app pushes a per-day
+             schedule to it; see widget/BestCardWidgetProvider.kt. -->
+        <receiver
+            android:name=".widget.BestCardWidgetProvider"
+            android:exported="false"
+            android:label="Best card today">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/best_card_widget_info" />
+        </receiver>
+
         <!-- ota_update plugin: lets the downloaded APK be opened by the
              system installer via a FileProvider URI. -->
         <provider
