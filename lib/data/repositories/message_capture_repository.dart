@@ -207,6 +207,9 @@ class MessageCaptureRepository {
     String? expenseGroupId,
     String? accountId,
     String? movementType,
+    /// Null leaves the stored choice alone, so callers that only know the
+    /// classification (editing a movement) do not wipe it.
+    bool? recordInUsd,
     bool autoPost = true,
     int priority = 100,
   }) async {
@@ -222,6 +225,8 @@ class MessageCaptureRepository {
           'expense_group_id': expenseGroupId,
           'account_id': accountId,
           'movement_type': movementType,
+          if (recordInUsd != null)
+            'record_currency': recordInUsd ? 'USD' : null,
           'auto_post': autoPost,
           'priority': priority,
         }, onConflict: 'user_id,match_type,pattern')

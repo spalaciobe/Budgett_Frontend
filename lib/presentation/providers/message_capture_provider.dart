@@ -12,6 +12,7 @@ import 'package:budgett_frontend/data/repositories/bank_repository.dart';
 import 'package:budgett_frontend/data/repositories/message_capture_repository.dart';
 import 'package:budgett_frontend/presentation/providers/auth_provider.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
+import 'package:budgett_frontend/presentation/providers/fx_rate_provider.dart';
 import 'package:budgett_frontend/presentation/providers/settings_provider.dart';
 
 /// Single [MessageCaptureRepository] for the whole app, mirroring
@@ -127,6 +128,10 @@ final captureIngestServiceProvider = Provider<CaptureIngestService>((ref) {
     captureRepo: ref.watch(messageCaptureRepositoryProvider),
     financeRepo: ref.watch(financeRepositoryProvider),
     platform: ref.watch(messageCaptureServiceProvider),
+    // The service, not fxRateProvider: that one auto-disposes, and a `read`
+    // of it from here would drop the fetch as soon as it started.
+    usdCopRate: () async =>
+        (await ref.read(fxRateServiceProvider).getCurrentTrm()).rate,
   );
 });
 

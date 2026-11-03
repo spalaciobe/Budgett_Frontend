@@ -107,13 +107,27 @@ void main() {
     await tester.pumpAndSettle();
 
     // Flip auto-post only.
-    await tester.tap(find.byType(Switch));
+    await tester.tap(find.text('Record without asking'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
 
     expect(repo.aliasUpdates.single.data['auto_post'], false);
+    expect(repo.aliasUpdates.single.data['record_currency'], isNull);
     expect(repo.renames, isEmpty);
+  });
+
+  testWidgets('recording in USD is saved on the rule', (tester) async {
+    final repo = _FakeRepository();
+    await tester.pumpWidget(_host(repo));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Record in USD'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    expect(repo.aliasUpdates.single.data['record_currency'], 'USD');
   });
 
   testWidgets('an empty name cannot be saved', (tester) async {

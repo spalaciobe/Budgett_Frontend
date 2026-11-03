@@ -67,6 +67,7 @@ MerchantAlias _alias({
   String? categoryId = 'cat-food',
   String? accountId,
   bool autoPost = true,
+  String? recordCurrency,
 }) =>
     MerchantAlias(
       id: 'alias-1',
@@ -75,6 +76,7 @@ MerchantAlias _alias({
       categoryId: categoryId,
       accountId: accountId,
       autoPost: autoPost,
+      recordCurrency: recordCurrency,
     );
 
 // ─── fakes ───────────────────────────────────────────────────────────────────
@@ -283,6 +285,7 @@ Future<
   List<Account>? accounts,
   List<RecurringTransaction> recurring = const [],
   String? pendingRecurringId,
+  double? usdCop,
 }) async {
   final captures = _FakeCaptureRepository(
     aliases: aliases,
@@ -298,6 +301,7 @@ Future<
     captureRepo: captures,
     financeRepo: finance,
     platform: _FakePlatform(List.of(queue), locationLabel: locationLabel),
+    usdCopRate: () async => usdCop,
   );
 
   final result = await service.ingest(
@@ -419,6 +423,52 @@ void main() {
         settings: const CaptureSettings(autoPostEnabled: false),
       );
       expect(run.result.pending, 1);
+    });
+  });
+
+  group('a merchant recorded in USD', () {
+    final card = _account(id: 'acc-card', name: 'AMEX', type: 'credit_card');
+
+    test('converts the peso amount at the TRM on a credit card', () async {
+      final run = await _ingest(
+        [_capture()],
+        aliases: [_alias(accountId: 'acc-card', recordCurrency: 'USD')],
+        accounts: [card],
+        usdCop: 4590,
+      );
+
+      expect(run.result.posted, 1);
+      final tx = run.finance.posted.single;
+      expect(tx['currency'], 'USD');
+      expect(tx['amount'], 10.0);
+      // The capture keeps what the bank actually sent.
+      final row = run.captures.inserted.single;
+      expect(row.amount, 45900.0);
+    });
+
+    test('keeps pesos on an account that was debited in pesos', () async {
+      final run = await _ingest(
+        [_capture()],
+        aliases: [_alias(accountId: 'acc-savings', recordCurrency: 'USD')],
+        usdCop: 4590,
+      );
+
+      final tx = run.finance.posted.single;
+      expect(tx['currency'], 'COP');
+      expect(tx['amount'], 45900.0);
+    });
+
+    test('waits for review when there is no rate', () async {
+      final run = await _ingest(
+        [_capture()],
+        aliases: [_alias(accountId: 'acc-card', recordCurrency: 'USD')],
+        accounts: [card],
+      );
+
+      expect(run.result.pending, 1);
+      expect(run.finance.posted, isEmpty);
+      expect(run.captures.updates.last.data['error'],
+          contains('Exchange rate unavailable'));
     });
   });
 

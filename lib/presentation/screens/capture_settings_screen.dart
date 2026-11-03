@@ -690,6 +690,7 @@ class _AliasTile extends ConsumerWidget {
     final details = <String>[
       alias.autoPost ? 'Records itself' : 'Always asks first',
       if (categoryName != null) categoryName,
+      if (alias.recordsInUsd) 'in USD',
       if (alias.hitCount > 0) 'used ${alias.hitCount}×',
       // Last, so it truncates first: the raw text the rule matches on only
       // matters when wondering why a merchant is not being recognised.
@@ -776,6 +777,7 @@ class _EditMerchantSheetState extends ConsumerState<EditMerchantSheet> {
   late final TextEditingController _name =
       TextEditingController(text: widget.alias.displayName);
   late bool _autoPost = widget.alias.autoPost;
+  late bool _recordInUsd = widget.alias.recordsInUsd;
   bool _renamePast = true;
   bool _saving = false;
 
@@ -867,6 +869,21 @@ class _EditMerchantSheetState extends ConsumerState<EditMerchantSheet> {
                 style: AppText.caption.copyWith(color: muted),
               ),
             ),
+            SwitchListTile(
+              value: _recordInUsd,
+              onChanged: (v) => setState(() => _recordInUsd = v),
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Record in USD'),
+              subtitle: Text(
+                // The bank quotes these in pesos, but the card bills them in
+                // dollars — this is what keeps them in the USD debt.
+                _recordInUsd
+                    ? 'Card purchases quoted in pesos are converted at '
+                        "today's TRM."
+                    : 'Recorded in the currency the bank sends.',
+                style: AppText.caption.copyWith(color: muted),
+              ),
+            ),
             if (_renamed && recorded != null && recorded > 0)
               CheckboxListTile(
                 value: _renamePast,
@@ -921,6 +938,7 @@ class _EditMerchantSheetState extends ConsumerState<EditMerchantSheet> {
       await repo.updateAlias(widget.alias.id, {
         'display_name': newName,
         'auto_post': _autoPost,
+        'record_currency': _recordInUsd ? 'USD' : null,
       });
 
       var renamed = 0;

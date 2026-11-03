@@ -108,12 +108,30 @@ class CaptureIngestService {
   final CapturePlatform platform;
   final ExpenseMessageParser parser;
 
+  /// Today's TRM (COP per 1 USD), or null when it cannot be had. Only asked
+  /// for when a merchant is recorded in USD — see [_inRecordCurrency].
+  final Future<double?> Function() usdCopRate;
+
   CaptureIngestService({
     required this.captureRepo,
     required this.financeRepo,
     CapturePlatform? platform,
     this.parser = const ExpenseMessageParser(),
-  }) : platform = platform ?? MessageCaptureService();
+    Future<double?> Function()? usdCopRate,
+  })  : platform = platform ?? MessageCaptureService(),
+        usdCopRate = usdCopRate ?? _noRate;
+
+  static Future<double?> _noRate() async => null;
+
+  /// [usdCopRate], asked at most once per run and never allowed to throw:
+  /// a failed lookup must cost one conversion, not the whole batch.
+  Future<double?> Function() _rateOnce() {
+    Future<double?>? pending;
+    return () => pending ??= usdCopRate().catchError((Object e) {
+          debugPrint('TRM unavailable for capture conversion: $e');
+          return null;
+        });
+  }
 
   /// Drains the queue and processes everything in it.
   ///
@@ -139,6 +157,7 @@ class CaptureIngestService {
     final known = await captureRepo.knownFingerprints();
     final aliases = await captureRepo.getAliases();
     final cardMap = await captureRepo.getCardMappings();
+    final rate = _rateOnce();
 
     final accountsById = {
       for (final account in _flatten(accounts)) account.id: account
@@ -198,6 +217,7 @@ class CaptureIngestService {
           settings: settings,
           recurring: recurring,
           batchCandidates: batchCandidates,
+          rate: rate,
         );
 
         inserted++;
@@ -239,6 +259,7 @@ class CaptureIngestService {
     required CaptureSettings settings,
     required List<RecurringTransaction> recurring,
     required List<DedupCandidate> batchCandidates,
+    required Future<double?> Function() rate,
   }) async {
     final locationLabel = await _describeLocation(capture);
 
@@ -463,10 +484,25 @@ class CaptureIngestService {
 
     if (!canPost) return _Outcome.pending;
 
+    final toPost = await _inRecordCurrency(
+      parsed,
+      alias: alias,
+      account: accountsById[accountId],
+      rate: rate,
+    );
+    if (toPost == null) {
+      // Posting the peso amount would put a dollar charge in the card's COP
+      // balance, so it waits for the rate — or for the user — instead.
+      await captureRepo.updateCapture(message.id, {
+        'error': 'Exchange rate unavailable — review to record it in USD',
+      });
+      return _Outcome.pending;
+    }
+
     try {
       final transactionId = await postTransaction(
         message: message,
-        parsed: parsed,
+        parsed: toPost,
         accountId: accountId!,
         merchantDisplay: merchantDisplay,
         categoryId: alias!.categoryId,
@@ -519,6 +555,7 @@ class CaptureIngestService {
     };
     final banksById = {for (final bank in banks) bank.id: bank};
     final cardMap = await captureRepo.getCardMappings();
+    final rate = _rateOnce();
 
     var applied = 0;
     for (final message in pending) {
@@ -544,11 +581,18 @@ class CaptureIngestService {
         occurredAt: message.occurredAt,
         confidence: message.confidence ?? 1.0,
       );
+      final toPost = await _inRecordCurrency(
+        parsed,
+        alias: alias,
+        account: accountsById[accountId],
+        rate: rate,
+      );
+      if (toPost == null) continue;
 
       try {
         final transactionId = await postTransaction(
           message: message,
-          parsed: parsed,
+          parsed: toPost,
           accountId: accountId,
           merchantDisplay: alias.displayName,
           categoryId: alias.categoryId,
@@ -764,6 +808,47 @@ class CaptureIngestService {
       if (id != null && accountsById.containsKey(id)) return id;
     }
     return null;
+  }
+
+  /// [parsed] in the currency its merchant is recorded in.
+  ///
+  /// Merchants that bill the card in dollars (Uber BV, app stores) are quoted
+  /// in pesos by the bank's alert. Recorded as sent, the charge lands in the
+  /// card's COP balance while the statement carries it as USD debt — so an
+  /// alias marked USD converts the amount at today's TRM.
+  ///
+  /// Only a credit card has a USD debt for the amount to join; any other
+  /// account was debited in pesos and keeps the bank's figure. Returns null
+  /// when the conversion is wanted but there is no rate to do it with.
+  Future<ParsedMessage?> _inRecordCurrency(
+    ParsedMessage parsed, {
+    required MerchantAlias? alias,
+    required Account? account,
+    required Future<double?> Function() rate,
+  }) async {
+    final amount = parsed.amount;
+    if (alias == null ||
+        !alias.recordsInUsd ||
+        account?.type != 'credit_card' ||
+        amount == null ||
+        (parsed.currency ?? 'COP') != 'COP') {
+      return parsed;
+    }
+    final usdCop = await rate();
+    if (usdCop == null || usdCop <= 0) return null;
+    return ParsedMessage(
+      status: parsed.status,
+      occurredAt: parsed.occurredAt,
+      kind: parsed.kind,
+      issuerKey: parsed.issuerKey,
+      amount: double.parse((amount / usdCop).toStringAsFixed(2)),
+      currency: 'USD',
+      merchantRaw: parsed.merchantRaw,
+      merchantKey: parsed.merchantKey,
+      cardLast4: parsed.cardLast4,
+      confidence: parsed.confidence,
+      ignoredReason: parsed.ignoredReason,
+    );
   }
 
   /// Every condition that must hold for a message to be recorded unattended.

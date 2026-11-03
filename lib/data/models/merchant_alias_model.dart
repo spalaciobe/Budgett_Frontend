@@ -18,6 +18,11 @@ class MerchantAlias {
   final String? expenseGroupId;
   final String? accountId;
   final String? movementType;
+
+  /// Currency to record this merchant's purchases in, or null for whatever
+  /// the bank sent. 'USD' is for merchants that bill the card in dollars while
+  /// the alert quotes pesos — see [CaptureIngestService].
+  final String? recordCurrency;
   final bool autoPost;
   final int priority;
   final int hitCount;
@@ -33,6 +38,7 @@ class MerchantAlias {
     this.expenseGroupId,
     this.accountId,
     this.movementType,
+    this.recordCurrency,
     this.autoPost = false,
     this.priority = 100,
     this.hitCount = 0,
@@ -62,6 +68,8 @@ class MerchantAlias {
   /// it to be posted unattended.
   bool get isComplete => categoryId != null;
 
+  bool get recordsInUsd => recordCurrency == 'USD';
+
   factory MerchantAlias.fromJson(Map<String, dynamic> json) => MerchantAlias(
         id: json['id'] as String,
         matchType: (json['match_type'] as String?) ?? 'exact',
@@ -72,6 +80,7 @@ class MerchantAlias {
         expenseGroupId: json['expense_group_id'] as String?,
         accountId: json['account_id'] as String?,
         movementType: json['movement_type'] as String?,
+        recordCurrency: json['record_currency'] as String?,
         autoPost: (json['auto_post'] as bool?) ?? false,
         priority: (json['priority'] as int?) ?? 100,
         hitCount: (json['hit_count'] as int?) ?? 0,

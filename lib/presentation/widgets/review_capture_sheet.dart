@@ -12,6 +12,7 @@ import 'package:budgett_frontend/core/utils/error_messages.dart';
 import 'package:budgett_frontend/core/utils/maps_link.dart';
 import 'package:budgett_frontend/data/models/account_model.dart';
 import 'package:budgett_frontend/data/models/captured_message_model.dart';
+import 'package:budgett_frontend/data/models/fx_rate_model.dart';
 import 'package:budgett_frontend/data/models/category_model.dart';
 import 'package:budgett_frontend/data/models/merchant_alias_model.dart';
 import 'package:budgett_frontend/data/repositories/bank_repository.dart';
@@ -73,6 +74,9 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
   bool _rememberCard = true;
   bool _showRawMessage = false;
   bool _saving = false;
+  /// Whether the merchant's recording currency has been applied yet. It
+  /// waits on the aliases, the account and the TRM, so it runs from build.
+  bool _currencySeeded = false;
 
   CapturedMessage get _message => widget.message;
 
@@ -139,12 +143,13 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
     ref.watch(captureCardMappingsProvider);
     ref.watch(merchantAliasesProvider);
     // Kept alive (it auto-disposes) so the COP/USD toggle has a rate to hand.
-    ref.watch(fxRateProvider);
+    final fxRate = ref.watch(fxRateProvider);
 
     // Seed the account once the list is available: the alias, the card map or
     // the source default may already have picked one during ingestion.
     final accounts = accountsAsync.valueOrNull ?? const <Account>[];
     _accountId ??= _seedAccountId(_flatten(accounts));
+    _seedCurrency(_flatten(accounts), fxRate);
 
     return AlertDialog(
       scrollable: true,
@@ -663,7 +668,9 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
           subtitle: Text(
             key == null
                 ? 'Needs a merchant in the message'
-                : 'Messages for "$key" will be named "${name.isEmpty ? '…' : name}"',
+                : 'Messages for "$key" will be named '
+                    '"${name.isEmpty ? '…' : name}"'
+                    '${_currency == 'USD' ? ' and recorded in USD' : ''}',
             style: AppText.caption,
           ),
           contentPadding: EdgeInsets.zero,
@@ -703,6 +710,42 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
           ),
       ],
     );
+  }
+
+  /// Switches to USD, converting the amount, when this merchant is recorded
+  /// in dollars — the same rule ingestion applies to auto-posted captures, so
+  /// a reviewed one is not filed differently.
+  void _seedCurrency(List<Account> accounts, AsyncValue<FxRate?> fxRate) {
+    if (_currencySeeded) return;
+    final aliases = ref.read(merchantAliasesProvider).valueOrNull;
+    if (aliases == null || fxRate.isLoading || _accountId == null) return;
+    _currencySeeded = true;
+
+    final alias = MerchantAlias.bestMatch(aliases, _merchantKey);
+    final account = accounts.where((a) => a.id == _accountId).firstOrNull;
+    final usdCop = fxRate.valueOrNull?.rate;
+    // Without a rate the peso amount stays as sent; clearing it on open would
+    // lose the one figure the message gave.
+    if (alias == null ||
+        !alias.recordsInUsd ||
+        account?.type != 'credit_card' ||
+        _currency != 'COP' ||
+        usdCop == null) {
+      return;
+    }
+    // Writing the controller notifies the field, which cannot rebuild while
+    // this build is still running.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _currency != 'COP') return;
+      convertAmountOnCurrencyToggle(
+        context,
+        _amountController,
+        from: 'COP',
+        to: 'USD',
+        usdCop: usdCop,
+      );
+      setState(() => _currency = 'USD');
+    });
   }
 
   /// Pre-fills the account, in the same order the ingest pipeline resolves it
@@ -887,6 +930,7 @@ class _ReviewCaptureSheetState extends ConsumerState<ReviewCaptureSheet> {
           movementType: _type == _kReimbursement
               ? null
               : _kindForType().movementType,
+          recordInUsd: _currency == 'USD',
           autoPost: _autoPostNext,
         );
       }
