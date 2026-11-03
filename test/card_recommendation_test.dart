@@ -244,6 +244,7 @@ void main() {
       expect(second['daysToPay'], 45);
       expect(second['due'], '2026-11-30');
       expect(second['dueLabel'], 'Due Mon, Nov 30');
+      expect(second['dueShort'], 'Nov 30');
     });
   });
 }

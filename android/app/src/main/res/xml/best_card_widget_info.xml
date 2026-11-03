@@ -1,16 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- updatePeriodMillis is only the fallback; an alarm after midnight does the
-     daily flip. The layout itself is the preview on Android 12+. -->
+<!-- Two cells wide; resizes between one and two rows (2x1 ↔ 2x2). The
+     provider picks widget_best_card_small for one row.
+     min*/maxResize* are the pre-Android-12 sizing (≈70·n − 30 dp per cell);
+     target*/maxResize* cells are what Android 12+ launchers use.
+     updatePeriodMillis is only the fallback; an alarm after midnight does the
+     daily flip. -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/best_card_widget_description"
     android:initialLayout="@layout/widget_best_card"
-    android:minWidth="180dp"
+    android:minWidth="110dp"
     android:minHeight="110dp"
-    android:minResizeWidth="140dp"
-    android:minResizeHeight="90dp"
+    android:minResizeWidth="110dp"
+    android:minResizeHeight="40dp"
+    android:maxResizeWidth="180dp"
+    android:maxResizeHeight="180dp"
     android:previewLayout="@layout/widget_best_card"
-    android:resizeMode="horizontal|vertical"
-    android:targetCellWidth="3"
+    android:resizeMode="vertical"
+    android:targetCellWidth="2"
     android:targetCellHeight="2"
     android:updatePeriodMillis="3600000"
     android:widgetCategory="home_screen" />

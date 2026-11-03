@@ -112,6 +112,8 @@ Map<String, dynamic> buildCardWidgetSnapshot({
   final cards = creditCardAccounts(accounts);
   final dayKey = DateFormat('yyyy-MM-dd');
   final dueLabel = DateFormat('EEE, MMM d', 'en_US');
+  // For the one-row (2x1) widget, where "Due Tue, Dec 15" does not fit.
+  final dueShort = DateFormat('MMM d', 'en_US');
 
   final entries = <Map<String, dynamic>>[];
   var status = cards.isEmpty
@@ -139,6 +141,7 @@ Map<String, dynamic> buildCardWidgetSnapshot({
               'daysToPay': r.daysToPay,
               'due': dayKey.format(r.payment),
               'dueLabel': 'Due ${dueLabel.format(r.payment)}',
+              'dueShort': dueShort.format(r.payment),
             },
         ],
       });

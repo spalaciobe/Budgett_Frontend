@@ -7,6 +7,9 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.os.Build
+import android.os.Bundle
+import android.util.SizeF
 import android.view.View
 import android.widget.RemoteViews
 import com.budgett.budgett_frontend.MainActivity
@@ -41,17 +44,49 @@ class BestCardWidgetProvider : AppWidgetProvider() {
             scheduleMidnightRefresh(context, ids)
         }
 
+        /** Below this height (dp) the widget is one row tall: 2x1. */
+        private const val COMPACT_MAX_HEIGHT_DP = 100
+
         private fun render(
             context: Context,
             manager: AppWidgetManager,
             ids: IntArray,
         ) {
-            val views = buildViews(context)
-            for (id in ids) manager.updateAppWidget(id, views)
+            for (id in ids) manager.updateAppWidget(id, viewsFor(context, manager, id))
         }
 
-        private fun buildViews(context: Context): RemoteViews {
-            val views = RemoteViews(context.packageName, R.layout.widget_best_card)
+        /**
+         * Android 12+ takes both layouts and swaps them itself as the widget is
+         * resized. Older launchers only report the size, so the layout is
+         * chosen here and re-chosen in onAppWidgetOptionsChanged.
+         */
+        private fun viewsFor(
+            context: Context,
+            manager: AppWidgetManager,
+            id: Int,
+        ): RemoteViews {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                return RemoteViews(
+                    mapOf(
+                        SizeF(100f, 40f) to buildViews(context, compact = true),
+                        SizeF(100f, COMPACT_MAX_HEIGHT_DP.toFloat()) to
+                            buildViews(context, compact = false),
+                    ),
+                )
+            }
+            // In portrait the usable height is MAX_HEIGHT; MIN_HEIGHT is the
+            // landscape one.
+            val height = manager.getAppWidgetOptions(id)
+                .getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0)
+            val compact = height in 1 until COMPACT_MAX_HEIGHT_DP
+            return buildViews(context, compact)
+        }
+
+        private fun buildViews(context: Context, compact: Boolean): RemoteViews {
+            val views = RemoteViews(
+                context.packageName,
+                if (compact) R.layout.widget_best_card_small else R.layout.widget_best_card,
+            )
 
             val open = PendingIntent.getActivity(
                 context,
@@ -97,12 +132,20 @@ class BestCardWidgetProvider : AppWidgetProvider() {
 
             val best = cards.getJSONObject(0)
             val days = best.optInt("daysToPay")
+            val dayWord = if (days == 1) "day" else "days"
             views.setTextViewText(R.id.card_name, best.optString("name"))
-            views.setTextViewText(
-                R.id.days,
-                if (days == 1) "1 day to pay" else "$days days to pay",
-            )
             views.setViewVisibility(R.id.days, View.VISIBLE)
+
+            if (compact) {
+                // One row: the answer and its date, no runners-up.
+                views.setTextViewText(R.id.days, "$days $dayWord")
+                val dueShort = best.optString("dueShort")
+                    .ifEmpty { best.optString("dueLabel").removePrefix("Due ") }
+                views.setTextViewText(R.id.due, "· $dueShort")
+                return views
+            }
+
+            views.setTextViewText(R.id.days, "$days $dayWord to pay")
             views.setTextViewText(R.id.due, best.optString("dueLabel"))
 
             val others = (1 until cards.length()).map {
@@ -170,6 +213,16 @@ class BestCardWidgetProvider : AppWidgetProvider() {
     ) {
         render(context, appWidgetManager, appWidgetIds)
         scheduleMidnightRefresh(context, appWidgetIds)
+    }
+
+    override fun onAppWidgetOptionsChanged(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int,
+        newOptions: Bundle,
+    ) {
+        // Resized between 2x1 and 2x2 (only matters before Android 12).
+        render(context, appWidgetManager, intArrayOf(appWidgetId))
     }
 
     override fun onDisabled(context: Context) {
