@@ -21,11 +21,17 @@ import 'package:budgett_frontend/data/models/credit_card_rules_model.dart';
 import 'package:budgett_frontend/data/models/bank_model.dart';
 import 'package:budgett_frontend/core/utils/credit_card_calculator.dart';
 import 'package:budgett_frontend/core/utils/installment_calculator.dart';
+import 'package:budgett_frontend/core/utils/installment_prepay.dart';
 
 class FinanceRepository {
   final SupabaseClient _client;
 
   FinanceRepository(this._client);
+
+  static String _isoDate(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-'
+      '${d.month.toString().padLeft(2, '0')}-'
+      '${d.day.toString().padLeft(2, '0')}';
 
   String _todayDateString() {
     final now = DateTime.now();
@@ -318,11 +324,14 @@ class FinanceRepository {
   /// settled on the card), so the stored rate matches reality rather than a
   /// guessed market rate.
   ///
-  /// When [closedInstallmentIds] is non-empty, those pending installment
-  /// children are flipped to status='paid' with date=today BEFORE the payment
-  /// transaction is inserted, so their balance effect is already posted when
-  /// the transfer arrives. Caller must have included their amounts inside
-  /// [settleAmount] so the card balance nets to the intended value.
+  /// When [closedInstallmentIds] is non-empty, those installment children are
+  /// settled early BEFORE the payment transaction is inserted: status='paid'
+  /// and date=[date]. Pending cuotas start counting in the balance at that
+  /// point, so the caller must include their amounts inside [settleAmount];
+  /// cuotas that were already 'paid' already count and must not be added.
+  /// With [closeInto], the cuotas also move out of their future billing
+  /// periods into that statement, so the bank's no-longer-billed cuotas stop
+  /// showing up as upcoming charges.
   Future<void> payCreditCard({
     required String sourceAccountId,
     required String cardAccountId,
@@ -333,16 +342,24 @@ class FinanceRepository {
     required DateTime date,
     String? notes,
     List<String> closedInstallmentIds = const [],
+    InstallmentCloseTarget? closeInto,
     String? billingPeriod,
   }) async {
     final userId = _client.auth.currentUser!.id;
-    final dateStr =
-        '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    final dateStr = _isoDate(date);
 
     if (closedInstallmentIds.isNotEmpty) {
       await _client
           .from('transactions')
-          .update({'status': 'paid', 'date': dateStr})
+          .update({
+            'status': 'paid',
+            'date': dateStr,
+            if (closeInto != null) ...{
+              'periodo_facturacion': closeInto.period,
+              'fecha_corte_calculada': _isoDate(closeInto.cutoffDate),
+              'fecha_pago_calculada': _isoDate(closeInto.paymentDate),
+            },
+          })
           .inFilter('id', closedInstallmentIds)
           .eq('user_id', userId);
     }

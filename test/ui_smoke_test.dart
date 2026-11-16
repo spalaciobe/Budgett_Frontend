@@ -48,6 +48,7 @@ import 'package:budgett_frontend/data/repositories/bank_repository.dart';
 import 'package:budgett_frontend/data/models/bank_model.dart';
 import 'package:budgett_frontend/core/utils/card_recommendation.dart';
 import 'package:budgett_frontend/presentation/widgets/best_card_today_card.dart';
+import 'package:budgett_frontend/presentation/widgets/pay_credit_card_dialog.dart';
 import 'package:budgett_frontend/presentation/providers/finance_provider.dart';
 import 'package:budgett_frontend/presentation/providers/message_capture_provider.dart';
 import 'package:budgett_frontend/presentation/providers/settings_provider.dart';
@@ -358,6 +359,67 @@ class _FakeFinanceRepository extends FinanceRepository {
   Future<Map<int, ({DateTime cutoff, DateTime payment})>> getBillingCalendar(
           String accountId, int year) async =>
       const {};
+}
+
+/// A card with rules and two installment purchases whose future cuotas were
+/// created up front (status `paid`), as the app does. The Pay card dialog
+/// must offer to prepay them.
+class _PrepayFinanceRepository extends _FakeFinanceRepository {
+  static final card = Account.fromJson({
+    'id': 'cc-amex',
+    'name': 'AMEX Oro Bancolombia',
+    'type': 'credit_card',
+    'balance': -3_138_518,
+    'credit_limit': 28_000_000,
+    'credit_card_details': {
+      'id': 'ccd-amex',
+      'account_id': 'cc-amex',
+      'banco_id': 'bank-1',
+      'tipo_corte': 'fijo',
+      'dia_corte_nominal': 15,
+      'tipo_pago': 'fijo',
+      'dia_pago_nominal': 2,
+      'mes_pago': 'siguiente',
+    },
+  });
+
+  static Transaction _cuota(String parent, String name, int n, int of,
+      double amount, int monthsAhead) {
+    final now = DateTime.now();
+    final d = DateTime(now.year, now.month + monthsAhead, 15);
+    return Transaction.fromJson({
+      'id': '$parent-$n',
+      'account_id': 'cc-amex',
+      'parent_transaction_id': parent,
+      'amount': amount,
+      'description': '$name - Inst. $n/$of',
+      'date': d.toIso8601String().split('T')[0],
+      'type': 'expense',
+      'status': 'paid',
+      'currency': 'COP',
+      'num_cuotas': of,
+      'installment_number': n,
+      'periodo_facturacion':
+          '${d.year}-${d.month.toString().padLeft(2, '0')}',
+    });
+  }
+
+  @override
+  Future<List<Account>> getAccounts() async =>
+      [...await super.getAccounts(), card];
+
+  @override
+  Future<List<Transaction>> getTransactionsForAccountsSince(
+    List<String> accountIds, {
+    required DateTime since,
+    int maxRows = 2000,
+  }) async =>
+      [
+        for (var n = 2; n <= 4; n++)
+          _cuota('mp', 'Air Fryer + Espejo Mari', n, 6, 88_889.5, n - 1),
+        for (var n = 2; n <= 3; n++)
+          _cuota('rv', 'Payment reversal', n, 12, 5_462.16, n - 1),
+      ];
 }
 
 /// Two credit cards with real cut-off rules, so Home ranks them through the
@@ -748,6 +810,26 @@ final _targets = <String, _Target>{
   'screen_credit_card_details': _Target(
     () => const CreditCardDetailsScreen(accountId: 'acc-2'),
     overrides: financeOverrides(),
+  ),
+  // Future cuotas that already count in the balance must still be offered
+  // for prepayment; captured with the list expanded.
+  'dialog_pay_card_prepay': _Target(
+    () => Scaffold(body: PayCreditCardDialog(card: _PrepayFinanceRepository.card)),
+    overrides: financeOverrides(repository: _PrepayFinanceRepository()),
+    interact: (tester) async {
+      final tile = find.textContaining('Prepay installments');
+      if (tile.evaluate().isEmpty) return;
+      await tester.ensureVisible(tile);
+      await tester.tap(tile);
+      for (var i = 0; i < 5; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      final first = find.byType(CheckboxListTile).first;
+      await tester.tap(first);
+      for (var i = 0; i < 3; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+    },
   ),
   'screen_accounts': _Target(
     () => const AccountsScreen(),

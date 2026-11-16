@@ -5,8 +5,10 @@ import 'package:intl/intl.dart';
 
 import '../../core/app_spacing.dart';
 import '../../core/utils/credit_card_calculator.dart';
+import '../../core/utils/installment_prepay.dart';
 import '../../data/models/account_model.dart';
 import '../../data/models/bank_model.dart';
+import '../../data/models/credit_card_rules_model.dart';
 import '../../data/models/transaction_model.dart';
 import '../../data/repositories/bank_repository.dart';
 import '../providers/finance_provider.dart';
@@ -109,31 +111,51 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
         _closedInstallments.clear();
         _setSettle(_cardMinimum);
       } else if (preset == _PaymentPreset.statementMonth) {
-        _closedInstallments.clear();
-        _setSettle(_statementMonthTotal());
+        final period = _selectedBillingPeriod ?? _currentBillingPeriod();
+        _setSettle(_statementMonthTotal() +
+            (period == null
+                ? 0.0
+                : InstallmentPrepay.addedToPeriod(_closedTxs(), period)));
       } else if (preset == _PaymentPreset.currentBalance) {
-        _setSettle(_cardDebt + _closedInstallmentsTotal());
+        _setSettle(
+            _cardDebt + InstallmentPrepay.uncountedTotal(_closedTxs()));
       } else {
         // custom — leave whatever is in the field
       }
     });
   }
 
-  /// Card's current open billing period (or null when rules / banks
-  /// catalog haven't loaded). Cached per build via [_currentBillingPeriod].
-  String? _currentBillingPeriod() {
+  /// The card's rules and bank, or null while the banks catalog loads.
+  (CreditCardRules, Bank)? _rulesAndBank() {
     final rules = widget.card.creditCardRules;
     if (rules == null) return null;
     final banks = ref.read(banksFutureProvider).valueOrNull;
     if (banks == null) return null;
-    Bank bank;
-    try {
-      bank = banks.firstWhere((b) => b.id == rules.bankId);
-    } catch (_) {
-      return null;
-    }
+    final bank = banks.where((b) => b.id == rules.bankId).firstOrNull;
+    return bank == null ? null : (rules, bank);
+  }
+
+  /// Card's current open billing period (or null when rules / banks
+  /// catalog haven't loaded).
+  String? _currentBillingPeriod() {
+    final rb = _rulesAndBank();
+    if (rb == null) return null;
     return CreditCardCalculator.determineBillingPeriod(
-        DateTime.now(), rules, bank);
+        DateTime.now(), rb.$1, rb.$2);
+  }
+
+  /// Statement that cuotas checked under "Prepay installments" move into:
+  /// the chosen cycle with the Statement preset, otherwise the last cycle
+  /// already cut on the payment date (its total payment is the one that
+  /// includes the deferred balance).
+  String? _prepayTargetPeriod() {
+    if (_preset == _PaymentPreset.statementMonth &&
+        _selectedBillingPeriod != null) {
+      return _selectedBillingPeriod;
+    }
+    final rb = _rulesAndBank();
+    if (rb == null) return null;
+    return InstallmentPrepay.lastClosedPeriod(_selectedDate, rb.$1, rb.$2);
   }
 
   /// Sum of expenses in [period] for the active [_debtCurrency]. Refunds and
@@ -289,22 +311,21 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
     );
   }
 
-  double _closedInstallmentsTotal() {
+  /// Cuotas the user checked under "Prepay installments".
+  List<Transaction> _closedTxs() {
     final txs = ref.read(accountDetailTransactionsProvider(widget.card.id)).valueOrNull ?? [];
-    return txs
-        .where((t) => _closedInstallments.contains(t.id))
-        .fold<double>(0.0, (s, t) => s + t.amount);
+    return txs.where((t) => _closedInstallments.contains(t.id)).toList();
   }
 
-  List<Transaction> _pendingInstallments(List<Transaction> txs) {
-    return txs
-        .where((t) =>
-            t.parentTransactionId != null &&
-            t.status == 'pending' &&
-            t.accountId == widget.card.id)
-        .toList()
-      ..sort((a, b) => a.date.compareTo(b.date));
-  }
+  /// Cuotas this payment can settle early: pending ones and every cuota not
+  /// billed yet on the payment date, whether or not it already counts.
+  List<Transaction> _closableInstallments(List<Transaction> txs) =>
+      InstallmentPrepay.closable(
+        txs,
+        cardId: widget.card.id,
+        currency: _debtCurrency,
+        paymentDate: _selectedDate,
+      );
 
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
@@ -313,7 +334,15 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
       firstDate: DateTime.now().subtract(const Duration(days: 365)),
       lastDate: DateTime.now().add(const Duration(days: 30)),
     );
-    if (picked != null) setState(() => _selectedDate = picked);
+    if (picked == null) return;
+    setState(() {
+      _selectedDate = picked;
+      // A later date can turn a checked cuota into one already billed.
+      final txs = ref.read(accountDetailTransactionsProvider(widget.card.id)).valueOrNull ?? [];
+      final stillClosable = _closableInstallments(txs).map((t) => t.id).toSet();
+      _closedInstallments.removeWhere((id) => !stillClosable.contains(id));
+      _applyPreset(_preset);
+    });
   }
 
   Future<void> _submit() async {
@@ -353,6 +382,13 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
       final billingPeriod = _preset == _PaymentPreset.statementMonth
           ? _selectedBillingPeriod
           : null;
+      final targetPeriod = _prepayTargetPeriod();
+      final rb = _rulesAndBank();
+      final closeInto = _closedInstallments.isEmpty ||
+              targetPeriod == null ||
+              rb == null
+          ? null
+          : InstallmentCloseTarget.forPeriod(targetPeriod, rb.$1, rb.$2);
       await repo.payCreditCard(
         sourceAccountId: _sourceAccountId!,
         cardAccountId: widget.card.id,
@@ -365,6 +401,7 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
             ? null
             : _notesController.text.trim(),
         closedInstallmentIds: _closedInstallments.toList(),
+        closeInto: closeInto,
         billingPeriod: billingPeriod,
       );
 
@@ -395,9 +432,9 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
         .toList();
 
     final installmentsAsync = ref.watch(accountDetailTransactionsProvider(widget.card.id));
-    final pending = installmentsAsync.valueOrNull == null
+    final closable = installmentsAsync.valueOrNull == null
         ? <Transaction>[]
-        : _pendingInstallments(installmentsAsync.value!);
+        : _closableInstallments(installmentsAsync.value!);
 
     // Watch banks so the "Statement" chip rebuilds with the right total
     // once the catalog loads.
@@ -553,25 +590,32 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
                     ),
                   ),
                 ],
-                if (pending.isNotEmpty &&
-                    _preset == _PaymentPreset.currentBalance) ...[
+                // Hidden for Minimum only (which clears the selection): with
+                // Custom the user types the amount, but checked cuotas are
+                // still sent, so they must stay visible.
+                if (closable.isNotEmpty &&
+                    _preset != _PaymentPreset.minimum) ...[
                   kGapXl,
                   ExpansionTile(
                     tilePadding: EdgeInsets.zero,
                     childrenPadding: EdgeInsets.zero,
                     title: Text(
-                      'Close pending installments (${_closedInstallments.length}/${pending.length})',
+                      'Prepay installments (${_closedInstallments.length}/${closable.length})',
                     ),
-                    subtitle: const Text(
-                      'Checked ones are marked paid today and added to the settle amount.',
-                    ),
-                    children: pending.map((t) {
+                    subtitle: Text(_prepayTargetPeriod() == null
+                        ? 'Checked cuotas are settled by this payment.'
+                        : 'Checked cuotas are settled by this payment and move to the ${_formatPeriod(_prepayTargetPeriod()!)} statement.'),
+                    children: closable.map((t) {
                       final checked = _closedInstallments.contains(t.id);
                       return CheckboxListTile(
                         dense: true,
                         contentPadding: EdgeInsets.zero,
+                        // Cuota rows are named "<purchase> - Inst. n/N" when
+                        // created; only add the number when it is missing.
                         title: Text(
-                          '${t.description} · ${t.installmentNumber ?? '?'}/${t.numCuotas ?? '?'}',
+                          t.description.contains('Inst.')
+                              ? t.description
+                              : '${t.description} · ${t.installmentNumber ?? '?'}/${t.numCuotas ?? '?'}',
                         ),
                         subtitle: Text(
                           '${CurrencyFormatter.format(t.amount, currency: t.currency)} · due ${DateFormat.yMMMd().format(t.date)}',
@@ -583,7 +627,7 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
                           } else {
                             _closedInstallments.remove(t.id);
                           }
-                          _applyPreset(_PaymentPreset.currentBalance);
+                          _applyPreset(_preset);
                         }),
                       );
                     }).toList(),
