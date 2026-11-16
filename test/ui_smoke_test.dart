@@ -824,7 +824,9 @@ final _targets = <String, _Target>{
       for (var i = 0; i < 5; i++) {
         await tester.pump(const Duration(milliseconds: 100));
       }
-      final first = find.byType(CheckboxListTile).first;
+      // Second tile: the first one is "Select all". One checked cuota shows
+      // the partial state of "Select all".
+      final first = find.byType(CheckboxListTile).at(1);
       await tester.tap(first);
       for (var i = 0; i < 3; i++) {
         await tester.pump(const Duration(milliseconds: 100));

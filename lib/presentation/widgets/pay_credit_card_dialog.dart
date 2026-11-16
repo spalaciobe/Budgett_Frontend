@@ -605,7 +605,42 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
                     subtitle: Text(_prepayTargetPeriod() == null
                         ? 'Checked cuotas are settled by this payment.'
                         : 'Checked cuotas are settled by this payment and move to the ${_formatPeriod(_prepayTargetPeriod()!)} statement.'),
-                    children: closable.map((t) {
+                    children: [
+                      // Paying a card off usually means every cuota, and a
+                      // long purchase can have a dozen of them.
+                      CheckboxListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        tristate: true,
+                        title: Text(
+                          'Select all',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        value: _closedInstallments.isEmpty
+                            ? false
+                            : closable.every(
+                                    (t) => _closedInstallments.contains(t.id))
+                                ? true
+                                : null,
+                        // Ignore the tristate cycle: a partial selection
+                        // becomes all, and only a full one clears.
+                        onChanged: (_) => setState(() {
+                          final allChecked = closable.every(
+                              (t) => _closedInstallments.contains(t.id));
+                          if (allChecked) {
+                            _closedInstallments.clear();
+                          } else {
+                            _closedInstallments
+                                .addAll(closable.map((t) => t.id));
+                          }
+                          _applyPreset(_preset);
+                        }),
+                      ),
+                      const Divider(height: 1),
+                      ...closable.map((t) {
                       final checked = _closedInstallments.contains(t.id);
                       return CheckboxListTile(
                         dense: true,
@@ -630,7 +665,8 @@ class _PayCreditCardDialogState extends ConsumerState<PayCreditCardDialog> {
                           _applyPreset(_preset);
                         }),
                       );
-                    }).toList(),
+                    }),
+                    ],
                   ),
                 ],
                 kGapLg,
