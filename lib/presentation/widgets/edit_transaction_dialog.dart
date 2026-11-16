@@ -235,7 +235,13 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
     try {
       final accounts = ref.read(accountsProvider).valueOrNull ?? [];
       final account = _flattenAccounts(accounts).firstWhereOrNull((a) => a.id == _selectedAccountId);
-      if (account != null && account.type == 'credit_card' && account.creditCardRules != null) {
+      // Installment cuotas keep the cycle their schedule (or a prepayment)
+      // gave them: they are dated on a cut-off day, which some banks bill in
+      // the next cycle, so re-deriving it from the date would move them.
+      if (account != null &&
+          account.type == 'credit_card' &&
+          account.creditCardRules != null &&
+          widget.transaction.parentTransactionId == null) {
         final bank = await ref.read(bankRepositoryProvider).getBanks().then(
             (banks) => banks.firstWhereOrNull((b) => b.id == account.creditCardRules!.bankId));
         if (bank != null) {

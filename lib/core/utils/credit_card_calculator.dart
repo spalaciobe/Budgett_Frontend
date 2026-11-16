@@ -107,14 +107,25 @@ class CreditCardCalculator {
     return calculatedDate;
   }
 
+  /// Whether a purchase on calendar day [day] is billed in the cycle that
+  /// closes on [cutoff]. Before the cut-off: yes. On the cut-off day itself it
+  /// depends on the bank ([Bank.cutoffDayInNextCycle]). Compared by calendar
+  /// day, so the time of a captured purchase never changes its cycle.
+  static bool inClosingCycle(DateTime day, DateTime cutoff, Bank bank) {
+    final d = _dateOnly(day);
+    final c = _dateOnly(cutoff);
+    if (d.isBefore(c)) return true;
+    return d.isAtSameMomentAs(c) && !bank.cutoffDayInNextCycle;
+  }
+
   /// Determines the billing period for a transaction date
   /// Returns a string like "2026-01"
   static String determineBillingPeriod(DateTime transactionDate, CreditCardRules rules, Bank bank) {
     // 1. Calculate cutoff for the transaction month
     DateTime cutoffThisMonth = calculateCutoffDate(rules, bank, transactionDate.year, transactionDate.month);
 
-    // 2. If transaction is before or on cutoff, it belongs to this month's period
-    if (transactionDate.isBefore(cutoffThisMonth) || transactionDate.isAtSameMomentAs(cutoffThisMonth)) {
+    // 2. Up to the cutoff (see [inClosingCycle]) it belongs to this month's period
+    if (inClosingCycle(transactionDate, cutoffThisMonth, bank)) {
        return "${transactionDate.year}-${transactionDate.month.toString().padLeft(2, '0')}";
     } else {
        // 3. Otherwise it belongs to next month's period
@@ -125,10 +136,8 @@ class CreditCardCalculator {
 
   /// Cut-off and payment-due dates for a purchase made on [purchaseDate].
   ///
-  /// Same cycle assignment as [determineBillingPeriod] (a purchase on the
-  /// cut-off day still belongs to that cycle), but compared by calendar day:
-  /// a purchase at 15:00 on the cut-off day is not "after" a cut-off stored as
-  /// midnight.
+  /// Same cycle assignment as [determineBillingPeriod] (see [inClosingCycle]
+  /// for the cut-off day itself), compared by calendar day.
   ///
   /// [overrideFor] supplies the user-edited `bank_billing_calendar` entry for a
   /// billing period, when there is one; it wins over the computed dates, as it
@@ -147,7 +156,7 @@ class CreditCardCalculator {
     var year = day.year;
     var month = day.month;
     var cutoff = cutoffFor(year, month);
-    if (day.isAfter(_dateOnly(cutoff))) {
+    if (!inClosingCycle(day, cutoff, bank)) {
       final next = DateTime(year, month + 1);
       year = next.year;
       month = next.month;

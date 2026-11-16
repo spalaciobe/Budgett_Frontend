@@ -47,7 +47,7 @@ class CreditCardBillingSubtitle extends ConsumerWidget {
 
         int year;
         int month;
-        if (!transactionDate.isAfter(cutoffThisMonth)) {
+        if (CreditCardCalculator.inClosingCycle(transactionDate, cutoffThisMonth, bank)) {
           year = transactionDate.year;
           month = transactionDate.month;
         } else {
@@ -153,7 +153,7 @@ class CreditCardBillingSimulator extends ConsumerWidget {
     final cutoffThisMonth = effectiveCutoff(transactionDate.year, transactionDate.month);
     int year;
     int month;
-    if (!transactionDate.isAfter(cutoffThisMonth)) {
+    if (CreditCardCalculator.inClosingCycle(transactionDate, cutoffThisMonth, bank)) {
       year = transactionDate.year;
       month = transactionDate.month;
     } else {

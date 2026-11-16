@@ -10,6 +10,10 @@ class Bank {
   final String? logoUrl;
   final bool isActive;
 
+  /// True when the bank bills purchases made on the cut-off day in the NEXT
+  /// cycle instead of the one closing that day (Bancolombia does).
+  final bool cutoffDayInNextCycle;
+
   Bank({
     required this.id,
     required this.name,
@@ -21,6 +25,7 @@ class Bank {
     this.dateChangeFrequency,
     this.logoUrl,
     this.isActive = true,
+    this.cutoffDayInNextCycle = false,
   });
 
   factory Bank.fromJson(Map<String, dynamic> json) {
@@ -35,6 +40,7 @@ class Bank {
       dateChangeFrequency: json['frecuencia_cambio_fecha'],
       logoUrl: json['logo_url'],
       isActive: json['activo'] ?? true,
+      cutoffDayInNextCycle: json['dia_corte_en_siguiente_ciclo'] ?? false,
     );
   }
 }
