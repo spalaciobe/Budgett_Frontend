@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:budgett_frontend/core/utils/card_history_window.dart';
 import 'package:budgett_frontend/data/repositories/finance_repository.dart';
 import 'package:budgett_frontend/data/models/profile_model.dart';
 import 'package:budgett_frontend/data/models/account_model.dart';
@@ -64,6 +65,15 @@ final accountDetailTransactionsProvider = FutureProvider.autoDispose
     orElse: () => throw StateError('Account not found: $accountId'),
   );
   final ids = <String>[account.id, ...account.pockets.map((p) => p.id)];
+  if (account.type == 'credit_card') {
+    // Card screens total each billing period, so load whole periods rather
+    // than the newest N rows (future installment cuotas used to push the
+    // oldest period half out of a 100-row window).
+    final window = CardHistoryWindow.from(DateTime.now());
+    final rows = await repo.getTransactionsForAccountsSince(ids,
+        since: window.fetchFrom);
+    return rows.where(window.keeps).toList();
+  }
   return repo.getTransactionsForAccounts(ids, limit: 100);
 });
 

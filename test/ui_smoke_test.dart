@@ -298,6 +298,14 @@ class _FakeFinanceRepository extends FinanceRepository {
       _transactions;
 
   @override
+  Future<List<Transaction>> getTransactionsForAccountsSince(
+    List<String> accountIds, {
+    required DateTime since,
+    int maxRows = 2000,
+  }) async =>
+      _transactions;
+
+  @override
   Future<double> accountFundedTotal(String accountId) async => 5_000_000;
 
   @override

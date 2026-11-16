@@ -657,6 +657,30 @@ class FinanceRepository {
     return data.map((json) => Transaction.fromJson(json)).toList();
   }
 
+  /// Like [getTransactionsForAccounts], but bounded by date instead of by a
+  /// row count: every row dated on or after [since], future ones included.
+  /// Credit-card screens use it so a billing period is never half-loaded
+  /// (see `CardHistoryWindow`). [maxRows] is only a safety cap.
+  Future<List<Transaction>> getTransactionsForAccountsSince(
+    List<String> accountIds, {
+    required DateTime since,
+    int maxRows = 2000,
+  }) async {
+    if (accountIds.isEmpty) return [];
+    final csv = accountIds.join(',');
+    final sinceStr =
+        '${since.year}-${since.month.toString().padLeft(2, '0')}-${since.day.toString().padLeft(2, '0')}';
+    final List<dynamic> data = await _client
+        .from('transactions')
+        .select()
+        .or('account_id.in.($csv),target_account_id.in.($csv)')
+        .eq('is_installment_parent', false)
+        .gte('date', sinceStr)
+        .order('date', ascending: false)
+        .limit(maxRows);
+    return data.map((json) => Transaction.fromJson(json)).toList();
+  }
+
   /// The individual transactions that make up a category's monthly total on
   /// the Budget screen, for the given [month]/[year]. Mirrors the filters used
   /// by [getSpendingByCategory] / [getIncomeByCategory] so the list reconciles
