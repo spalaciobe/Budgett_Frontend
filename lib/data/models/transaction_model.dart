@@ -103,6 +103,21 @@ class Transaction {
   bool get isCrossCurrencyPayment =>
       targetCurrency != null && targetCurrency != currency;
 
+  /// Currency credited on the target account: [targetCurrency] on a
+  /// cross-currency transfer (e.g. COP paying a card's USD debt), otherwise
+  /// [currency].
+  String get settledCurrency =>
+      isCrossCurrencyPayment ? targetCurrency! : currency;
+
+  /// Amount credited on the target account, in [settledCurrency]. Mirrors the
+  /// balance trigger, which applies `amount / fx_rate` on cross-currency
+  /// transfers.
+  double get settledAmount {
+    final rate = fxRate;
+    if (!isCrossCurrencyPayment || rate == null || rate == 0) return amount;
+    return amount / rate;
+  }
+
   bool get isInstallmentChild => parentTransactionId != null;
   bool get isInstallment => isInstallmentParent || isInstallmentChild;
 

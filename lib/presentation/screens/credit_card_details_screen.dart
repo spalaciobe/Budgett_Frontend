@@ -193,7 +193,13 @@ class CreditCardDetailsBody extends ConsumerWidget {
                 } else {
                   period = t.billingPeriod ?? 'Unassigned';
                 }
-                final key = '$period::${t.currency}';
+                // A COP payment of the card's USD debt belongs with the USD
+                // cycle: group payments by the currency they settle on the
+                // card, not the currency that left the source account.
+                final currency = t.targetAccountId == freshAccount.id
+                    ? t.settledCurrency
+                    : t.currency;
+                final key = '$period::$currency';
                 grouped.putIfAbsent(key, () => []).add(t);
               }
               final sortedKeys = grouped.keys.toList()
@@ -234,7 +240,9 @@ class CreditCardDetailsBody extends ConsumerWidget {
                 double paymentsTotal = 0;
                 for (final t in periodTransactions) {
                   if (t.type == 'transfer') {
-                    paymentsTotal += t.amount;
+                    paymentsTotal += t.targetAccountId == freshAccount.id
+                        ? t.settledAmount
+                        : t.amount;
                   } else if (t.type == 'income') {
                     chargesTotal -= t.amount;
                   } else {
