@@ -26,6 +26,13 @@ class BudgetComparisonWidget extends StatefulWidget {
   final List<SubCategory>? subCategories;
   final Map<String, double>? subCategorySpending;
 
+  /// Budget per sub-category for the month, keyed by sub-category id.
+  final Map<String, double>? subCategoryBudgets;
+
+  /// True when [budgetAmount] is just the sum of the sub-category budgets
+  /// (no larger category-level budget overrides it).
+  final bool budgetFromSubcategories;
+
   const BudgetComparisonWidget({
     super.key,
     required this.categoryName,
@@ -41,6 +48,8 @@ class BudgetComparisonWidget extends StatefulWidget {
     this.accumulatedBalance,
     this.subCategories,
     this.subCategorySpending,
+    this.subCategoryBudgets,
+    this.budgetFromSubcategories = false,
   });
 
   @override
@@ -247,6 +256,20 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
     final bool hasSubs = widget.subCategories != null &&
         widget.subCategories!.isNotEmpty;
 
+    // Money in the category budget not assigned to any sub-category, and the
+    // spending that isn't covered by a sub-category budget (either untagged
+    // or tagged with a sub-category without its own budget).
+    final subBudgets = widget.subCategoryBudgets ?? const <String, double>{};
+    final double assigned =
+        subBudgets.values.fold<double>(0.0, (sum, v) => sum + v);
+    final double unassigned = subBudgets.isEmpty
+        ? 0.0
+        : (widget.budgetAmount - assigned).clamp(0.0, double.infinity);
+    final double spentInBudgetedSubs = subBudgets.keys.fold<double>(
+        0.0, (sum, id) => sum + (widget.subCategorySpending?[id] ?? 0.0));
+    final double unassignedSpent = (widget.spentAmount - spentInBudgetedSubs)
+        .clamp(0.0, double.infinity);
+
     return Card(
       margin: const EdgeInsets.only(bottom: kSpaceLg),
       elevation: 2,
@@ -423,6 +446,17 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                               style:
                                   const TextStyle(fontWeight: FontWeight.bold),
                             ),
+                            if (widget.budgetFromSubcategories)
+                              Text(
+                                'Sum of subcategories',
+                                maxLines: 1,
+                                overflow: TextOverflow.fade,
+                                style: TextStyle(
+                                    fontSize: 10,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant),
+                              ),
                           ],
                         ),
                       ),
@@ -571,38 +605,24 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
                           ? CrossFadeState.showFirst
                           : CrossFadeState.showSecond,
                       firstChild: Column(
-                        children: widget.subCategories!.map((sub) {
-                          final amount =
-                              widget.subCategorySpending?[sub.id] ?? 0.0;
-                          return Padding(
-                            padding:
-                                const EdgeInsets.symmetric(vertical: 2),
-                            child: Row(
-                              mainAxisAlignment:
-                                  MainAxisAlignment.spaceBetween,
-                              children: [
-                                Padding(
-                                  padding:
-                                      const EdgeInsets.only(left: 12.0),
-                                  child: Text(
-                                    sub.name,
-                                    style: TextStyle(
-                                        fontSize: 12,
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSurfaceVariant),
-                                  ),
-                                ),
-                                Text(
-                                  CurrencyFormatter.format(amount),
-                                  style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500),
-                                ),
-                              ],
+                        children: [
+                          for (final sub in widget.subCategories!)
+                            _SubCategoryRow(
+                              name: sub.name,
+                              spent:
+                                  widget.subCategorySpending?[sub.id] ?? 0.0,
+                              budget: widget.subCategoryBudgets?[sub.id],
+                              isIncome: widget.isIncome,
                             ),
-                          );
-                        }).toList(),
+                          if (unassigned > 0)
+                            _SubCategoryRow(
+                              name: 'Unassigned',
+                              spent: unassignedSpent,
+                              budget: unassigned,
+                              isIncome: widget.isIncome,
+                              italic: true,
+                            ),
+                        ],
                       ),
                       secondChild: const SizedBox.shrink(),
                     ),
@@ -612,6 +632,96 @@ class _BudgetComparisonWidgetState extends State<BudgetComparisonWidget> {
             ),
             secondChild: const SizedBox.shrink(),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One sub-category line inside an expanded category card: its spending and,
+/// when it has its own budget, "spent / budget" plus a thin progress bar.
+class _SubCategoryRow extends StatelessWidget {
+  final String name;
+  final double spent;
+  final double? budget;
+  final bool isIncome;
+  final bool italic;
+
+  const _SubCategoryRow({
+    required this.name,
+    required this.spent,
+    required this.budget,
+    required this.isIncome,
+    this.italic = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final hasBudget = budget != null && budget! > 0;
+    final over = hasBudget && spent > budget!;
+    final progress = hasBudget ? (spent / budget!).clamp(0.0, 1.0) : 0.0;
+    final Color barColor = isIncome
+        ? (progress >= 1.0 ? context.semantic.positive : context.semantic.warning)
+        : over
+            ? scheme.error
+            : progress > 0.9
+                ? context.semantic.warning
+                : scheme.primary;
+
+    return Padding(
+      padding: const EdgeInsets.only(left: 12, top: 3, bottom: 3),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: scheme.onSurfaceVariant,
+                    fontStyle: italic ? FontStyle.italic : null,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: CurrencyFormatter.format(spent),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w500,
+                        color: !isIncome && over ? scheme.error : null,
+                      ),
+                    ),
+                    if (hasBudget)
+                      TextSpan(
+                        text: ' / ${CurrencyFormatter.format(budget!)}',
+                        style: TextStyle(color: scheme.onSurfaceVariant),
+                      ),
+                  ],
+                ),
+                style: const TextStyle(fontSize: 12),
+              ),
+            ],
+          ),
+          if (hasBudget) ...[
+            const SizedBox(height: 3),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(2),
+              child: LinearProgressIndicator(
+                value: progress,
+                backgroundColor: scheme.surfaceContainerHighest,
+                color: barColor,
+                minHeight: 3,
+              ),
+            ),
+          ],
         ],
       ),
     );

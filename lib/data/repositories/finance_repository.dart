@@ -182,16 +182,67 @@ class FinanceRepository {
   }
 
   // Budgets
+  /// Effective budgets for [month]/[year], one per category: the explicit
+  /// category budget merged with its sub-category budgets (see
+  /// [Budget.effectiveAmount]). Categories that only have sub-category
+  /// budgets get a synthesized entry with an empty [Budget.id].
   Future<List<Budget>> getBudgets(int month, int year) => _withRetry(() async {
         final userId = _client.auth.currentUser!.id;
-        final List<dynamic> data = await _client
-            .from('budgets')
-            .select()
-            .eq('user_id', userId)
-            .eq('month', month)
-            .eq('year', year);
-        return data.map((json) => Budget.fromJson(json)).toList();
+        final results = await Future.wait([
+          _client
+              .from('budgets')
+              .select()
+              .eq('user_id', userId)
+              .eq('month', month)
+              .eq('year', year),
+          _client
+              .from('sub_category_budgets')
+              .select('category_id, sub_category_id, amount')
+              .eq('user_id', userId)
+              .eq('month', month)
+              .eq('year', year),
+        ]);
+        return mergeBudgets(
+          categoryRows: List<Map<String, dynamic>>.from(results[0]),
+          subCategoryRows: List<Map<String, dynamic>>.from(results[1]),
+          month: month,
+          year: year,
+        );
       }, 'Error fetching budgets');
+
+  /// Pure merge of `budgets` and `sub_category_budgets` rows into one
+  /// effective [Budget] per category. Exposed for tests.
+  static List<Budget> mergeBudgets({
+    required List<Map<String, dynamic>> categoryRows,
+    required List<Map<String, dynamic>> subCategoryRows,
+    required int month,
+    required int year,
+  }) {
+    final explicit = <String, Map<String, dynamic>>{
+      for (final row in categoryRows) row['category_id'] as String: row,
+    };
+    final subs = <String, Map<String, double>>{};
+    for (final row in subCategoryRows) {
+      final amount = (row['amount'] as num).toDouble();
+      if (amount <= 0) continue;
+      subs.putIfAbsent(row['category_id'] as String, () => {})[
+          row['sub_category_id'] as String] = amount;
+    }
+
+    return [
+      for (final categoryId in {...explicit.keys, ...subs.keys})
+        Budget.effective(
+          id: (explicit[categoryId]?['id'] as String?) ?? '',
+          categoryId: categoryId,
+          month: month,
+          year: year,
+          categoryAmount: explicit[categoryId] == null
+              ? null
+              : (explicit[categoryId]!['amount'] as num).toDouble(),
+          subCategoryBudgets: subs[categoryId] ?? const {},
+        ),
+    ];
+  }
 
   // ── Billing Calendar (manual overrides) ─────────────────────────────────
 
@@ -247,6 +298,62 @@ class FinanceRepository {
      }, onConflict: 'category_id, month, year, user_id');
   }
 
+  /// Removes the explicit category budget for [month]/[year], so the
+  /// category's budget falls back to the sum of its sub-categories.
+  Future<void> deleteBudget(String categoryId, int month, int year) async {
+    final userId = _client.auth.currentUser!.id;
+    await _client
+        .from('budgets')
+        .delete()
+        .eq('user_id', userId)
+        .eq('category_id', categoryId)
+        .eq('month', month)
+        .eq('year', year);
+  }
+
+  /// Saves the sub-category budgets of [categoryId] for [month]/[year].
+  /// Entries with an amount > 0 are upserted; sub-categories mapped to null
+  /// or 0 have their budget removed. Sub-categories not in [amounts] are left
+  /// untouched.
+  Future<void> setSubCategoryBudgets(
+    String categoryId,
+    int month,
+    int year,
+    Map<String, double?> amounts,
+  ) async {
+    final userId = _client.auth.currentUser!.id;
+    final toSave = <Map<String, dynamic>>[];
+    final toClear = <String>[];
+    amounts.forEach((subId, amount) {
+      if (amount != null && amount > 0) {
+        toSave.add({
+          'user_id': userId,
+          'category_id': categoryId,
+          'sub_category_id': subId,
+          'amount': amount,
+          'month': month,
+          'year': year,
+        });
+      } else {
+        toClear.add(subId);
+      }
+    });
+
+    if (toSave.isNotEmpty) {
+      await _client.from('sub_category_budgets').upsert(toSave,
+          onConflict: 'sub_category_id, month, year, user_id');
+    }
+    if (toClear.isNotEmpty) {
+      await _client
+          .from('sub_category_budgets')
+          .delete()
+          .eq('user_id', userId)
+          .eq('month', month)
+          .eq('year', year)
+          .inFilter('sub_category_id', toClear);
+    }
+  }
+
   /// Copia los presupuestos del mes anterior al mes/año indicado.
   /// Si ya existen presupuestos para ese mes, los sobreescribe (upsert).
   /// Retorna el número de presupuestos copiados.
@@ -258,13 +365,19 @@ class FinanceRepository {
     if (previous.isEmpty) return 0;
 
     for (final budget in previous) {
-      await setBudget(Budget(
-        id: '',
-        categoryId: budget.categoryId,
-        amount: budget.amount,
-        month: month,
-        year: year,
-      ));
+      if (budget.categoryAmount != null) {
+        await setBudget(Budget(
+          id: '',
+          categoryId: budget.categoryId,
+          amount: budget.categoryAmount!,
+          month: month,
+          year: year,
+        ));
+      }
+      if (budget.subCategoryBudgets.isNotEmpty) {
+        await setSubCategoryBudgets(
+            budget.categoryId, month, year, budget.subCategoryBudgets);
+      }
     }
     return previous.length;
   }
@@ -947,17 +1060,10 @@ class FinanceRepository {
     return income;
   }
 
+  /// Sum of the effective category budgets (see [getBudgets]).
   Future<double> getTotalBudgeted(int month, int year) async {
-    final userId = _client.auth.currentUser!.id;
-    final result = await _client
-        .from('budgets')
-        .select('amount')
-        .eq('user_id', userId)
-        .eq('month', month)
-        .eq('year', year);
-    
-    if (result.isEmpty) return 0.0;
-    return result.fold<double>(0.0, (sum, item) => sum + (item['amount'] as num).toDouble());
+    final budgets = await getBudgets(month, year);
+    return budgets.fold<double>(0.0, (sum, b) => sum + b.amount);
   }
 
   // Update and Delete Methods

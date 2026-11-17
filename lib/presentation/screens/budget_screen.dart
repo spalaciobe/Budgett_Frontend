@@ -10,6 +10,7 @@ import 'package:budgett_frontend/presentation/widgets/edit_budget_dialog.dart';
 import 'package:budgett_frontend/presentation/widgets/budget_comparison_widget.dart';
 import 'package:budgett_frontend/presentation/widgets/category_transactions_dialog.dart';
 import 'package:budgett_frontend/presentation/widgets/edit_category_dialog.dart';
+import 'package:budgett_frontend/data/models/budget_model.dart';
 import 'package:budgett_frontend/data/models/category_model.dart';
 import 'package:budgett_frontend/data/models/category_spending.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -327,10 +328,9 @@ class BudgetScreen extends ConsumerWidget {
                         nonSavingsCategories.where(isEmptyCat).toList();
 
                     Widget buildRow(Category cat) {
-                      final budget = budgets.cast<dynamic>().firstWhere(
-                            (b) => b.categoryId == cat.id,
-                            orElse: () => null,
-                          );
+                      final Budget? budget = budgets
+                          .where((b) => b.categoryId == cat.id)
+                          .firstOrNull;
                       final actualSpent = cat.type == 'income'
                           ? (incomeFlows[cat.id]?.total ?? 0.0)
                           : (spending[cat.id]?.total ?? 0.0);
@@ -354,6 +354,10 @@ class BudgetScreen extends ConsumerWidget {
                             : null,
                         subCategories: cat.subCategories,
                         subCategorySpending: subSpending,
+                        subCategoryBudgets: budget?.subCategoryBudgets,
+                        budgetFromSubcategories: budget != null &&
+                            budget.subCategoryBudgets.isNotEmpty &&
+                            budget.amount <= budget.subCategoryTotal,
                         onEditBudget: () {
                           showDialog(
                             context: context,
@@ -362,7 +366,10 @@ class BudgetScreen extends ConsumerWidget {
                               categoryName: cat.name,
                               month: selectedDate.month,
                               year: selectedDate.year,
-                              currentAmount: budget?.amount,
+                              currentAmount: budget?.categoryAmount,
+                              subCategories: cat.subCategories ?? const [],
+                              currentSubBudgets:
+                                  budget?.subCategoryBudgets ?? const {},
                               categoryType: cat.type,
                               categoryIcon: cat.icon,
                               categoryColor: cat.color,

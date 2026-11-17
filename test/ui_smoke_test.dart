@@ -68,6 +68,7 @@ import 'package:budgett_frontend/presentation/screens/recurring_transactions_scr
 import 'package:budgett_frontend/data/models/sub_category_model.dart';
 import 'package:budgett_frontend/presentation/widgets/account_card.dart';
 import 'package:budgett_frontend/presentation/widgets/budget_comparison_widget.dart';
+import 'package:budgett_frontend/presentation/widgets/edit_budget_dialog.dart';
 import 'package:budgett_frontend/presentation/widgets/investment_holding_card.dart';
 import 'package:budgett_frontend/presentation/widgets/portfolio_donut_chart.dart';
 import 'package:budgett_frontend/core/parsing/expense_draft.dart';
@@ -712,6 +713,66 @@ final _targets = <String, _Target>{
         ),
         maxWidth: 440,
       )),
+  // Sub-category budgets: "spent / budget" per line, plus the part of the
+  // category budget not assigned to any sub-category. Expanded so the rows show.
+  'budget_comparison_sub_budgets': _Target(
+    () => _wrap(
+      BudgetComparisonWidget(
+        categoryName: 'Family support',
+        budgetAmount: 350000,
+        spentAmount: 291983,
+        color: const Color(0xFF3F51B5),
+        onEditBudget: () {},
+        onEditCategory: () {},
+        onViewTransactions: () {},
+        subCategories: [
+          SubCategory.fromJson(
+              {'id': 's1', 'category_id': 'c1', 'name': 'Health insurance'}),
+          SubCategory.fromJson(
+              {'id': 's2', 'category_id': 'c1', 'name': 'Allowance'}),
+          SubCategory.fromJson(
+              {'id': 's3', 'category_id': 'c1', 'name': 'Others'}),
+          SubCategory.fromJson(
+              {'id': 's4', 'category_id': 'c1', 'name': 'Groceries'}),
+        ],
+        subCategorySpending: const {'s1': 91983, 's2': 100000, 's3': 100000},
+        subCategoryBudgets: const {'s1': 92000, 's2': 100000, 's3': 80000},
+      ),
+      maxWidth: 440,
+    ),
+    interact: (tester) async {
+      await tester.tap(find.byIcon(Icons.expand_more).first);
+      for (var i = 0; i < 4; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+    },
+  ),
+  'dialog_edit_budget_sub_categories': _Target(
+    () => Scaffold(
+      body: EditBudgetDialog(
+        categoryId: 'c1',
+        categoryName: 'Family support',
+        month: 11,
+        year: 2026,
+        currentAmount: 350000,
+        categoryType: 'expense',
+        categoryIcon: 'family_restroom',
+        categoryColor: '0xFF3F51B5',
+        subCategories: [
+          SubCategory.fromJson(
+              {'id': 's1', 'category_id': 'c1', 'name': 'Health insurance'}),
+          SubCategory.fromJson(
+              {'id': 's2', 'category_id': 'c1', 'name': 'Allowance'}),
+          SubCategory.fromJson(
+              {'id': 's3', 'category_id': 'c1', 'name': 'Others'}),
+          SubCategory.fromJson(
+              {'id': 's4', 'category_id': 'c1', 'name': 'Groceries'}),
+        ],
+        currentSubBudgets: const {'s1': 92000, 's2': 100000, 's3': 80000},
+      ),
+    ),
+    overrides: financeOverrides(),
+  ),
   'portfolio_donut_chart': _Target(() => _wrap(
         const PortfolioDonutChart(
           centerLabel: 'Total',
